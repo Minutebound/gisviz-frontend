@@ -1,0 +1,140 @@
+@import "tailwindcss";
+
+/* 1. Tailwind v4 Custom Theme Variables */
+@theme {
+  --color-gisviz-ink: var(--ink);
+  --color-gisviz-ink-soft: var(--ink-soft);
+  --color-gisviz-paper: var(--paper);
+  --color-gisviz-canvas: var(--canvas);
+  --color-gisviz-card: var(--card);
+  --color-gisviz-rail: var(--rail);
+  --color-gisviz-rail-soft: var(--rail-soft);
+  --color-gisviz-accent: var(--accent);
+  --color-gisviz-accent-soft: var(--accent-soft);
+  --color-gisviz-survey: var(--survey);        /* warm topographic secondary accent */
+  --color-gisviz-survey-soft: var(--survey-soft);
+  --color-gisviz-border: var(--border);
+  --color-gisviz-grid: var(--grid);            /* graticule / hairline */
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-sora), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, SFMono-Regular, monospace;
+}
+
+/* 2. Light & Dark palettes — richer depth, dual accent (emerald + survey amber) */
+@layer base {
+  :root {
+    --ink: #14201b;          /* deep forest, high legibility */
+    --ink-soft: #5d7268;     /* muted sage-gray */
+    --paper: #f5f8f6;        /* elevated surface */
+    --canvas:#f2eee3;       /* pale sage page background */
+    --card: #ffffff;         /* crisp white plates */
+    --rail: #14201b;
+    --rail-soft: #d8e8de;    /* light tinted hover */
+    --accent: #f65821;       /* refined emerald — slightly deeper, less neon */
+    --accent-soft: #d3f0e3;  /* emerald wash for fills */
+    --survey: #c2691f;       /* warm topographic amber — the cartographic counterpoint */
+    --survey-soft: #f6e6d4;
+    --border: #cbd9d1;       /* tinted sage border */
+    --grid: #b9cdc2;         /* graticule hairline */
+  }
+
+  .dark {
+    --ink: #e8f1ec;          /* crisp near-white */
+    --ink-soft: #8ba499;     /* muted sage-gray */
+    --paper: #14201b;        /* elevated dark */
+    --canvas: #0c1611;       /* deep teal-forest (not flat black — has hue) */
+    --card: #14241c;         /* slightly lifted card */
+    --rail: #0c1611;
+    --rail-soft: #0c3b2b;    /* dark emerald hover */
+    --accent: #f65821;       /* vivid emerald that pops on deep teal */
+    --accent-soft: #0e3429;  /* emerald wash for dark fills */
+    --survey: #e3923f;       /* warm amber, glows against teal */
+    --survey-soft: #3a2a17;
+    --border: #21372c;       /* subtle dark border */
+    --grid: #1c3025;         /* graticule hairline (dark) */
+  }
+
+  button{
+    cursor: pointer;
+  }
+}
+
+/* 3. Base background + ambient cartographic graticule */
+body {
+  font-size:16px;           /* default base font size */
+  background-color: var(--card);
+  background-image:
+    /* soft emerald glow top-right */
+    radial-gradient(
+      1200px 518px at 82% -12%,
+      color-mix(in srgb, var(--accent) 16%, transparent),
+      transparent 60%
+    ),
+    /* faint amber counter-glow bottom-left */
+    radial-gradient(
+      900px 480px at -8% 108%,
+      color-mix(in srgb, var(--survey) 9%, transparent),
+      transparent 60%
+    ),
+    /* ambient graticule grid — the map underlay */
+    linear-gradient(to right, var(--grid) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid) 1px, transparent 1px);
+  background-size: auto, auto, 64px 64px, 64px 64px;
+  background-position: 0 0, 0 0, 0 0, 0 0;
+  color: var(--ink);
+  min-height: 100vh;
+  transition-property: color, background-color;
+  transition-duration: 300ms;
+}
+
+/* Tone the graticule down so it reads as texture, not noise */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background: color-mix(in srgb, var(--canvas) 78%, transparent);
+}
+body > * { position: relative; z-index: 1; }
+
+/* 4. Cartographic helpers */
+
+/* Corner registration / crop marks for the map plate */
+.reg-mark {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border-color: var(--survey);
+  z-index: 20;
+  opacity: 0.85;
+  pointer-events: none;
+}
+.reg-tl { top: 12px; left: 12px; border-top: 2px solid; border-left: 2px solid; }
+.reg-tr { top: 12px; right: 12px; border-top: 2px solid; border-right: 2px solid; }
+.reg-bl { bottom: 12px; left: 12px; border-bottom: 2px solid; border-left: 2px solid; }
+.reg-br { bottom: 12px; right: 12px; border-bottom: 2px solid; border-right: 2px solid; }
+
+/* Accessibility: visible keyboard focus everywhere */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* Subtle plate lift on hover */
+@keyframes plate-rise {
+  from { transform: translateY(2px); opacity: 0; }
+  to   { transform: translateY(0);   opacity: 1; }
+}
+.plate-enter { animation: plate-rise 380ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+

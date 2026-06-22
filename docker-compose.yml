@@ -1,0 +1,21 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gisviz-frontend
+    restart: always
+    env_file:
+      - .env.frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app                  # Hot-reload your code
+      - /app/node_modules       # Prevent Mac/Linux module crashes
+      - /app/.next              # Prevent Next.js build cache crashes
+    networks:
+      - gisviz-network
+
+networks:
+  gisviz-network:
+    external: true
