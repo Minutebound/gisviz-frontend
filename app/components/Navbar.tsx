@@ -1,34 +1,22 @@
 'use client'
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
-import axios from 'axios'
-import { Bell, Home, Compass, Map as MapIcon, Bookmark, Settings, Sun, Moon, Menu, X, Search } from 'lucide-react'
+import { Bell, Home, Compass, Map as MapIcon, Bookmark, Settings, LogOut, Sun, Moon, Menu, X } from 'lucide-react'
 import Sidebar from './Sidebar'
 import Logo from './Logo'
-
-interface UserProfile {
-  handle: string;
-  avatar: string;
-}
+import { useAuth } from '../../context/AuthContext'
 
 export default function Navbar() {
+  const { userHandle, isAuthenticated, logoutSession } = useAuth()
   const [isProfileOpen, setIsProfileOpen] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  
-  const dropdownRef = useRef<HTMLDivElement>(null)
-  
-  const [currentUser, setCurrentUser] = useState<UserProfile>({
-    handle: 'sujith_dev',
-    avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=sujith_dev`
-  })
 
-  const [isDarkMode, setIsDarkMode] = useState(false) 
+  const [isDarkMode, setIsDarkMode] = useState(false)
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
     setMounted(true)
     const storedTheme = localStorage.getItem('theme')
-    
     if (storedTheme === 'dark') {
       setIsDarkMode(true)
       document.documentElement.classList.add('dark')
@@ -39,34 +27,9 @@ export default function Navbar() {
     }
   }, [])
 
-  useEffect(() => {
-    axios.get('http://localhost:8001/api/v1/publications')
-      .then(res => {
-        const userPost = res.data.find((p: any) => p.author_handle === 'sujith_dev');
-        if (userPost) {
-          setCurrentUser({
-            handle: userPost.author_handle,
-            avatar: userPost.author_avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${userPost.author_handle}`
-          })
-        }
-      })
-      .catch(err => console.error("Error fetching user data:", err))
-  }, [])
-
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsProfileOpen(false)
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside)
-    return () => document.removeEventListener("mousedown", handleClickOutside)
-  }, [])
-
   const toggleTheme = () => {
     const newTheme = !isDarkMode
     setIsDarkMode(newTheme)
-    
     if (newTheme) {
       document.documentElement.classList.add('dark')
       localStorage.setItem('theme', 'dark')
@@ -76,101 +39,88 @@ export default function Navbar() {
     }
   }
 
+  const displayHandle = userHandle ?? 'guest'
+
   return (
     <>
-      <header className="sticky top-0 z-50 bg-[color-mix(in_srgb,var(--color-paper)_86%,transparent)] backdrop-blur-[10px] border-b border-gisviz-border transition-colors">
-        <div className="max-w-[1280px] mx-auto px-[20px] h-[60px] flex items-center gap-[16px]">
-          
-          <button 
-            className="lg:hidden flex items-center justify-center w-[38px] h-[38px] border border-gisviz-border bg-gisviz-surface rounded-md text-gisviz-ink hover:text-gisviz-accent hover:border-gisviz-accent transition-colors shrink-0"
+      <header className="sticky top-0 z-50 bg-gisviz-canvas/80 backdrop-blur-md border-b border-gisviz-border">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+
+          <button
+            className="lg:hidden p-2 -ml-2 text-gisviz-ink-soft hover:text-gisviz-accent rounded-full transition-colors"
             onClick={() => setIsMobileMenuOpen(true)}
           >
-            <Menu size={18} />
+            <Menu className="w-6 h-6" />
           </button>
 
-          <Link href="/" className="flex items-center shrink-0">
-             <Logo scale={2.5} className="min-w-max ml-2 sm:ml-6 mb-2" textClassName="hidden sm:block" />
-          </Link>
+          <Logo className="min-w-max" textClassName="hidden sm:block text-xl" />
 
-          <div className="flex items-center gap-[10px] relative ml-auto shrink-0">
-            
-            <button 
-              onClick={toggleTheme} 
-              className="flex items-center justify-center w-[38px] h-[38px] border border-gisviz-border bg-gisviz-surface rounded-md text-gisviz-ink hover:text-gisviz-accent hover:border-gisviz-accent transition-colors"
+          <div className="flex items-center gap-3 relative ml-auto">
+
+            <button
+              onClick={toggleTheme}
+              className="p-2 text-gisviz-ink-soft hover:text-gisviz-accent rounded-full transition-colors flex items-center justify-center w-9 h-9"
             >
               {mounted ? (
-                isDarkMode ? <Sun size={17} /> : <Moon size={17} />
+                isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />
               ) : (
-                <div className="w-[17px] h-[17px] opacity-0" /> 
+                <div className="w-5 h-5 opacity-0" />
               )}
             </button>
-            
-            <button className="flex items-center justify-center w-[38px] h-[38px] border border-gisviz-border bg-gisviz-surface rounded-md text-gisviz-ink hover:text-gisviz-accent hover:border-gisviz-accent transition-colors">
-              <Bell size={17} />
-            </button>
-            
-            <div ref={dropdownRef} className="relative ml-[2px]">
-              <img 
-                src={currentUser.avatar}
-                alt="Profile"
-                className="w-[34px] h-[34px] rounded-full object-cover border border-gisviz-border cursor-pointer hover:border-gisviz-accent transition-colors bg-gisviz-surface"
-                onClick={() => setIsProfileOpen(!isProfileOpen)}
-              />
 
-              {isProfileOpen && (
-                <div className="absolute top-[46px] right-0 w-[220px] bg-gisviz-surface border border-gisviz-border rounded-md shadow-xl py-[6px] flex flex-col z-50">
-                  <div className="px-[16px] py-[8px] border-b border-dashed border-gisviz-border mb-[4px] bg-gisviz-card/50">
-                    <p className="text-[13px] font-semibold text-gisviz-ink leading-tight">Sujith</p>
-                    <p className="font-mono text-[10.5px] text-gisviz-ink-soft mt-[2px]">@{currentUser.handle}</p>
-                  </div>
-                  <Link href="/" onClick={() => setIsProfileOpen(false)} className="flex items-center gap-[10px] px-[16px] py-[8px] text-[13px] text-gisviz-ink hover:bg-gisviz-paper hover:text-gisviz-accent transition-colors">
-                    <Home size={15}/> Home
-                  </Link>
-                  <Link href="#" onClick={() => setIsProfileOpen(false)} className="flex items-center gap-[10px] px-[16px] py-[8px] text-[13px] text-gisviz-ink hover:bg-gisviz-paper hover:text-gisviz-accent transition-colors">
-                    <Compass size={15}/> Explore
-                  </Link>
-                  <Link href={`/profile/${currentUser.handle}`} onClick={() => setIsProfileOpen(false)} className="flex items-center gap-[10px] px-[16px] py-[8px] text-[13px] text-gisviz-ink hover:bg-gisviz-paper hover:text-gisviz-accent transition-colors">
-                    <MapIcon size={15}/> My Plates
-                  </Link>
-                  <Link href="#" onClick={() => setIsProfileOpen(false)} className="flex items-center gap-[10px] px-[16px] py-[8px] text-[13px] text-gisviz-ink hover:bg-gisviz-paper hover:text-gisviz-accent transition-colors">
-                    <Bookmark size={15}/> Saved
-                  </Link>
-                  <div className="border-t border-dashed border-gisviz-border my-[4px]"></div>
-                  <Link href="#" onClick={() => setIsProfileOpen(false)} className="flex items-center gap-[10px] px-[16px] py-[8px] text-[13px] text-gisviz-ink hover:bg-gisviz-paper hover:text-gisviz-accent transition-colors">
-                    <Settings size={15}/> Settings
-                  </Link>
+            <button className="p-2 text-gisviz-ink-soft hover:text-gisviz-accent rounded-full transition-colors">
+              <Bell className="w-5 h-5" />
+            </button>
+
+            <div
+              className="w-8 h-8 rounded-full bg-gradient-to-tr from-gisviz-accent to-emerald-300 border border-gisviz-border cursor-pointer"
+              onClick={() => setIsProfileOpen(!isProfileOpen)}
+            ></div>
+
+            {isProfileOpen && (
+              <div className="absolute top-12 right-0 w-56 bg-gisviz-card border border-gisviz-border rounded-xl shadow-lg py-2 flex flex-col z-50">
+                <div className="px-4 py-2 border-b border-gisviz-border mb-2">
+                  <p className="text-sm font-bold text-gisviz-ink">@{displayHandle}</p>
+                  <p className="text-xs text-gisviz-ink-soft">
+                    {isAuthenticated ? 'Signed in' : 'Not signed in'}
+                  </p>
                 </div>
-              )}
-            </div>
+                <Link href="/" className="flex items-center gap-3 px-4 py-2 hover:bg-gisviz-canvas hover:text-gisviz-accent text-sm text-gisviz-ink"><Home size={16} /> Home</Link>
+                <Link href="#" className="flex items-center gap-3 px-4 py-2 hover:bg-gisviz-canvas hover:text-gisviz-accent text-sm text-gisviz-ink"><Compass size={16} /> Explore</Link>
+                <Link href="#" className="flex items-center gap-3 px-4 py-2 hover:bg-gisviz-canvas hover:text-gisviz-accent text-sm text-gisviz-ink"><MapIcon size={16} /> My Maps</Link>
+                <Link href="#" className="flex items-center gap-3 px-4 py-2 hover:bg-gisviz-canvas hover:text-gisviz-accent text-sm text-gisviz-ink"><Bookmark size={16} /> Saved</Link>
+                <div className="border-t border-gisviz-border my-2"></div>
+                <Link href="#" className="flex items-center gap-3 px-4 py-2 hover:bg-gisviz-canvas hover:text-gisviz-accent text-sm text-gisviz-ink"><Settings size={16} /> Settings</Link>
+                {isAuthenticated && (
+                  <button
+                    onClick={() => { logoutSession(); setIsProfileOpen(false) }}
+                    className="flex items-center gap-3 px-4 py-2 hover:bg-gisviz-canvas hover:text-gisviz-accent text-sm text-gisviz-ink text-left"
+                  >
+                    <LogOut size={16} /> Sign out
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </header>
 
-      {/* MOBILE DRAWER */}
+      {/* Mobile drawer */}
       {isMobileMenuOpen && (
         <div className="fixed inset-0 z-[100] lg:hidden flex">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)}></div>
-          <div className="relative w-[320px] max-w-[86vw] bg-gisviz-paper h-full border-r border-gisviz-border shadow-2xl flex flex-col overflow-y-auto animate-[slide_0.18s_ease]">
-            <div className="flex items-center justify-between p-[16px] mb-[18px]">
-              <Link href="/" onClick={() => setIsMobileMenuOpen(false)}>
-                 <Logo scale={1.8} className="min-w-max ml-2" /> 
-              </Link>
-              <button 
-                onClick={() => setIsMobileMenuOpen(false)} 
-                className="flex items-center justify-center w-[38px] h-[38px] border border-gisviz-border bg-gisviz-surface rounded-md text-gisviz-ink hover:text-gisviz-accent hover:border-gisviz-accent transition-colors"
-              >
-                <X size={18} />
-              </button>
+          <div className="relative w-80 max-w-[85vw] bg-gisviz-canvas h-full border-r border-gisviz-border shadow-2xl flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b border-gisviz-border">
+              <div className="font-display font-bold text-gisviz-ink text-lg flex items-center gap-2">
+                <Logo scale={1.5} />
+                <span>Discover</span>
+              </div>
+              <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 text-gisviz-ink-soft hover:text-gisviz-accent rounded-full"><X className="w-5 h-5" /></button>
             </div>
-            <div className="px-[16px] flex-1">
+            <div className="p-4 flex-1 overflow-y-auto">
               <Sidebar />
             </div>
           </div>
-          
-          {/* Add the required slide animation for the drawer via standard Tailwind arbitrary values or global CSS if preferred, but doing inline injection here for safety: */}
-          <style dangerouslySetInnerHTML={{__html: `
-            @keyframes slide { from { transform: translateX(-12px); opacity: 0.6; } to { transform: none; opacity: 1; } }
-          `}} />
         </div>
       )}
     </>
