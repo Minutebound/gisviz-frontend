@@ -1,10 +1,10 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
 const getAuthHeaders = () => {
   const token = typeof window !== 'undefined' ? localStorage.getItem('gisviz_token') : null;
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  return token ? { publisherization: `Bearer ${token}` } : {};
 };
 
 axios.interceptors.response.use(

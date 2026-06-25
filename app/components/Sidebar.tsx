@@ -1,6 +1,6 @@
 'use client'
 import React, { useEffect, useState } from 'react'
-import { TrendingUp, Users, UserPlus } from 'lucide-react'
+import { TrendingUp, Users, UserPlus, ShieldCheck, ExternalLink } from 'lucide-react'
 import { gisvizApi } from '../../services/api'
 
 interface Category { category_id: number; slug: string; label: string; usage_count: number }
@@ -16,15 +16,15 @@ export default function Sidebar() {
       .then((data: Category[]) => setTrending(data.slice(0, 5)))
       .catch(() => setTrending([]))
 
-    // Derive popular publishers from the current feed's authors until a
+    // Derive popular publishers from the current feed's publishers until a
     // dedicated /users/popular endpoint exists.
     gisvizApi
       .fetchGlobalStream(0, 50)
-      .then((posts: { author_handle: string; author_avatar_url: string }[]) => {
+      .then((posts: { publisher_handle: string; publisher_avatar_url: string }[]) => {
         const seen = new Map<string, Publisher>()
         for (const p of posts) {
-          if (p.author_handle && !seen.has(p.author_handle)) {
-            seen.set(p.author_handle, { handle: p.author_handle, avatar: p.author_avatar_url })
+          if (p.publisher_handle && !seen.has(p.publisher_handle)) {
+            seen.set(p.publisher_handle, { handle: p.publisher_handle, avatar: p.publisher_avatar_url })
           }
         }
         setPublishers(Array.from(seen.values()).slice(0, 3))
@@ -94,6 +94,34 @@ export default function Sidebar() {
             ))
           )}
         </div>
+      </div>
+
+      {/* MINI NATIVE ADVERTISEMENT */}
+      <div className="flex-shrink-0 relative bg-gisviz-rail border border-gisviz-border p-5 overflow-hidden flex flex-col group cursor-pointer shadow-sm">
+        <i className="absolute w-[8px] h-[8px] border-[1.5px] border-gisviz-accent/50 z-10 top-0 left-0 border-r-0 border-b-0 " />
+        <i className="absolute w-[8px] h-[8px] border-[1.5px] border-gisviz-accent/50 z-10 bottom-0 right-0 border-l-0 border-t-0" />
+        
+        <div className="flex justify-between items-start mb-3 z-10">
+          <span className="font-mono text-[9px] tracking-[0.2em] text-gisviz-ink-soft uppercase border border-gisviz-border px-1.5 py-0.5">
+            PROMOTED
+          </span>
+          <ShieldCheck className="w-4 h-4 text-gisviz-accent" />
+        </div>
+        
+        <div className="relative z-10">
+          <h4 className="font-display font-semibold text-sm text-white mb-1.5 leading-snug group-hover:text-gisviz-accent transition-colors">
+            Enterprise Spatial Analytics
+          </h4>
+          <p className="text-[11px] text-slate-400 mb-3 leading-relaxed font-sans">
+            Process millions of coordinates in milliseconds. Upgrade your vector pipeline today.
+          </p>
+          <button className="flex items-center gap-1.5 font-mono text-[10px] border border-gisviz-accent bg-transparent text-gisviz-accent px-2.5 py-1.5 rounded-md hover:bg-gisviz-accent hover:text-white transition-colors w-max">
+            <span>Explore</span>
+            <ExternalLink size={11} />
+          </button>
+        </div>
+        
+        <div className="absolute top-0 right-0 w-full h-full bg-[url('https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=400&fit=crop')] bg-cover bg-center opacity-[0.08] mix-blend-overlay pointer-events-none"></div>
       </div>
 
       {/* Footer */}

@@ -12,7 +12,7 @@ RUN npm install
 COPY . .
 
 # Expose Next.js port
-EXPOSE 3000
+EXPOSE 3001
 
 # Start the Next.js development server
 CMD ["npm", "run", "dev"]
