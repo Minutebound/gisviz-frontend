@@ -9,7 +9,7 @@ const nextConfig: NextConfig = {
         // Intercept any request starting with /api/
         source: '/api/:path*',
         // Forward it silently to the FastAPI backend
-        destination: 'http://localhost:8001/api/:path*',
+        destination: 'http://gisviz-api:8001/api/:path*',
       },
     ];
   },

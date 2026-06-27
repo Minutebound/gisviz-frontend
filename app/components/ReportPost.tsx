@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { X, Flag, AlertTriangle, Loader2, Check } from 'lucide-react'
+import { gisvizApi } from '../../services/api'
 
 interface ReportModalProps {
   isOpen: boolean
@@ -37,12 +38,13 @@ export default function ReportModal({ isOpen, onClose, publicationId }: ReportMo
     
     setIsSubmitting(true)
     
-    // Simulate API call to POST /api/v1/publications/{id}/report
     try {
-      await new Promise(resolve => setTimeout(resolve, 800))
+      // The real API call!
+      await gisvizApi.reportPost(publicationId, reason, details)
       setSubmitted(true)
     } catch (err) {
-      console.error(err)
+      console.error("Failed to submit report:", err)
+      // Optional: You could add a setCommentError state here to show UI errors
     } finally {
       setIsSubmitting(false)
     }
@@ -81,7 +83,7 @@ export default function ReportModal({ isOpen, onClose, publicationId }: ReportMo
             </div>
             <h4 className="font-bold text-gisviz-ink mb-2">Report Logged Successfully</h4>
             <p className="text-sm font-mono text-gisviz-ink-soft mb-6">
-              Our administration team will review Publication #{publicationId.slice(0,8)} shortly.
+              Our team will review Publication #{publicationId.slice(0,8)} shortly.
             </p>
             <button onClick={onClose} className="bg-gisviz-canvas border border-gisviz-border hover:bg-gisviz-rail-soft text-gisviz-ink px-6 py-2 rounded-md font-mono text-sm transition-colors">
               Close Window

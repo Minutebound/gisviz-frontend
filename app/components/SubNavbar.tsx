@@ -38,8 +38,8 @@ export default function SubNavbar() {
   if (!shouldShow) return null
 
   return (
-    <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 mt-4 mb-2">
-      <div className="flex items-center gap-6">
+    <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 mt-5">
+      <div className="flex items-center gap-4">
         {navLinks.map((link) => (
           <Link 
             key={link.href}

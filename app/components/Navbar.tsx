@@ -7,22 +7,21 @@ import Sidebar from './Sidebar'
 import Logo from './Logo'
 import { useAuth } from '../../context/AuthContext'
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
+
 export default function Navbar() {
-  // Removed 'user' to resolve the AuthContextType TypeScript error
-  // Added 'token' assuming your context provides it (or we can fallback to localStorage)
-  const { userHandle, isAuthenticated, token, logoutSession } = useAuth()
+  // Added isLoading to safely check hydration state
+  const { user, isAuthenticated, logoutSession, isLoading } = useAuth()
   
   const [isProfileOpen, setIsProfileOpen] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isDarkMode, setIsDarkMode] = useState(false)
   const [mounted, setMounted] = useState(false)
-  
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [imageError, setImageError] = useState(false)
   
   const dropdownRef = useRef<HTMLDivElement>(null)
 
-  // 1. Theme Initialization
+  // Wait until mounted to avoid hydration mismatch
   useEffect(() => {
     setMounted(true)
     const storedTheme = localStorage.getItem('theme')
@@ -36,37 +35,6 @@ export default function Navbar() {
     }
   }, [])
 
-  // 2. Fetch Avatar if Authenticated
-  useEffect(() => {
-    const fetchProfile = async () => {
-      // Fallback to localStorage if token isn't directly in useAuth
-      const authToken = token || localStorage.getItem('token') 
-      if (!authToken) return
-
-      try {
-        const res = await fetch('/api/v1/auth/me', {
-          headers: {
-            'Authorization': `Bearer ${authToken}`
-          }
-      })
-        if (res.ok) {
-          const data = await res.json()
-          setAvatarUrl(data.avatar_storage_url)
-          setImageError(false)
-        }
-      } catch (error) {
-        console.error("Failed to fetch user profile for avatar", error)
-      }
-    }
-
-    if (isAuthenticated) {
-      fetchProfile()
-    } else {
-      setAvatarUrl(null)
-    }
-  }, [isAuthenticated, token])
-
-  // 3. Handle Click-Outside to close dropdown
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -94,7 +62,8 @@ export default function Navbar() {
     }
   }
 
-  const displayHandle = userHandle ?? 'guest'
+  const displayHandle = user?.user_handle ?? 'guest'
+  const avatarUrl = user?.avatar_path ? `${API_BASE_URL}${user.avatar_path}` : null
 
   return (
     <>
@@ -109,7 +78,6 @@ export default function Navbar() {
             <Menu className="w-6 h-6" />
           </button>
 
-          {/* Logo functioning as a direct link to the homepage */}
           <Link href="/" className="flex items-center hover:opacity-90 transition-opacity min-w-max">
             <Logo scale={1.7} className="min-w-max" textClassName="hidden sm:block text-xl" />
           </Link>
@@ -128,10 +96,11 @@ export default function Navbar() {
               )}
             </button>
 
-            {isAuthenticated ? (
-              // Wrapper div with ref for the click-away listener
+            {/* HYDRATION FIX: Wait for mount and AuthContext to finish loading */}
+            {!mounted || isLoading ? (
+              <div className="w-8 h-8 rounded-full bg-gisviz-border animate-pulse" />
+            ) : isAuthenticated ? (
               <div className="relative" ref={dropdownRef}>
-                {/* Database Avatar Render with Fallback */}
                 <div
                   className="w-8 h-8 rounded-full border border-gisviz-border cursor-pointer shadow-sm overflow-hidden flex items-center justify-center bg-gisviz-canvas hover:ring-2 hover:ring-gisviz-accent hover:ring-offset-2 hover:ring-offset-gisviz-canvas transition-all relative"
                   onClick={() => setIsProfileOpen(!isProfileOpen)}
@@ -151,12 +120,10 @@ export default function Navbar() {
                   )}
                 </div>
 
-                {/* Profile Dropdown */}
                 {isProfileOpen && (
                   <div className="absolute top-12 right-0 w-52 bg-gisviz-card border border-gisviz-border rounded-xl shadow-lg py-2 flex flex-col z-50 plate-enter">
-                    <div className="px-4 py-2 border-b border-gisviz-border mb-2">
-                      <p className="text-sm font-bold text-gisviz-ink">@{displayHandle}</p>
-                      <p className="text-xs text-gisviz-ink-soft">Enterprise Access</p>
+                    <div className=" text-sm px-4 py-2 border-b border-gisviz-border mb-2">
+                     User handle <p className="font-bold text-gisviz-accent/80">@{displayHandle}</p>
                     </div>
                     
                     <Link 
