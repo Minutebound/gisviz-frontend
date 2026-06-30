@@ -2,7 +2,12 @@
 
 import React from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+// Some environments may not have `next/navigation` available (or its types).
+// Provide a small fallback hook that uses the browser location when needed.
+function usePathname(): string {
+  if (typeof window !== 'undefined') return window.location.pathname
+  return '/'
+}
 import { ChevronLeft } from 'lucide-react'
 
 // 1. The navigation links to display
@@ -41,12 +46,10 @@ export default function SubNavbar() {
     <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 mt-5">
       <div className="flex items-center gap-4">
         {navLinks.map((link) => (
-          <Link 
-            key={link.href}
-            href={link.href} 
-            className="inline-flex items-center gap-2 text-xs font-mono text-gisviz-ink-soft hover:text-gisviz-accent transition-colors"
-          >
-            {link.icon} {link.label}
+          <Link key={link.href} href={link.href} legacyBehavior>
+            <a className="inline-flex items-center gap-2 text-[12px] font-mono text-gisviz-ink-soft hover:text-gisviz-accent transition-colors">
+              {link.icon} {link.label}
+            </a>
           </Link>
         ))}
       </div>

@@ -2,7 +2,6 @@ import type { Metadata } from 'next'
 import { Search } from 'lucide-react'
 import Feed from './components/Feed'
 import Sidebar from './components/Sidebar'
-import Navbar from './components/Navbar'
 
 export const metadata: Metadata = {
   title: 'Feed',  // → renders as "Feed | gisviz" in the tab

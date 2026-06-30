@@ -66,7 +66,7 @@ export default function SharePost({ isOpen, onClose, url, title }: ShareModalPro
         <div className="reg-mark reg-br"></div> */}
 
         <div className="flex justify-between items-start mb-6">
-          <h3 className="font-display font-bold text-xl text-gisviz-ink">Share Publication</h3>
+          <h3 className="font-display font-bold text-[16px] text-gisviz-ink">Share Publication</h3>
           <button onClick={onClose} className="text-gisviz-ink-soft hover:text-gisviz-accent transition-colors">
             <X size={20} />
           </button>
@@ -75,7 +75,7 @@ export default function SharePost({ isOpen, onClose, url, title }: ShareModalPro
         <div className="space-y-6">
           {/* Direct Link Copy */}
           <div>
-            <label className="block text-xs font-mono text-gisviz-ink-soft mb-2 uppercase tracking-wider">
+            <label className="block text-[12px] font-mono text-gisviz-ink-soft mb-2 uppercase tracking-wider">
               Direct Link
             </label>
             <div className="flex gap-2">
@@ -95,7 +95,7 @@ export default function SharePost({ isOpen, onClose, url, title }: ShareModalPro
 
           {/* Social Routing */}
           <div>
-            <label className="block text-xs font-mono text-gisviz-ink-soft mb-3 uppercase tracking-wider">
+            <label className="block text-[12px] font-mono text-gisviz-ink-soft mb-3 uppercase tracking-wider">
               Distribute Externally
             </label>
             <div className="grid grid-cols-3 gap-3">
@@ -105,7 +105,7 @@ export default function SharePost({ isOpen, onClose, url, title }: ShareModalPro
                 className="flex flex-col items-center justify-center gap-2 p-3 bg-gisviz-canvas border border-gisviz-border rounded-md hover:border-gisviz-accent hover:text-gisviz-accent text-gisviz-ink-soft transition-all"
               >
                 <TwitterIcon size={20} />
-                <span className="text-xs font-mono font-bold">X / Twitter</span>
+                <span className="text-[12px] font-mono font-bold">X / Twitter</span>
               </a>
               <a 
                 href={`https://www.linkedin.com/shareArticle?mini=true&url=${encodeURIComponent(url)}&title=${encodeURIComponent(title)}`}
@@ -113,14 +113,14 @@ export default function SharePost({ isOpen, onClose, url, title }: ShareModalPro
                 className="flex flex-col items-center justify-center gap-2 p-3 bg-gisviz-canvas border border-gisviz-border rounded-md hover:border-gisviz-accent hover:text-gisviz-accent text-gisviz-ink-soft transition-all"
               >
                 <LinkedinIcon size={20} />
-                <span className="text-xs font-mono font-bold">LinkedIn</span>
+                <span className="text-[12px] font-mono font-bold">LinkedIn</span>
               </a>
               <a 
                 href={`mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent("Check out this spatial dataset on gisviz: " + url)}`}
                 className="flex flex-col items-center justify-center gap-2 p-3 bg-gisviz-canvas border border-gisviz-border rounded-md hover:border-gisviz-accent hover:text-gisviz-accent text-gisviz-ink-soft transition-all"
               >
                 <Mail size={20} />
-                <span className="text-xs font-mono font-bold">Email</span>
+                <span className="text-[12px] font-mono font-bold">Email</span>
               </a>
             </div>
           </div>

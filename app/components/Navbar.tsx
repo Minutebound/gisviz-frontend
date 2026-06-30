@@ -79,7 +79,7 @@ export default function Navbar() {
           </button>
 
           <Link href="/" className="flex items-center hover:opacity-90 transition-opacity min-w-max">
-            <Logo scale={1.7} className="min-w-max" textClassName="hidden sm:block text-xl" />
+            <Logo scale={1.7} className="min-w-max" textClassName="hidden sm:block text-[16px]" />
           </Link>
 
           <div className="flex items-center gap-4 relative ml-auto">
@@ -114,7 +114,7 @@ export default function Navbar() {
                       onError={() => setImageError(true)}
                     />
                   ) : (
-                    <div className="w-full h-full bg-gradient-to-tr from-gisviz-accent to-emerald-400 flex items-center justify-center text-white text-xs font-bold uppercase font-mono shadow-inner">
+                    <div className="w-full h-full bg-gradient-to-tr from-gisviz-accent to-emerald-400 flex items-center justify-center text-white text-[12px] font-bold uppercase font-mono shadow-inner">
                       {displayHandle.charAt(0)}
                     </div>
                   )}
@@ -181,7 +181,7 @@ export default function Navbar() {
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)}></div>
           <div className="relative w-80 max-w-[85vw] bg-gisviz-canvas h-full border-r border-gisviz-border shadow-2xl flex flex-col">
             <div className="flex items-center justify-between p-4 border-b border-gisviz-border">
-              <Link href="/" onClick={() => setIsMobileMenuOpen(false)} className="font-display font-bold text-gisviz-ink text-lg flex items-center gap-2">
+              <Link href="/" onClick={() => setIsMobileMenuOpen(false)} className="font-display font-bold text-gisviz-ink text-[16px] flex items-center gap-2">
                 <Logo scale={1.5} />
               </Link>
               <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 text-gisviz-ink-soft hover:text-gisviz-accent rounded-full">

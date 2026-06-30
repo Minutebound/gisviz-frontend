@@ -37,7 +37,8 @@
     --survey-soft: #f6e6d4;
     --border: #cbd9d1;       /* tinted sage border */
     --grid: #b9cdc2;         /* graticule hairline */
-  }
+    --alert:#ff0000;
+   }
 
   .dark {
     --ink: #e8f1ec;          /* crisp near-white */
@@ -53,6 +54,7 @@
     --survey-soft: #3a2a17;
     --border: #21372c;       /* subtle dark border */
     --grid: #1c3025;         /* graticule hairline (dark) */
+    --alert:#ff0000;
   }
 
   button{

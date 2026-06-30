@@ -69,7 +69,7 @@ export default function ModerationDashboard() {
         <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
           <ShieldAlert size={32} />
         </div>
-        <h2 className="text-xl font-display font-bold text-gisviz-ink mb-2">Access Restricted</h2>
+        <h2 className="text-[16px] font-display font-bold text-gisviz-ink mb-2">Access Restricted</h2>
         <p className="text-gisviz-ink-soft font-mono text-sm mb-8">
           You do not have the required administrative permissions to view this moderation queue.
         </p>
@@ -84,14 +84,14 @@ export default function ModerationDashboard() {
   return (
     <div className="max-w-6xl mx-auto py-10 px-4">
       <div className="mb-8">
-        <h1 className="text-2xl font-display font-bold text-gisviz-ink flex items-center gap-3">
+        <h1 className="text-[24px] font-display font-bold text-gisviz-ink flex items-center gap-3">
           <Flag className="text-red-500" size={24} /> Moderation Queue
         </h1>
         <p className="text-gisviz-ink-soft font-mono text-sm mt-2">Manage reported content and user access.</p>
       </div>
 
       <div className="bg-gisviz-card border border-gisviz-border rounded-sm shadow-sm overflow-hidden">
-        <table className="w-full text-left font-mono text-xs border-collapse">
+        <table className="w-full text-left font-mono text-[12px] border-collapse">
           <thead className="bg-gisviz-canvas text-gisviz-ink-soft uppercase border-b border-gisviz-border">
             <tr>
               <th className="p-4">Post Title</th>

@@ -68,7 +68,7 @@ export default function ReportModal({ isOpen, onClose, publicationId }: ReportMo
         <div className="reg-mark reg-br"></div> */}
 
         <div className="flex justify-between items-start mb-6">
-          <h3 className="font-display font-bold text-xl text-gisviz-ink flex items-center gap-2">
+          <h3 className="font-display font-bold text-[16px] text-gisviz-ink flex items-center gap-2">
             <Flag className="text-red-500" size={20} /> Report Quality Issue
           </h3>
           <button onClick={onClose} className="text-gisviz-ink-soft hover:text-gisviz-accent transition-colors">
@@ -93,13 +93,13 @@ export default function ReportModal({ isOpen, onClose, publicationId }: ReportMo
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-900/50 p-3 rounded-md flex items-start gap-3">
               <AlertTriangle className="text-orange-500 shrink-0 mt-0.5" size={16} />
-              <p className="text-xs font-mono text-orange-800 dark:text-orange-300">
+              <p className="text-[12px] font-mono text-orange-800 dark:text-orange-300">
                 Reports are monitored by enterprise administrators. False reporting may result in restricted access.
               </p>
             </div>
 
             <div>
-              <label className="block text-xs font-mono text-gisviz-ink-soft mb-2 uppercase tracking-wider">
+              <label className="block text-[12px] font-mono text-gisviz-ink-soft mb-2 uppercase tracking-wider">
                 Violation Classification
               </label>
               <select 
@@ -118,7 +118,7 @@ export default function ReportModal({ isOpen, onClose, publicationId }: ReportMo
             </div>
 
             <div>
-              <label className="block text-xs font-mono text-gisviz-ink-soft mb-2 uppercase tracking-wider">
+              <label className="block text-[12px] font-mono text-gisviz-ink-soft mb-2 uppercase tracking-wider">
                 Additional Context (Optional)
               </label>
               <textarea 
@@ -140,7 +140,7 @@ export default function ReportModal({ isOpen, onClose, publicationId }: ReportMo
               <button 
                 type="submit"
                 disabled={isSubmitting || !reason}
-                className="flex items-center justify-center gap-2 bg-red-600 text-white px-5 py-2 rounded-md hover:bg-red-700 transition-all font-mono text-sm shadow-sm disabled:opacity-50"
+                className="flex items-center justify-center gap-2 bg-gisviz-alert text-white px-5 py-2 rounded-md hover:bg-red-700 transition-all font-mono text-sm shadow-sm disabled:opacity-50"
               >
                 {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Flag size={16} />}
                 Submit Report

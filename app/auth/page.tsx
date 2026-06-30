@@ -161,13 +161,13 @@ function AuthContent() {
           <div className="inline-flex items-center justify-center w-12 h-12 bg-gisviz-accent text-white rounded-full mb-4">
             {view === 'verify' ? <ShieldCheck size={24} /> : <Key size={24} />}
           </div>
-          <h1 className="text-2xl font-display font-bold text-gisviz-ink">
+          <h1 className="text-[24px] font-display font-bold text-gisviz-ink">
             {view === 'login' && 'Login Access'}
             {view === 'register' && 'Platform Registration'}
             {view === 'verify' && 'Verify Identity'}
             {view === 'forgot' && 'Recover Access'}
           </h1>
-          <p className="text-xs font-mono text-gisviz-ink-soft mt-2 uppercase tracking-wider">
+          <p className="text-[12px] font-mono text-gisviz-ink-soft mt-2 uppercase tracking-wider">
             {view === 'login' && 'System Access'}
             {view === 'register' && 'Platform Registration'}
             {view === 'verify' && 'Verify Identity'}
@@ -177,20 +177,20 @@ function AuthContent() {
 
         {errorMsg && <div className="p-3 mb-6 bg-red-50 border border-red-200 text-red-600 text-sm font-mono rounded-md">{errorMsg}</div>}
         {successMsg && <div className="p-3 mb-6 bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm font-mono rounded-md">{successMsg}</div>}
-        {devNotice && <div className="p-3 mb-6 bg-yellow-50 border border-yellow-300 text-yellow-800 text-xs font-mono rounded-md break-all">{devNotice}</div>}
+        {devNotice && <div className="p-3 mb-6 bg-yellow-50 border border-yellow-300 text-yellow-800 text-[12px] font-mono rounded-md break-all">{devNotice}</div>}
 
         {/* LOGIN VIEW */}
         {view === 'login' && (
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label className="block text-xs font-mono text-gisviz-ink-soft mb-1 uppercase tracking-wider">Handle or Email</label>
+              <label className="block text-[12px] font-mono text-gisviz-ink-soft mb-1 uppercase tracking-wider">Handle or Email</label>
               <div className="relative">
                 <AtSign className="absolute left-3 top-2.5 text-gisviz-ink-soft" size={16} />
                 <input required type="text" name="user_handle" onChange={handleChange} className="w-full bg-gisviz-canvas border border-gisviz-border rounded-md pl-10 pr-4 py-2 text-gisviz-ink focus:ring-2 focus:ring-gisviz-accent outline-none font-mono text-sm" />
               </div>
             </div>
             <div>
-              <label className="block text-xs font-mono text-gisviz-ink-soft mb-1 uppercase tracking-wider">Security Key</label>
+              <label className="block text-[12px] font-mono text-gisviz-ink-soft mb-1 uppercase tracking-wider">Security Key</label>
               <div className="relative">
                 <Lock className="absolute left-3 top-2.5 text-gisviz-ink-soft" size={16} />
                 <input required type="password" name="password" onChange={handleChange} className="w-full bg-gisviz-canvas border border-gisviz-border rounded-md pl-10 pr-4 py-2 text-gisviz-ink focus:ring-2 focus:ring-gisviz-accent outline-none font-mono text-sm" />
@@ -199,7 +199,7 @@ function AuthContent() {
             <button type="submit" disabled={isLoading} className="w-full flex items-center justify-center gap-2 bg-gisviz-accent text-white py-2.5 rounded-md hover:bg-opacity-90 transition-all font-mono text-sm font-bold mt-6">
               {isLoading ? <Loader2 size={16} className="animate-spin" /> : 'Initialize Session'}
             </button>
-            <div className="flex justify-between mt-4 text-xs font-mono text-gisviz-accent">
+            <div className="flex justify-between mt-4 text-[12px] font-mono text-gisviz-accent">
               <button type="button" onClick={() => { clearMessages(); setView('forgot') }} className="hover:underline">Forgot Key?</button>
               <button type="button" onClick={() => { clearMessages(); setView('register') }} className="hover:underline">Request Access</button>
             </div>
@@ -210,21 +210,21 @@ function AuthContent() {
         {view === 'register' && (
           <form onSubmit={handleRegister} className="space-y-4">
             <div>
-              <label className="block text-xs font-mono text-gisviz-ink-soft mb-1 uppercase tracking-wider">User Handle</label>
+              <label className="block text-[12px] font-mono text-gisviz-ink-soft mb-1 uppercase tracking-wider">User Handle</label>
               <div className="relative">
                 <AtSign className="absolute left-3 top-2.5 text-gisviz-ink-soft" size={16} />
                 <input required type="text" name="user_handle" onChange={handleChange} className="w-full bg-gisviz-canvas border border-gisviz-border rounded-md pl-10 pr-4 py-2 text-gisviz-ink focus:ring-2 focus:ring-gisviz-accent outline-none font-mono text-sm" />
               </div>
             </div>
             <div>
-              <label className="block text-xs font-mono text-gisviz-ink-soft mb-1 uppercase tracking-wider">Email Address</label>
+              <label className="block text-[12px] font-mono text-gisviz-ink-soft mb-1 uppercase tracking-wider">Email Address</label>
               <div className="relative">
                 <Mail className="absolute left-3 top-2.5 text-gisviz-ink-soft" size={16} />
                 <input required type="email" name="email_address" onChange={handleChange} className="w-full bg-gisviz-canvas border border-gisviz-border rounded-md pl-10 pr-4 py-2 text-gisviz-ink focus:ring-2 focus:ring-gisviz-accent outline-none font-mono text-sm" />
               </div>
             </div>
             <div>
-              <label className="block text-xs font-mono text-gisviz-ink-soft mb-1 uppercase tracking-wider">Security Key</label>
+              <label className="block text-[12px] font-mono text-gisviz-ink-soft mb-1 uppercase tracking-wider">Security Key</label>
               <div className="relative">
                 <Lock className="absolute left-3 top-2.5 text-gisviz-ink-soft" size={16} />
                 <input required type="password" name="password" onChange={handleChange} minLength={8} className="w-full bg-gisviz-canvas border border-gisviz-border rounded-md pl-10 pr-4 py-2 text-gisviz-ink focus:ring-2 focus:ring-gisviz-accent outline-none font-mono text-sm" />
@@ -234,7 +234,7 @@ function AuthContent() {
               {isLoading ? <Loader2 size={16} className="animate-spin" /> : <><UserPlus size={16} /> Submit Credentials</>}
             </button>
             <div className="text-center mt-4">
-              <button type="button" onClick={() => { clearMessages(); setView('login') }} className="text-xs font-mono text-gisviz-accent hover:underline">Return to Login</button>
+              <button type="button" onClick={() => { clearMessages(); setView('login') }} className="text-[12px] font-mono text-gisviz-accent hover:underline">Return to Login</button>
             </div>
           </form>
         )}
@@ -247,8 +247,8 @@ function AuthContent() {
               <span className="font-bold text-gisviz-ink">{formData.email_address || 'your email address'}</span>
             </p>
             <div>
-              <label className="block text-xs font-mono text-gisviz-ink-soft mb-1 uppercase tracking-wider text-center">Verification Code</label>
-              <input required type="text" maxLength={6} name="otp" onChange={handleChange} className="w-full text-center tracking-[0.5em] bg-gisviz-canvas border border-gisviz-border rounded-md px-4 py-4 text-gisviz-ink text-2xl font-bold focus:ring-2 focus:ring-gisviz-accent outline-none font-mono" placeholder="••••••" />
+              <label className="block text-[12px] font-mono text-gisviz-ink-soft mb-1 uppercase tracking-wider text-center">Verification Code</label>
+              <input required type="text" maxLength={6} name="otp" onChange={handleChange} className="w-full text-center tracking-[0.5em] bg-gisviz-canvas border border-gisviz-border rounded-md px-4 py-4 text-gisviz-ink text-[24px] font-bold focus:ring-2 focus:ring-gisviz-accent outline-none font-mono" placeholder="••••••" />
             </div>
             <button type="submit" disabled={isLoading} className="w-full flex items-center justify-center gap-2 bg-emerald-600 text-white py-2.5 rounded-md hover:bg-opacity-90 transition-all font-mono text-sm font-bold mt-6">
               {isLoading ? <Loader2 size={16} className="animate-spin" /> : 'Verify Identity'}
@@ -265,11 +265,11 @@ function AuthContent() {
                     setErrorMsg(parseError(err, 'Failed to resend code.'));
                   }
                 }}
-                className="text-xs font-mono text-gisviz-accent hover:underline"
+                className="text-[12px] font-mono text-gisviz-accent hover:underline"
               >
                 Resend Verification Code
               </button>
-              <button type="button" onClick={() => { clearMessages(); setView('login') }} className="text-xs font-mono text-gisviz-ink-soft hover:underline">Return to Login</button>
+              <button type="button" onClick={() => { clearMessages(); setView('login') }} className="text-[12px] font-mono text-gisviz-ink-soft hover:underline">Return to Login</button>
             </div>
           </form>
         )}
@@ -279,7 +279,7 @@ function AuthContent() {
           <form onSubmit={handleForgot} className="space-y-4">
             <p className="text-sm font-mono text-gisviz-ink-soft text-center mb-4">Submit your email to receive a recovery token.</p>
             <div>
-              <label className="block text-xs font-mono text-gisviz-ink-soft mb-1 uppercase tracking-wider">Email Address</label>
+              <label className="block text-[12px] font-mono text-gisviz-ink-soft mb-1 uppercase tracking-wider">Email Address</label>
               <div className="relative">
                 <Mail className="absolute left-3 top-2.5 text-gisviz-ink-soft" size={16} />
                 <input required type="email" name="email_address" onChange={handleChange} className="w-full bg-gisviz-canvas border border-gisviz-border rounded-md pl-10 pr-4 py-2 text-gisviz-ink focus:ring-2 focus:ring-gisviz-accent outline-none font-mono text-sm" />
@@ -289,7 +289,7 @@ function AuthContent() {
               {isLoading ? <Loader2 size={16} className="animate-spin" /> : <><ArrowRight size={16} /> Dispatch Token</>}
             </button>
             <div className="text-center mt-4">
-              <button type="button" onClick={() => { clearMessages(); setView('login') }} className="text-xs font-mono text-gisviz-accent hover:underline">Return to Login</button>
+              <button type="button" onClick={() => { clearMessages(); setView('login') }} className="text-[12px] font-mono text-gisviz-accent hover:underline">Return to Login</button>
             </div>
           </form>
         )}

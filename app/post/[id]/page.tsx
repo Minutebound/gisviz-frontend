@@ -156,7 +156,7 @@ export default function PostDetail() {
         {comment.publisher_avatar_path ? (
           <img src={`${API_BASE_URL}${comment.publisher_avatar_path}`} alt={comment.publisher_handle} className="w-7 h-7 rounded-full border border-gisviz-border object-cover" />
         ) : (
-          <div className="w-7 h-7 rounded-full bg-gisviz-rail-soft border border-gisviz-border flex items-center justify-center font-bold text-gisviz-ink-soft font-mono text-[10px]">
+          <div className="w-7 h-7 rounded-full bg-gisviz-rail-soft border border-gisviz-border flex items-center justify-center font-bold text-gisviz-ink-soft font-mono text-[12px]">
              {comment.publisher_handle.charAt(0).toUpperCase()}
           </div>
         )}
@@ -167,7 +167,7 @@ export default function PostDetail() {
             <Link href={`/profile/${comment.publisher_handle}`} className="text-xs font-bold font-mono text-gisviz-ink hover:text-gisviz-accent transition-colors">
               @{comment.publisher_handle || 'Unknown'}
             </Link>
-            <span className="text-[10px] font-mono text-gisviz-ink-soft">
+            <span className="text-[12px] font-mono text-gisviz-ink-soft">
               {new Date(comment.created_timestamp).toLocaleDateString()}
             </span>
           </div>
@@ -178,7 +178,7 @@ export default function PostDetail() {
         {!isReply && isAuthenticated && (
           <button 
             onClick={() => setReplyingTo({ id: comment.comment_id, handle: comment.publisher_handle })}
-            className="text-[10px] font-mono font-bold text-gisviz-ink-soft hover:text-gisviz-accent uppercase mt-1.5 ml-1 transition-colors"
+            className="text-[12px] font-mono font-bold text-gisviz-ink-soft hover:text-gisviz-accent uppercase mt-1.5 ml-1 transition-colors"
           >
             Reply
           </button>
@@ -195,7 +195,7 @@ export default function PostDetail() {
   )
   
   if (isLoading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin text-gisviz-accent" size={32} /></div>
-  if (!post) return <div className="min-h-screen flex flex-col items-center justify-center gap-4"><MapPin size={48} className="opacity-50" /><h2 className="text-xl">Not Found</h2></div>
+  if (!post) return <div className="min-h-screen flex flex-col items-center justify-center gap-4"><MapPin size={48} className="opacity-50" /><h2 className="text-[16px]">Not Found</h2></div>
 
   const displayHandle = post.publisher_handle || 'Unknown'
   const avatarUrl = post.publisher_avatar_path ? `${API_BASE_URL}${post.publisher_avatar_path}` : null
@@ -267,18 +267,18 @@ export default function PostDetail() {
           <div className="bg-gisviz-card border border-gisviz-border rounded-sm p-6 shadow-md shrink-0">
             {/* 1. Highlighted Category */}
             {post.categories.length > 0 && (
-              <span className="inline-block px-2.5 py-1 bg-gisviz-accent/10 text-gisviz-accent text-[10px] font-mono font-bold tracking-widest uppercase border border-gisviz-accent/20 rounded-sm mb-4">
+              <span className="inline-block px-2.5 py-1 bg-gisviz-rail-soft text-gisviz-ink text-[12px] font-mono font-bold tracking-widest uppercase rounded-sm mb-4">
                 {post.categories[0].label}
               </span>
             )}
             
             {/* 2. Title */}
-            <h1 className="text-xl lg:text-2xl font-display font-bold text-gisviz-ink mb-4 leading-tight uppercase tracking-wide">
+            <h1 className="text-[16px] lg:text-[24px] font-display font-bold text-gisviz-ink mb-4 leading-tight uppercase tracking-wide">
               {post.title}
             </h1>
 
             {/* 3 & 4. Published On / By */}
-            <div className="flex flex-col gap-3 pb-5 mb-5 border-b border-gisviz-border">
+            <div className="flex flex-col gap-3 pb-5 mb-5">
               <div className="text-xs font-mono text-gisviz-ink-soft">
                 Published on {new Date(post.created_timestamp).toLocaleDateString()}
               </div>
@@ -287,7 +287,7 @@ export default function PostDetail() {
                   {avatarUrl ? (
                     <img src={avatarUrl} className="w-6 h-6 rounded-full border border-gisviz-border object-cover" alt={displayHandle} />
                   ) : (
-                    <div className="w-6 h-6 rounded-full border border-gisviz-border bg-gradient-to-tr from-gisviz-accent to-emerald-400 flex items-center justify-center text-white font-mono text-[10px] font-bold">
+                    <div className="w-6 h-6 rounded-full border border-gisviz-border bg-gradient-to-tr from-gisviz-accent to-emerald-400 flex items-center justify-center text-white font-mono text-[12px] font-bold">
                       {displayHandle.charAt(0).toUpperCase()}
                     </div>
                   )}
@@ -300,7 +300,7 @@ export default function PostDetail() {
             {post.keywords.length > 0 && (
               <div className="flex flex-wrap gap-2">
                 {post.keywords.map((kw) => (
-                  <span key={kw.keyword_id} className="text-[10px] font-mono font-bold text-gisviz-ink-soft border border-gisviz-border bg-gisviz-canvas px-2 py-0.5 rounded-sm">
+                  <span key={kw.keyword_id} className="text-[12px] font-mono font-bold text-gisviz-ink-soft border border-gisviz-border bg-gisviz-canvas px-2 py-0.5 rounded-sm">
                     #{kw.word}
                   </span>
                 ))}
@@ -308,13 +308,13 @@ export default function PostDetail() {
             )}
           </div>
 
-          {/* Discussion / Comments Plate */}
+          {/* Discussion Thread / Comments Plate */}
           <div className="bg-gisviz-card border border-gisviz-border rounded-sm shadow-md flex-1 flex flex-col min-h-0 h-[500px] lg:h-auto">
             <div className="p-4 border-b border-gisviz-border bg-gisviz-canvas/50 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2">
                 <MessageSquare size={18} className="text-gisviz-accent" />
                 <h3 className="font-display font-bold text-gisviz-ink text-sm uppercase tracking-wide">
-                  Analyst Discussion
+                  Discussion Thread
                 </h3>
               </div>
               <span className="text-xs font-mono font-bold text-gisviz-ink-soft bg-gisviz-rail-soft px-2 py-0.5 rounded-sm">
@@ -335,7 +335,7 @@ export default function PostDetail() {
                 <form onSubmit={handlePostComment} className="flex flex-col gap-2">
                   {replyingTo && (
                     <div className="flex items-center justify-between bg-gisviz-accent/10 border border-gisviz-accent/20 px-3 py-1.5 rounded-sm">
-                      <span className="text-[10px] uppercase tracking-wider font-mono font-bold text-gisviz-accent">
+                      <span className="text-[12px] uppercase tracking-wider font-mono font-bold text-gisviz-accent">
                         Replying to @{replyingTo.handle}
                       </span>
                       <button type="button" onClick={() => setReplyingTo(null)} className="text-gisviz-accent hover:text-red-500 transition-colors">
@@ -364,7 +364,7 @@ export default function PostDetail() {
               ) : (
                 <div className="text-center p-3 border border-dashed border-gisviz-border rounded-sm">
                   <p className="text-xs font-mono text-gisviz-ink-soft">
-                    <Link href="/auth" className="text-gisviz-accent font-bold hover:underline">Authenticate</Link> to join the discussion.
+                    <Link href="/auth" className="text-gisviz-accent font-bold hover:underline">Authenticate</Link> to join the Discussion Thread.
                   </p>
                 </div>
               )}

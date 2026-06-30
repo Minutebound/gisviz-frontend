@@ -193,11 +193,11 @@ export default function SettingsPage() {
   // --- UI Helpers ---
   const LabelWithEdit = ({ label, fieldName }: { label: string, fieldName: string }) => (
     <div className="flex items-center justify-between mb-2">
-      <label className="text-xs font-mono text-gisviz-ink-soft uppercase tracking-wider">{label}</label>
+      <label className="text-[12px] font-mono text-gisviz-ink-soft uppercase tracking-wider">{label}</label>
       <button 
         type="button" 
         onClick={() => toggleEdit(fieldName)}
-        className="text-[10px] font-mono text-gisviz-accent hover:underline flex items-center gap-1 uppercase"
+        className="text-[12px] font-mono text-gisviz-accent hover:underline flex items-center gap-1 uppercase"
       >
         {editingFields[fieldName] ? <><X size={10}/> Cancel</> : <><Edit2 size={10}/> Edit</>}
       </button>
@@ -217,7 +217,7 @@ export default function SettingsPage() {
   return (
     <div className="py-8 max-w-4xl mx-auto px-4 md:px-0">
       <div className="mb-8">
-        <h1 className="text-3xl font-display font-bold text-gisviz-ink flex items-center gap-3">
+        <h1 className="text-[24px] font-display font-bold text-gisviz-ink flex items-center gap-3">
           <Settings className="text-gisviz-accent" size={32} />
           Profile Settings
         </h1>
@@ -241,7 +241,7 @@ export default function SettingsPage() {
           
           {/* Section: Base Identity */}
           <div className="space-y-4">
-            <h2 className="text-lg font-bold text-gisviz-ink border-b border-gisviz-border pb-2 uppercase tracking-wide font-mono text-sm flex items-center gap-2">
+            <h2 className="text-[16px] font-bold text-gisviz-ink border-b border-gisviz-border pb-2 uppercase tracking-wide font-mono text-sm flex items-center gap-2">
               <AtSign size={16} /> Identity & Avatar
             </h2>
             
@@ -258,17 +258,17 @@ export default function SettingsPage() {
                   ) : (
                     <ImageIcon className="text-gisviz-ink-soft" size={32} />
                   )}
-                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white text-xs font-mono">
+                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white text-[12px] font-mono">
                     Upload
                   </div>
                 </div>
                 <div>
-                  <label className="text-xs font-mono text-gisviz-ink-soft uppercase tracking-wider block mb-1">Profile Avatar</label>
-                  <p className="text-xs text-gisviz-ink-soft font-mono mb-3">JPG, PNG or WebP. Max size 2MB.</p>
+                  <label className="text-[12px] font-mono text-gisviz-ink-soft uppercase tracking-wider block mb-1">Profile Avatar</label>
+                  <p className="text-[12px] text-gisviz-ink-soft font-mono mb-3">JPG, PNG or WebP. Max size 2MB.</p>
                   <button 
                     type="button" 
                     onClick={() => fileInputRef.current?.click()}
-                    className="text-xs font-mono bg-gisviz-canvas border border-gisviz-border px-3 py-1.5 rounded hover:bg-gray-50 transition-colors"
+                    className="text-[12px] font-mono bg-gisviz-canvas border border-gisviz-border px-3 py-1.5 rounded hover:bg-gray-50 transition-colors"
                   >
                     Select File
                   </button>
@@ -278,7 +278,7 @@ export default function SettingsPage() {
 
               {/* System Locked Identity Stats */}
               <div>
-                <label className="flex items-center gap-1 text-xs font-mono text-gisviz-ink-soft mb-2 uppercase">
+                <label className="flex items-center gap-1 text-[12px] font-mono text-gisviz-ink-soft mb-2 uppercase">
                    User Handle <Lock size={12} className="text-gisviz-ink-soft opacity-70"/>
                 </label>
                 <div className="w-full bg-gisviz-canvas/50 border border-gisviz-border/50 rounded-md px-4 py-2.5 text-gisviz-ink font-bold font-mono text-sm shadow-inner">
@@ -286,7 +286,7 @@ export default function SettingsPage() {
                 </div>
               </div>
               <div>
-                <label className="flex items-center gap-1 text-xs font-mono text-gisviz-ink-soft mb-2 uppercase">
+                <label className="flex items-center gap-1 text-[12px] font-mono text-gisviz-ink-soft mb-2 uppercase">
                    System Role <Lock size={12} className="text-gisviz-ink-soft opacity-70"/>
                 </label>
                 <div className="w-full bg-gisviz-canvas/50 border border-gisviz-border/50 rounded-md px-4 py-2.5 text-gisviz-accent font-bold font-mono text-sm shadow-inner">
@@ -298,7 +298,7 @@ export default function SettingsPage() {
 
           {/* Section: Professional Info & Location */}
           <div className="space-y-4 pt-4">
-            <h2 className="text-lg font-bold text-gisviz-ink border-b border-gisviz-border pb-2 uppercase tracking-wide font-mono text-sm flex items-center gap-2">
+            <h2 className="text-[16px] font-bold text-gisviz-ink border-b border-gisviz-border pb-2 uppercase tracking-wide font-mono text-sm flex items-center gap-2">
               <Briefcase size={16} /> Professional Background
             </h2>
             
@@ -343,7 +343,7 @@ export default function SettingsPage() {
 
           {/* Section: Social Graph */}
           <div className="space-y-4 pt-4">
-            <h2 className="text-lg font-bold text-gisviz-ink border-b border-gisviz-border pb-2 uppercase tracking-wide font-mono text-sm flex items-center gap-2">
+            <h2 className="text-[16px] font-bold text-gisviz-ink border-b border-gisviz-border pb-2 uppercase tracking-wide font-mono text-sm flex items-center gap-2">
               <LinkIcon size={16} /> Network Links
             </h2>
             
@@ -388,28 +388,28 @@ export default function SettingsPage() {
         </div>
 
         <div className="relative z-10">
-          <h2 className="text-xl font-display font-bold text-gisviz-ink mb-1 flex items-center gap-2">
+          <h2 className="text-[16px] font-display font-bold text-gisviz-ink mb-1 flex items-center gap-2">
             Access & Security
           </h2>
-          <p className="text-xs font-mono text-gisviz-ink-soft mb-8">Protect your account credentials and system access.</p>
+          <p className="text-[12px] font-mono text-gisviz-ink-soft mb-8">Protect your account credentials and system access.</p>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             
             {/* Email Display Card */}
             <div className="bg-gisviz-canvas/50 border border-gisviz-border rounded-md p-5 shadow-inner flex flex-col justify-center">
-              <label className="flex items-center gap-2 text-xs font-mono text-gisviz-ink-soft mb-2 uppercase tracking-wide">
+              <label className="flex items-center gap-2 text-[12px] font-mono text-gisviz-ink-soft mb-2 uppercase tracking-wide">
                 <Mail size={14}/> Registered Email <Lock size={12} className="ml-1 opacity-50"/>
               </label>
               <div className="text-gisviz-ink font-bold font-mono text-base truncate">
                 {(user as any).email_address || (user as any).email || 'No email registered'}
               </div>
-              <p className="text-[10px] font-mono text-gisviz-ink-soft mt-2">Email addresses are managed via system administrators.</p>
+              <p className="text-[12px] font-mono text-gisviz-ink-soft mt-2">Email addresses are managed via system administrators.</p>
             </div>
 
             {/* Password Management */}
             <div className="bg-gisviz-canvas/30 border border-gisviz-border rounded-md p-5">
               <div className="flex items-center justify-between mb-4">
-                <label className="text-xs font-mono text-gisviz-ink-soft uppercase tracking-wider flex items-center gap-2">
+                <label className="text-[12px] font-mono text-gisviz-ink-soft uppercase tracking-wider flex items-center gap-2">
                   <Shield size={14}/> Account Password
                 </label>
                 <button 
@@ -419,7 +419,7 @@ export default function SettingsPage() {
                     setPwdMsg({ type: '', text: '' })
                     setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' })
                   }}
-                  className={`text-[10px] font-mono hover:underline flex items-center gap-1 uppercase px-2 py-1 rounded transition-colors ${editingFields.password ? 'bg-red-50 text-red-600' : 'bg-gisviz-accent/10 text-gisviz-accent'}`}
+                  className={`text-[12px] font-mono hover:underline flex items-center gap-1 uppercase px-2 py-1 rounded transition-colors ${editingFields.password ? 'bg-red-50 text-red-600' : 'bg-gisviz-accent/10 text-gisviz-accent'}`}
                 >
                   {editingFields.password ? <><X size={10}/> Cancel</> : <><Edit2 size={10}/> Change Password</>}
                 </button>
@@ -432,7 +432,7 @@ export default function SettingsPage() {
               ) : (
                 <form onSubmit={handlePasswordSubmit} className="space-y-4 plate-enter">
                   {pwdMsg.text && (
-                    <div className={`p-3 rounded-md text-xs font-mono border ${pwdMsg.type === 'error' ? 'bg-red-50 text-red-600 border-red-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>
+                    <div className={`p-3 rounded-md text-[12px] font-mono border ${pwdMsg.type === 'error' ? 'bg-red-50 text-red-600 border-red-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>
                       {pwdMsg.text}
                     </div>
                   )}

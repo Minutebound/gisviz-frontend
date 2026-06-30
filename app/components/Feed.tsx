@@ -34,6 +34,9 @@ interface Post {
   total_likes_count: number
   total_comments_count: number
   created_timestamp: string
+  note:string | null;
+  source_name:string|null;
+  source_url: string |null;
   updated_timestamp?: string
 }
 
@@ -183,12 +186,12 @@ export default function Feed() {
 
               <div className="flex justify-between items-start mb-4 gap-4">
                 <Link href={`/post/${post.post_id}`} className="hover:opacity-70 transition-opacity flex-1">
-                  <h2 className="text-xl md:text-2xl font-display font-medium text-gisviz-ink uppercase tracking-wide leading-snug cursor-pointer hover:underline">
+                  <h2 className="text-[16px] md:text-[24px] font-display font-medium text-gisviz-ink uppercase tracking-wide leading-snug cursor-pointer hover:underline">
                     {post.title}
                   </h2>
                 </Link>
                 <div className="flex items-center gap-2 pt-1 relative">
-                  <span className="text-xs font-mono font-medium text-gisviz-ink-soft whitespace-nowrap bg-gisviz-canvas px-2 py-1 rounded-md border border-gisviz-border">
+                  <span className="text-[12px] font-mono font-medium text-gisviz-ink-soft whitespace-nowrap bg-gisviz-canvas px-2 py-1 rounded-md border border-gisviz-border">
                     {new Date(post.created_timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
                   </span>
                   
@@ -229,15 +232,25 @@ export default function Feed() {
                 {post.categories.map((cat) => (
                   <span
                     key={cat.category_id}
-                    className="px-3 py-1 text-[10px] font-bold tracking-wider uppercase bg-gisviz-rail-soft text-gisviz-ink rounded-md border border-gisviz-border/30"
+                    className="px-3 py-1 text-[12px] font-bold tracking-wider uppercase bg-gisviz-rail-soft text-gisviz-ink rounded-md border border-gisviz-border/30"
                   >
                     {cat.label}
                   </span>
                 ))}
+
+                    {post.keywords.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {post.keywords.map((kw) => (
+                  <span key={kw.keyword_id} className="text-[12px] font-mono font-bold text-gisviz-ink-soft border border-gisviz-border bg-gisviz-canvas px-2 py-0.5 rounded-sm">
+                    #{kw.word}
+                  </span>
+                ))}
+              </div>
+            )}
               </div>
 
               {/* Professional Visual Image Render with Dominant Color Blur */}
-                <div className="w-[calc(100%+2.5rem)] -mx-5 border-y border-gisviz-border overflow-hidden mb-4 rounded-none relative flex items-center justify-center bg-black">
+                <div className="w-[calc(100%+2.5rem)] -mx-5 border-y border-gisviz-border overflow-hidden mb-3 rounded-none relative flex items-center justify-center bg-black">
                   {post.visual_image_path ? (
                     <>
                       {/* Blurred Backdrop for matching dominant color */}
@@ -262,33 +275,51 @@ export default function Feed() {
                     </div>
                   )}
                 </div>
-
-              <div className="flex items-center justify-between text-xs text-gisviz-ink-soft font-mono mb-4">
-                <div className="flex items-center gap-1.5">
-                  {post.keywords.length > 0 && (
-                    <span className="uppercase tracking-wider opacity-75">
-                     Source: {post.keywords.slice(0, 3).map(k => k.word).join(', ')}
-                    </span>
-                  )}
-                </div>
                 
-                <div className="flex items-center gap-2">
-                  <span className="uppercase tracking-wider opacity-75">Visual Credit:</span>
+             {/* Visual Credit Profile Block */}
+             <div className="flex items-center justify-between text-gisviz-ink-soft font-mono mb-3">
+               
+                <div className="flex flex-col items-end gap-1.5">
                   <Link 
                     href={`/profile/${post.publisher_handle}`} 
-                    className="flex items-center gap-1.5 bg-gisviz-canvas pr-2.5 pl-1 py-0.5 rounded-full border border-gisviz-border hover:border-gisviz-accent transition-colors group/author"
+                    className="flex items-center gap-1.5 transition-colors group/author"
                   >
                     {post.publisher_avatar_path ? (
-                      <img src={`${API_BASE_URL}${post.publisher_avatar_path}`} className="w-5 h-5 rounded-full object-cover" alt={post.publisher_handle} />
+                      <img src={`${API_BASE_URL}${post.publisher_avatar_path}`} className="w-10 h-10 rounded-full object-cover" alt={post.publisher_handle} />
                     ) : (
-                      <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-gisviz-accent to-emerald-400 flex items-center justify-center text-white text-[10px] font-bold uppercase font-mono">
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-gisviz-accent to-emerald-400 flex items-center justify-center text-white text-[10px] font-bold font-mono">
                         {post.publisher_handle.charAt(0)}
                       </div>
                     )}
-                    <span className="font-bold text-gisviz-ink text-[11px] group-hover/author:text-gisviz-accent transition-colors">
+                    <span className="font-bold text-gisviz-ink text-[16px] group-hover/author:text-gisviz-accent transition-colors">
                       @{post.publisher_handle}
                     </span>
                   </Link>
+                </div>
+
+                {/* Note & Source URL*/}
+                <div className="flex flex-col items-end gap-1.5 w-2/3 pr-4a italic  text-gisviz-ink-soft ">
+               
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px]">
+                    {post.source_name && (
+                      <span className="tracking-wider">
+                        Source: {' '}
+                        {post.source_url ? (
+                          <a href={post.source_url.startsWith('http') ? post.source_url : `https://${post.source_url}`} target="_blank" rel="noopener noreferrer" className="text-gisviz-accent hover:underline uppercase">
+                            {post.source_name}
+                          </a>
+                        ) : (
+                          <span className="text-gisviz-accent">{post.source_name}</span>
+                        )}
+                      </span>
+                    )}
+                    
+                  </div>
+                  {post.note && (
+                    <span className="text-[10px] leading-tight opacity-80 pl-2">
+                     Note: {post.note}
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -343,7 +374,7 @@ export default function Feed() {
           </button>
         </div>
       ) : (
-        <div className="text-center py-8 text-xs font-mono text-gisviz-ink-soft uppercase tracking-widest border-t border-gisviz-border/50 mt-4 mx-8">
+        <div className="text-center py-8 text-[12px] font-mono text-gisviz-ink-soft uppercase tracking-widest border-t border-gisviz-border/50 mt-4 mx-8">
           — No more in Feed —
         </div>
       )}
@@ -367,4 +398,4 @@ export default function Feed() {
 
     </div>
   )
-}
+} 

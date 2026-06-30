@@ -3,19 +3,18 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Map as MapIcon, Users, Activity, ExternalLink, Filter, Loader2, Image as ImageIcon, Check } from 'lucide-react'
+import { Map as MapIcon, Activity, ExternalLink, ArrowUpDown, Loader2, Image as ImageIcon, UserCheck, UserPlus, UserMinus, MapPin, Edit2 } from 'lucide-react'
 import { useAuth } from '../../../context/AuthContext'
 import { gisvizApi } from '../../../services/api'
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
 
 export default function ProfileHandlePage() {
   const params = useParams()
   const router = useRouter()
   const handle = params.handle as string
-  const { user, isAuthenticated } = useAuth()
+  const { user, isAuthenticated } = useAuth() as any
   
   const [activeTab, setActiveTab] = useState<'publications' | 'saved'>('publications')
+  const [sortOption, setSortOption] = useState<'latest' | 'alphabetical'>('latest')
   const [profile, setProfile] = useState<any>(null)
   const [posts, setPosts] = useState<any[]>([])
   
@@ -29,20 +28,37 @@ export default function ProfileHandlePage() {
   
   const isOwnProfile = isAuthenticated && user?.user_handle === handle
 
+  // Setup Base URL safely for avatar resolution
+  const RAW_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
+  const API_BASE_URL = RAW_API_URL.replace('/api/v1', '');
+
+  const getAvatarUrl = (path: string | null) => {
+    if (!path) return null;
+    if (path.startsWith("http")) return path; 
+    const baseUrl = API_BASE_URL.endsWith('/') ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
+    const safePath = path.startsWith('/') ? path : `/${path}`;
+    return `${baseUrl}${safePath}`;
+  };
+
   useEffect(() => {
     if (!handle) return
 
     const loadProfileData = async () => {
       setIsLoading(true)
       try {
+        const currentUserId = isAuthenticated && user ? user.user_id : undefined;
+
         const [profileData, postsData] = await Promise.all([
-          gisvizApi.fetchUserProfile(handle),
+          gisvizApi.fetchUserProfile(handle, currentUserId),
           gisvizApi.fetchUserPosts(handle)
         ])
+        
         setProfile(profileData)
         setPosts(postsData)
-        // Note: For a production app, the backend should return `is_following: true/false` 
-        // inside `profileData` to accurately set this initial state based on the active user.
+        
+        // Initialize follow state accurately from the backend database response
+        setIsFollowing(profileData.is_following || false)
+        
       } catch (err: any) {
         if (err.response?.status === 404) {
           setErrorMsg('Analyst profile not found in the database.')
@@ -55,7 +71,7 @@ export default function ProfileHandlePage() {
     }
 
     loadProfileData()
-  }, [handle])
+  }, [handle, isAuthenticated, user])
 
   // --- Follow / Unfollow Handler ---
   const handleFollowToggle = async () => {
@@ -77,10 +93,20 @@ export default function ProfileHandlePage() {
       }
     } catch (err) {
       console.error("Follow interaction failed", err)
+      alert("Something went wrong updating your follow status.");
     } finally {
       setFollowLoading(false)
     }
   }
+
+  // --- Sorting Logic ---
+  const sortedPosts = [...posts].sort((a, b) => {
+    if (sortOption === 'latest') {
+      return new Date(b.created_timestamp).getTime() - new Date(a.created_timestamp).getTime()
+    } else {
+      return (a.title || '').localeCompare(b.title || '')
+    }
+  })
 
   if (isLoading) {
     return (
@@ -93,7 +119,7 @@ export default function ProfileHandlePage() {
   if (errorMsg || !profile) {
     return (
       <div className="flex flex-col justify-center items-center h-[calc(100vh-4rem)] text-center">
-        <h2 className="text-2xl font-display text-gisviz-ink mb-2">Error 404</h2>
+        <h2 className="text-[24px] font-display text-gisviz-ink mb-2">Error 404</h2>
         <p className="text-gisviz-ink-soft font-mono uppercase text-sm mb-6">{errorMsg}</p>
         <button onClick={() => router.push('/')} className="text-gisviz-accent hover:underline font-mono text-sm border border-gisviz-accent/20 px-4 py-2 rounded-md">
           Return to Global Feed
@@ -114,39 +140,61 @@ export default function ProfileHandlePage() {
         </div>
 
         <div className="px-8 pb-8 pt-4 relative flex flex-col sm:flex-row gap-6 items-start sm:items-end -mt-16">
-          <div className="w-24 h-24 rounded-xl border-4 border-gisviz-card bg-gisviz-canvas overflow-hidden shadow-sm shrink-0 z-10 relative">
+          
+          {/* Avatar Container */}
+          <div className="w-24 h-24 rounded-xl border-4 border-gisviz-card bg-gisviz-canvas overflow-hidden shadow-sm shrink-0 z-10 relative flex items-center justify-center">
             {profile.avatar_path ? (
-              <img src={`${API_BASE_URL}${profile.avatar_path}`} alt={profile.user_handle} className="w-full h-full object-cover" />
+              <>
+                <img 
+                  src={getAvatarUrl(profile.avatar_path) as string} 
+                  alt={profile.user_handle} 
+                  className="w-full h-full object-cover" 
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                    e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                  }}
+                />
+                <div className="hidden w-full h-full bg-gradient-to-tr from-gisviz-accent to-emerald-400 flex items-center justify-center text-white text-[24px] font-bold uppercase font-mono shadow-inner">
+                  {profile.user_handle.charAt(0)}
+                </div>
+              </>
             ) : (
-               <div className="w-full h-full bg-gradient-to-tr from-gisviz-accent to-emerald-400 flex items-center justify-center text-white text-3xl font-bold uppercase font-mono shadow-inner">
+               <div className="w-full h-full bg-gradient-to-tr from-gisviz-accent to-emerald-400 flex items-center justify-center text-white text-[24px] font-bold uppercase font-mono shadow-inner">
                  {profile.user_handle.charAt(0)}
                </div>
             )}
           </div>
 
           <div className="flex-1 space-y-1 z-10">
-            <h1 className="text-3xl font-display font-bold text-gisviz-ink">
+            <h1 className="text-[24px] font-display font-bold text-gisviz-ink">
               @{profile.user_handle}
             </h1>
-            <p className="text-sm font-mono text-gisviz-ink-soft flex items-center gap-4">
+            <p className="text-sm font-mono text-gisviz-ink-soft flex items-center flex-wrap gap-3">
               <span>{profile.title || 'Platform Analyst'}</span>
-              <span className="w-1 h-1 rounded-full bg-gisviz-border"></span>
-              <span>Enterprise Access</span>
+              
+              {profile.location && (
+                <>
+                  <span className="flex items-center gap-1.5 text-gisviz-ink">
+                    <MapPin size={13} className="text-gisviz-accent" />
+                    {profile.location}
+                  </span>
+                </>
+              )}
             </p>
           </div>
 
           <div className="flex gap-4 font-mono text-sm z-10 w-full sm:w-auto mt-4 sm:mt-0 justify-between sm:justify-end border-t sm:border-t-0 border-gisviz-border pt-4 sm:pt-0">
             <div className="text-center sm:text-right">
-              <p className="text-2xl font-bold text-gisviz-ink">{profile.post_count || posts.length}</p>
-              <p className="text-xs text-gisviz-ink-soft uppercase tracking-wider">Publications</p>
+              <p className="text-[24px] font-bold text-gisviz-ink">{profile.post_count || posts.length}</p>
+              <p className="text-[12px] text-gisviz-ink-soft uppercase tracking-wider">Publications</p>
             </div>
             <div className="text-center sm:text-right">
-              <p className="text-2xl font-bold text-gisviz-ink">{profile.follower_count || 0}</p>
-              <p className="text-xs text-gisviz-ink-soft uppercase tracking-wider">Followers</p>
+              <p className="text-[24px] font-bold text-gisviz-ink">{profile.follower_count || 0}</p>
+              <p className="text-[12px] text-gisviz-ink-soft uppercase tracking-wider">Followers</p>
             </div>
             <div className="text-center sm:text-right">
-              <p className="text-2xl font-bold text-gisviz-ink">{profile.following_count || 0}</p>
-              <p className="text-xs text-gisviz-ink-soft uppercase tracking-wider">Following</p>
+              <p className="text-[24px] font-bold text-gisviz-ink">{profile.following_count || 0}</p>
+              <p className="text-[12px] text-gisviz-ink-soft uppercase tracking-wider">Following</p>
             </div>
           </div>
         </div>
@@ -172,23 +220,34 @@ export default function ProfileHandlePage() {
              <button 
                onClick={handleFollowToggle}
                disabled={followLoading}
-               className={`flex items-center gap-2 px-4 py-1.5 rounded-md transition-all font-mono text-xs shadow-sm disabled:opacity-50 ${
+               className={`group/btn flex items-center justify-center gap-2 px-5 py-2 rounded-full transition-all font-mono text-[12px] font-bold shadow-sm disabled:opacity-50 border ${
                  isFollowing 
-                  ? 'bg-gisviz-canvas border border-gisviz-border text-gisviz-ink hover:bg-red-50 hover:text-red-600 hover:border-red-200' 
-                  : 'bg-gisviz-accent text-white hover:bg-opacity-90'
+                  ? 'bg-gisviz-canvas border-gisviz-border text-gisviz-ink hover:bg-red-50 hover:text-red-600 hover:border-red-200' 
+                  : 'bg-gisviz-accent border-transparent text-white hover:bg-opacity-90'
                }`}
              >
                {followLoading ? (
-                 <Loader2 size={14} className="animate-spin" />
+                 <Loader2 size={15} className="animate-spin" />
                ) : isFollowing ? (
-                 <Check size={14} className="text-emerald-500" />
+                 <>
+                   <UserCheck size={15} className="block group-hover/btn:hidden text-emerald-500" />
+                   <UserMinus size={15} className="hidden group-hover/btn:block text-red-500" />
+                 </>
                ) : (
-                 <Users size={14} />
+                 <UserPlus size={15} />
                )}
-               {isFollowing ? 'Following' : 'Follow Analyst'}
+
+               {isFollowing ? (
+                 <>
+                   <span className="block group-hover/btn:hidden">Following</span>
+                   <span className="hidden group-hover/btn:block">Unfollow</span>
+                 </>
+               ) : (
+                 <span>Follow Analyst</span>
+               )}
              </button>
            ) : (
-             <Link href="/settings" className="flex items-center gap-2 bg-gisviz-rail-soft border border-gisviz-border text-gisviz-ink px-4 py-1.5 rounded-md hover:border-gisviz-ink transition-all font-mono text-xs shadow-sm">
+             <Link href="/settings" className="flex items-center gap-2 bg-gisviz-rail-soft border border-gisviz-border text-gisviz-ink px-5 py-2 rounded-full hover:border-gisviz-ink transition-all font-mono text-[12px] shadow-sm font-bold">
                Configure Profile
              </Link>
            )}
@@ -197,41 +256,62 @@ export default function ProfileHandlePage() {
 
       {/* Publications Grid */}
       <div className="flex justify-between items-center mb-4 mt-8">
-        <h2 className="text-lg font-display font-bold text-gisviz-ink flex items-center gap-2">
+        <h2 className="text-[16px] font-display font-bold text-gisviz-ink flex items-center gap-2">
           <Activity size={18} className="text-gisviz-accent" />
           {activeTab === 'publications' ? 'Recent Publications' : 'Saved Bookmarks'}
         </h2>
-        <button className="text-xs font-mono text-gisviz-ink-soft hover:text-gisviz-ink flex items-center gap-1 border border-gisviz-border px-3 py-1.5 rounded-md bg-gisviz-card">
-          <Filter size={14} /> Filter
+        
+        {/* Updated Sort Toggle Button */}
+        <button 
+          onClick={() => setSortOption(prev => prev === 'latest' ? 'alphabetical' : 'latest')}
+          className="text-[12px] font-mono text-gisviz-ink-soft hover:text-gisviz-ink flex items-center gap-1.5 border border-gisviz-border px-3 py-1.5 rounded-md bg-gisviz-card transition-colors select-none"
+        >
+          <ArrowUpDown size={14} />
+          {sortOption === 'latest' ? 'Sort: Latest' : 'Sort: A-Z'}
         </button>
       </div>
 
       {activeTab === 'publications' ? (
-        posts.length > 0 ? (
+        sortedPosts.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {posts.map((post) => (
-              <Link href={`/post/${post.post_id}`} key={post.post_id} className="bg-gisviz-card border border-gisviz-border p-5 rounded-sm hover:border-gisviz-accent transition-colors group cursor-pointer shadow-sm flex flex-col justify-between min-h-[192px] plate-enter">
+           {sortedPosts.map((post) => (
+              <Link href={`/post/${post.post_id}`} key={post.post_id} className="bg-gisviz-card border border-gisviz-border p-5 rounded-sm hover:border-gisviz-accent transition-colors group cursor-pointer shadow-sm flex flex-col justify-between min-h-[192px] plate-enter relative">
                 <div>
                   <div className="flex justify-between items-start mb-2">
                     <MapIcon className="text-gisviz-ink-soft group-hover:text-gisviz-accent transition-colors" size={20} />
-                    <ExternalLink className="text-gisviz-border group-hover:text-gisviz-ink-soft transition-colors opacity-0 group-hover:opacity-100" size={16} />
+                    
+                    {/* NEW EDIT BUTTON LOGIC */}
+                    {isOwnProfile ? (
+                      <button 
+                        onClick={(e) => {
+                          e.preventDefault(); // Stop the Link from navigating to the post
+                          router.push(`/post/${post.post_id}/edit`);
+                        }}
+                        className="text-gisviz-ink-soft hover:text-gisviz-accent transition-colors z-10 p-1 bg-gisviz-canvas rounded-md border border-transparent hover:border-gisviz-accent/30"
+                        title="Edit Publication"
+                      >
+                        <Edit2 size={16} />
+                      </button>
+                    ) : (
+                      <ExternalLink className="text-gisviz-border group-hover:text-gisviz-ink-soft transition-colors opacity-0 group-hover:opacity-100" size={16} />
+                    )}
                   </div>
                   <h3 className="font-bold text-gisviz-ink leading-tight line-clamp-2">{post.title}</h3>
                   <div className="flex gap-2 mt-3 flex-wrap">
                     {post.categories.map((cat: any) => (
-                      <span key={cat.category_id} className="text-[10px] font-mono bg-gisviz-canvas border border-gisviz-border px-2 py-0.5 rounded-full text-gisviz-ink-soft">
+                      <span key={cat.category_id} className="text-[12px] font-mono bg-gisviz-canvas border border-gisviz-border px-2 py-0.5 rounded-full text-gisviz-ink-soft">
                         {cat.label}
                       </span>
                     ))}
                     {post.categories.length === 0 && (
-                      <span className="text-[10px] font-mono bg-gisviz-canvas border border-gisviz-border px-2 py-0.5 rounded-full text-gisviz-ink-soft">
+                      <span className="text-[12px] font-mono bg-gisviz-canvas border border-gisviz-border px-2 py-0.5 rounded-full text-gisviz-ink-soft">
                         UNCLASSIFIED
                       </span>
                     )}
                   </div>
                 </div>
                 
-                <div className="flex justify-between items-center border-t border-gisviz-border pt-3 mt-4 text-xs font-mono text-gisviz-ink-soft">
+                <div className="flex justify-between items-center border-t border-gisviz-border pt-3 mt-4 text-[12px] font-mono text-gisviz-ink-soft">
                   <span>{new Date(post.created_timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                   <div className="flex gap-3">
                     <span>{post.total_likes_count || 0} Likes</span>

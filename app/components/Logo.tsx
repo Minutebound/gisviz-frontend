@@ -17,10 +17,11 @@ export default function Logo({
       style={{ transform: `scale(${scale})`, transformOrigin: 'left center' }}
       className={`group flex items-center transition-opacity hover:opacity-80 ${className}`}
     >
-      <div className={`text-gisviz-accent font-bold italic tracking-wider lowercase font-[cursive] ${textClassName}`}>
+      
+      <div className={`text-gisviz-accent italic font-bold tracking-wider font-[cursive] ${textClassName}`}>
         <span>gisviz</span>
         <span
-          className="rounded-md bg-gisviz-infos px-[7px] py-[3px] text-[8px] font-medium leading-none tracking-[0.1em] text-gisviz-ink-soft"
+          className="italic rounded-md bg-gisviz-infos ml-1 px-[4px] py-[3px] text-[8px] bg-gisviz-ink-soft/20 font-medium leading-none tracking-[0.1em] text-gisviz-ink"
           style={{ fontFamily: '"IBM Plex Mono", ui-monospace, monospace' }}
         >
           beta

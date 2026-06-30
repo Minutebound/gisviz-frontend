@@ -46,8 +46,8 @@ export default function ResetPasswordPage() {
           <div className="inline-flex items-center justify-center w-12 h-12 bg-red-600 text-white rounded-full mb-4">
             <Lock size={24} />
           </div>
-          <h1 className="text-2xl font-display font-bold text-gisviz-ink">Reconfigure Security Key</h1>
-          <p className="text-xs font-mono text-gisviz-ink-soft mt-2 uppercase tracking-wider">Authorized Protocol</p>
+          <h1 className="text-[24px] font-display font-bold text-gisviz-ink">Reconfigure Security Key</h1>
+          <p className="text-[12px] font-mono text-gisviz-ink-soft mt-2 uppercase tracking-wider">Authorized Protocol</p>
         </div>
 
         {errorMsg && <div className="p-3 mb-6 bg-red-50 border border-red-200 text-red-600 text-sm font-mono rounded-md">{errorMsg}</div>}
@@ -55,7 +55,7 @@ export default function ResetPasswordPage() {
 
         <form onSubmit={handleReset} className="space-y-4">
           <div>
-            <label className="block text-xs font-mono text-gisviz-ink-soft mb-1 uppercase tracking-wider">New Security Key</label>
+            <label className="block text-[12px] font-mono text-gisviz-ink-soft mb-1 uppercase tracking-wider">New Security Key</label>
             <div className="relative">
               <Lock className="absolute left-3 top-2.5 text-gisviz-ink-soft" size={16} />
               <input 
@@ -78,7 +78,7 @@ export default function ResetPasswordPage() {
           </button>
           
           <div className="text-center mt-6">
-              <button type="button" onClick={() => router.push('/auth')} className="text-xs font-mono text-gisviz-accent hover:underline">Abort and return to Login</button>
+              <button type="button" onClick={() => router.push('/auth')} className="text-[12px] font-mono text-gisviz-accent hover:underline">Abort and return to Login</button>
           </div>
         </form>
 

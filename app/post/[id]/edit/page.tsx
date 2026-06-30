@@ -1,16 +1,21 @@
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
-import { useRouter } from 'next/navigation'
-import { UploadCloud, Image as ImageIcon, Loader2, Map as MapIcon, X, Tag, Info, Link as LinkIcon, Send } from 'lucide-react'
-import { useAuth } from '../../context/AuthContext'
-import { gisvizApi } from '../../services/api'
+import { useParams, useRouter } from 'next/navigation'
+import { Edit2, Image as ImageIcon, Loader2, Map as MapIcon, X, Tag, Info, Link as LinkIcon, Send, Save, ArrowLeft } from 'lucide-react'
+import { useAuth } from '../../../../context/AuthContext'
+import { gisvizApi } from '../../../../services/api'
 
-export default function UploadPage() {
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
+
+export default function EditPostPage() {
+  const params = useParams()
   const router = useRouter()
-  const { user, isAuthenticated, isLoading: authLoading } = useAuth()
+  const postId = params.id as string
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth() as any
   
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSaving, setIsSaving] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
   const [successMsg, setSuccessMsg] = useState('')
   
@@ -33,27 +38,53 @@ export default function UploadPage() {
   // File State
   const [file, setFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [existingImagePath, setExistingImagePath] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Redirect if not logged in
+  // Initialization
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
-      router.push('/auth?redirect=/upload')
+      router.push('/auth')
+      return
     }
-  }, [isAuthenticated, authLoading, router])
 
-  useEffect(() => {
-    fetchCats()
-  }, [])
+    const initData = async () => {
+      try {
+        const [cats, postData] = await Promise.all([
+          gisvizApi.listCategories(),
+          gisvizApi.fetchPost(postId)
+        ])
+        
+        setAvailableCategories(cats)
 
-  const fetchCats = async () => {
-    try {
-      const cats = await gisvizApi.listCategories()
-      setAvailableCategories(cats)
-    } catch (err) {
-      console.error("Failed to fetch categories", err)
+        // Security check: only the publisher (or an admin) can edit
+        if (postData.publisher_user_id !== user?.user_id && user?.role_name !== 'admin' && user?.role_name !== 'editor') {
+            router.push(`/post/${postId}`)
+            return
+        }
+
+        setTitle(postData.title)
+        setDescription(postData.description || '')
+        setNote(postData.note || '')
+        setSourceName(postData.source_name || '')
+        setSourceUrl(postData.source_url || '')
+        setKeywordString(postData.keywords.map((k: any) => k.word).join(', '))
+        setSelectedCategoryIds(postData.categories.map((c: any) => c.category_id))
+        
+        setExistingImagePath(postData.visual_image_path)
+        if (postData.visual_image_path) {
+          setPreviewUrl(`${API_BASE_URL}${postData.visual_image_path}`)
+        }
+
+      } catch (err) {
+        setErrorMsg("Failed to load publication data.")
+      } finally {
+        setIsLoading(false)
+      }
     }
-  }
+
+    if (postId && user) initData()
+  }, [postId, isAuthenticated, authLoading, user, router])
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -97,48 +128,58 @@ export default function UploadPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!file) { setErrorMsg('Please upload a visual file before publishing.'); return }
     if (!title.trim()) { setErrorMsg('A title is required.'); return }
 
-    setIsLoading(true)
+    setIsSaving(true)
     setErrorMsg('')
 
     try {
-      const uploadRes = await gisvizApi.uploadVisual(file)
-      
+      let finalImagePath = existingImagePath;
+
+      // Only upload a new image if the user actually selected one
+      if (file) {
+        const uploadRes = await gisvizApi.uploadVisual(file)
+        finalImagePath = uploadRes.visual_path
+      }
+
       const keywords = keywordString.split(',').map(k => k.trim()).filter(k => k.length > 0)
 
-      const postRes = await gisvizApi.createPost({
+      await gisvizApi.updatePost(postId, {
         title,
         description: description || null,
         note: note || null,
         source_name: sourceName || null,
         source_url: sourceUrl || null,
-        visual_image_path: uploadRes.visual_path,
+        visual_image_path: finalImagePath,
         category_ids: selectedCategoryIds,
         keywords
       })
 
-      router.push(`/post/${postRes.post_id}`)
+      // Redirect back to the post view upon successful save
+      router.push(`/post/${postId}`)
     } catch (err: any) {
       const detail = err.response?.data?.detail
-      setErrorMsg(typeof detail === 'string' ? detail : 'Failed to publish the post. Please try again.')
+      setErrorMsg(typeof detail === 'string' ? detail : 'Failed to update the post. Please try again.')
     } finally {
-      setIsLoading(false)
+      setIsSaving(false)
     }
   }
 
-  if (authLoading || !user) return <div className="flex justify-center items-center h-64"><Loader2 size={32} className="animate-spin text-gisviz-accent" /></div>
+  if (isLoading) return <div className="flex justify-center items-center h-[calc(100vh-4rem)]"><Loader2 size={32} className="animate-spin text-gisviz-accent" /></div>
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8 pb-24">
       
+      <button onClick={() => router.back()} className="flex items-center gap-2 text-gisviz-ink-soft hover:text-gisviz-accent font-mono text-xs uppercase tracking-wider mb-6 transition-colors">
+        <ArrowLeft size={14} /> Cancel Editing
+      </button>
+
       <div className="mb-8">
         <h1 className="text-3xl font-display font-bold text-gisviz-ink flex items-center gap-3">
-          <UploadCloud className="text-gisviz-accent" size={32} />
-          Publish Spatial Data
+          <Edit2 className="text-gisviz-accent" size={32} />
+          Edit Publication
         </h1>
-        <p className="text-gisviz-ink-soft font-mono mt-2">Upload a new visual map, dataset rendering, or dashboard to the global feed.</p>
+        <p className="text-gisviz-ink-soft font-mono mt-2">Update your visual map, dataset metadata, or sources.</p>
       </div>
 
       {errorMsg && (
@@ -169,7 +210,7 @@ export default function UploadPage() {
               <>
                 <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
                 <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white">
-                  <UploadCloud size={32} className="mb-2" />
+                  <Edit2 size={32} className="mb-2" />
                   <span className="font-mono text-sm font-bold uppercase tracking-wider">Change Visual</span>
                 </div>
               </>
@@ -288,7 +329,7 @@ export default function UploadPage() {
                   <div className="flex-1 w-full">
                     <select 
                       onChange={addCategory}
-                      defaultValue=""
+                      value=""
                       className="w-full bg-gisviz-canvas border border-gisviz-border rounded-md px-3 py-2.5 text-gisviz-ink text-sm focus:ring-2 focus:ring-gisviz-accent outline-none font-mono"
                     >
                       <option value="" disabled>+ Add an existing Category...</option>
@@ -340,12 +381,12 @@ export default function UploadPage() {
 
             {/* Submit */}
             <div className="pt-6 border-t border-gisviz-border flex justify-end gap-4">
-              <button type="button" onClick={() => router.back()} disabled={isLoading} className="px-6 py-2.5 rounded-md font-mono text-sm border border-gisviz-border text-gisviz-ink-soft hover:bg-gisviz-rail transition-colors">
+              <button type="button" onClick={() => router.back()} disabled={isSaving} className="px-6 py-2.5 rounded-md font-mono text-sm border border-gisviz-border text-gisviz-ink-soft hover:bg-gisviz-rail transition-colors">
                 Cancel
               </button>
-              <button type="submit" disabled={isLoading} className="flex items-center gap-2 bg-gisviz-accent text-white py-2.5 px-8 rounded-md hover:bg-opacity-90 transition-all font-mono text-sm font-bold shadow-md disabled:opacity-70">
-                {isLoading ? <Loader2 size={18} className="animate-spin" /> : <UploadCloud size={18} />}
-                {isLoading ? 'Publishing...' : 'Publish to Feed'}
+              <button type="submit" disabled={isSaving} className="flex items-center gap-2 bg-gisviz-accent text-white py-2.5 px-8 rounded-md hover:bg-opacity-90 transition-all font-mono text-sm font-bold shadow-md disabled:opacity-70">
+                {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
+                {isSaving ? 'Saving...' : 'Save Changes'}
               </button>
             </div>
 

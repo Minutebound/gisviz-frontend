@@ -70,14 +70,26 @@ export const gisvizApi = {
     return res.data;
   },
 
-  // ----- Profile Endpoints -----
-  fetchUserProfile: async (handle: string) => {
-    const res = await axiosInstance.get(`/users/profile/${handle}`);
+  // ----- Users Endpoints -----
+  fetchUserProfile: async (handle: string, currentUserId?: string) => {
+    const params: any = {};
+    if (currentUserId) params.current_user_id = currentUserId;
+    
+    const res = await axiosInstance.get(`/users/profile/${handle}`, { params });
     return res.data;
   },
 
   fetchUserPosts: async (handle: string, skip = 0, limit = 50) => {
     const res = await axiosInstance.get(`/posts/user/${handle}`, { params: { skip, limit } });
+    return res.data;
+  },
+
+  // ----- Profile & Users Endpoints -----
+  getPopularPublishers: async (limit = 15, currentUserId?: string) => {
+    const params: any = { limit };
+    if (currentUserId) params.current_user_id = currentUserId;
+    
+    const res = await axiosInstance.get(`/users/popular`, { params });
     return res.data;
   },
 
@@ -117,8 +129,25 @@ export const gisvizApi = {
     visual_image_path: string | null;
     category_ids: number[];
     keywords: string[];
+    note?: string | null;
+    source_name?: string | null;
+    source_url?: string | null;
   }) => {
     const res = await axiosInstance.post('/posts', payload)
+    return res.data
+  },
+
+  updatePost: async (postId: string, payload: {
+    title: string;
+    description: string | null;
+    visual_image_path: string | null;
+    category_ids: number[];
+    keywords: string[];
+    note?: string | null;
+    source_name?: string | null;
+    source_url?: string | null;
+  }) => {
+    const res = await axiosInstance.put(`/posts/${postId}`, payload)
     return res.data
   },
 
@@ -128,7 +157,6 @@ export const gisvizApi = {
   },
 
   reportPost: async (postId: string, reason: string, details: string) => {
-    // Combine reason and details into a single string if your backend only has one 'reason' column
     const fullReason = details ? `${reason}: ${details}` : reason;
     
     const res = await axiosInstance.post(`/posts/${postId}/report`, {
@@ -169,6 +197,22 @@ export const gisvizApi = {
 
   suggestCategory: async (label: string) => {
     const res = await axiosInstance.post(`/categories/suggest`, { label });
+    return res.data;
+  },
+
+  // ----- Pending Categories (Admin/Editor) -----
+  getPendingCategories: async () => {
+    const res = await axiosInstance.get(`/categories/pending`);
+    return res.data;
+  },
+
+  approvePendingCategory: async (pendingId: string) => {
+    const res = await axiosInstance.post(`/categories/pending/${pendingId}/approve`);
+    return res.data;
+  },
+
+  rejectPendingCategory: async (pendingId: string) => {
+    const res = await axiosInstance.post(`/categories/pending/${pendingId}/reject`);
     return res.data;
   },
 
