@@ -80,11 +80,11 @@ export default function SharePost({ isOpen, onClose, url, title }: ShareModalPro
             </label>
             <div className="flex gap-2">
               <div className="flex-1 bg-gisviz-canvas border border-gisviz-border rounded-md px-3 py-2 flex items-center overflow-hidden">
-                <span className="text-sm font-mono text-gisviz-ink truncate">{url}</span>
+                <span className="text-[12px] font-mono text-gisviz-ink truncate">{url}</span>
               </div>
               <button 
                 onClick={handleCopy}
-                className="flex items-center justify-center gap-2 bg-gisviz-accent text-white px-4 py-2 rounded-md hover:bg-opacity-90 transition-all font-mono text-sm shrink-0 shadow-sm w-28"
+                className="flex items-center justify-center gap-2 bg-gisviz-accent text-white px-4 py-2 rounded-md hover:bg-opacity-90 transition-all font-mono text-[12px] shrink-0 shadow-sm w-28"
               >
                 {copied ? <><Check size={16} /> Copied</> : <><LinkIcon size={16} /> Copy</>}
               </button>

@@ -175,8 +175,8 @@ function AuthContent() {
           </p>
         </div>
 
-        {errorMsg && <div className="p-3 mb-6 bg-red-50 border border-red-200 text-red-600 text-sm font-mono rounded-md">{errorMsg}</div>}
-        {successMsg && <div className="p-3 mb-6 bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm font-mono rounded-md">{successMsg}</div>}
+        {errorMsg && <div className="p-3 mb-6 bg-red-50 border border-gisviz-alert/60 text-gisviz-alert/90 text-[12px] font-mono rounded-md">{errorMsg}</div>}
+        {successMsg && <div className="p-3 mb-6 bg-gisviz-safe/5  border border-gisviz-safe/20    text-gisviz-safe/70       text-[12px] font-mono rounded-md">{successMsg}</div>}
         {devNotice && <div className="p-3 mb-6 bg-yellow-50 border border-yellow-300 text-yellow-800 text-[12px] font-mono rounded-md break-all">{devNotice}</div>}
 
         {/* LOGIN VIEW */}
@@ -186,17 +186,17 @@ function AuthContent() {
               <label className="block text-[12px] font-mono text-gisviz-ink-soft mb-1 uppercase tracking-wider">Handle or Email</label>
               <div className="relative">
                 <AtSign className="absolute left-3 top-2.5 text-gisviz-ink-soft" size={16} />
-                <input required type="text" name="user_handle" onChange={handleChange} className="w-full bg-gisviz-canvas border border-gisviz-border rounded-md pl-10 pr-4 py-2 text-gisviz-ink focus:ring-2 focus:ring-gisviz-accent outline-none font-mono text-sm" />
+                <input required type="text" name="user_handle" onChange={handleChange} className="w-full bg-gisviz-canvas border border-gisviz-border rounded-md pl-10 pr-4 py-2 text-gisviz-ink focus:ring-2 focus:ring-gisviz-accent outline-none font-mono text-[12px]" />
               </div>
             </div>
             <div>
               <label className="block text-[12px] font-mono text-gisviz-ink-soft mb-1 uppercase tracking-wider">Security Key</label>
               <div className="relative">
                 <Lock className="absolute left-3 top-2.5 text-gisviz-ink-soft" size={16} />
-                <input required type="password" name="password" onChange={handleChange} className="w-full bg-gisviz-canvas border border-gisviz-border rounded-md pl-10 pr-4 py-2 text-gisviz-ink focus:ring-2 focus:ring-gisviz-accent outline-none font-mono text-sm" />
+                <input required type="password" name="password" onChange={handleChange} className="w-full bg-gisviz-canvas border border-gisviz-border rounded-md pl-10 pr-4 py-2 text-gisviz-ink focus:ring-2 focus:ring-gisviz-accent outline-none font-mono text-[12px]" />
               </div>
             </div>
-            <button type="submit" disabled={isLoading} className="w-full flex items-center justify-center gap-2 bg-gisviz-accent text-white py-2.5 rounded-md hover:bg-opacity-90 transition-all font-mono text-sm font-bold mt-6">
+            <button type="submit" disabled={isLoading} className="w-full flex items-center justify-center gap-2 bg-gisviz-accent text-white py-2.5 rounded-md hover:bg-opacity-90 transition-all font-mono text-[12px] font-bold mt-6">
               {isLoading ? <Loader2 size={16} className="animate-spin" /> : 'Initialize Session'}
             </button>
             <div className="flex justify-between mt-4 text-[12px] font-mono text-gisviz-accent">
@@ -213,24 +213,24 @@ function AuthContent() {
               <label className="block text-[12px] font-mono text-gisviz-ink-soft mb-1 uppercase tracking-wider">User Handle</label>
               <div className="relative">
                 <AtSign className="absolute left-3 top-2.5 text-gisviz-ink-soft" size={16} />
-                <input required type="text" name="user_handle" onChange={handleChange} className="w-full bg-gisviz-canvas border border-gisviz-border rounded-md pl-10 pr-4 py-2 text-gisviz-ink focus:ring-2 focus:ring-gisviz-accent outline-none font-mono text-sm" />
+                <input required type="text" name="user_handle" onChange={handleChange} className="w-full bg-gisviz-canvas border border-gisviz-border rounded-md pl-10 pr-4 py-2 text-gisviz-ink focus:ring-2 focus:ring-gisviz-accent outline-none font-mono text-[12px]" />
               </div>
             </div>
             <div>
               <label className="block text-[12px] font-mono text-gisviz-ink-soft mb-1 uppercase tracking-wider">Email Address</label>
               <div className="relative">
                 <Mail className="absolute left-3 top-2.5 text-gisviz-ink-soft" size={16} />
-                <input required type="email" name="email_address" onChange={handleChange} className="w-full bg-gisviz-canvas border border-gisviz-border rounded-md pl-10 pr-4 py-2 text-gisviz-ink focus:ring-2 focus:ring-gisviz-accent outline-none font-mono text-sm" />
+                <input required type="email" name="email_address" onChange={handleChange} className="w-full bg-gisviz-canvas border border-gisviz-border rounded-md pl-10 pr-4 py-2 text-gisviz-ink focus:ring-2 focus:ring-gisviz-accent outline-none font-mono text-[12px]" />
               </div>
             </div>
             <div>
               <label className="block text-[12px] font-mono text-gisviz-ink-soft mb-1 uppercase tracking-wider">Security Key</label>
               <div className="relative">
                 <Lock className="absolute left-3 top-2.5 text-gisviz-ink-soft" size={16} />
-                <input required type="password" name="password" onChange={handleChange} minLength={8} className="w-full bg-gisviz-canvas border border-gisviz-border rounded-md pl-10 pr-4 py-2 text-gisviz-ink focus:ring-2 focus:ring-gisviz-accent outline-none font-mono text-sm" />
+                <input required type="password" name="password" onChange={handleChange} minLength={8} className="w-full bg-gisviz-canvas border border-gisviz-border rounded-md pl-10 pr-4 py-2 text-gisviz-ink focus:ring-2 focus:ring-gisviz-accent outline-none font-mono text-[12px]" />
               </div>
             </div>
-            <button type="submit" disabled={isLoading} className="w-full flex items-center justify-center gap-2 bg-gisviz-ink text-white py-2.5 rounded-md hover:bg-opacity-90 transition-all font-mono text-sm font-bold mt-6">
+            <button type="submit" disabled={isLoading} className="w-full flex items-center justify-center gap-2 bg-gisviz-ink text-white py-2.5 rounded-md hover:bg-opacity-90 transition-all font-mono text-[12px] font-bold mt-6">
               {isLoading ? <Loader2 size={16} className="animate-spin" /> : <><UserPlus size={16} /> Submit Credentials</>}
             </button>
             <div className="text-center mt-4">
@@ -242,7 +242,7 @@ function AuthContent() {
         {/* VERIFY VIEW */}
         {view === 'verify' && (
           <form onSubmit={handleVerify} className="space-y-4">
-            <p className="text-sm font-mono text-gisviz-ink-soft text-center mb-6">
+            <p className="text-[12px] font-mono text-gisviz-ink-soft text-center mb-6">
               Enter the 6-digit code sent to <br/>
               <span className="font-bold text-gisviz-ink">{formData.email_address || 'your email address'}</span>
             </p>
@@ -250,7 +250,7 @@ function AuthContent() {
               <label className="block text-[12px] font-mono text-gisviz-ink-soft mb-1 uppercase tracking-wider text-center">Verification Code</label>
               <input required type="text" maxLength={6} name="otp" onChange={handleChange} className="w-full text-center tracking-[0.5em] bg-gisviz-canvas border border-gisviz-border rounded-md px-4 py-4 text-gisviz-ink text-[24px] font-bold focus:ring-2 focus:ring-gisviz-accent outline-none font-mono" placeholder="••••••" />
             </div>
-            <button type="submit" disabled={isLoading} className="w-full flex items-center justify-center gap-2 bg-emerald-600 text-white py-2.5 rounded-md hover:bg-opacity-90 transition-all font-mono text-sm font-bold mt-6">
+            <button type="submit" disabled={isLoading} className="w-full flex items-center justify-center gap-2 bg-gisviz-safe/60      text-white py-2.5 rounded-md hover:bg-opacity-90 transition-all font-mono text-[12px] font-bold mt-6">
               {isLoading ? <Loader2 size={16} className="animate-spin" /> : 'Verify Identity'}
             </button>
             
@@ -277,15 +277,15 @@ function AuthContent() {
         {/* FORGOT PASSWORD VIEW */}
         {view === 'forgot' && (
           <form onSubmit={handleForgot} className="space-y-4">
-            <p className="text-sm font-mono text-gisviz-ink-soft text-center mb-4">Submit your email to receive a recovery token.</p>
+            <p className="text-[12px] font-mono text-gisviz-ink-soft text-center mb-4">Submit your email to receive a recovery token.</p>
             <div>
               <label className="block text-[12px] font-mono text-gisviz-ink-soft mb-1 uppercase tracking-wider">Email Address</label>
               <div className="relative">
                 <Mail className="absolute left-3 top-2.5 text-gisviz-ink-soft" size={16} />
-                <input required type="email" name="email_address" onChange={handleChange} className="w-full bg-gisviz-canvas border border-gisviz-border rounded-md pl-10 pr-4 py-2 text-gisviz-ink focus:ring-2 focus:ring-gisviz-accent outline-none font-mono text-sm" />
+                <input required type="email" name="email_address" onChange={handleChange} className="w-full bg-gisviz-canvas border border-gisviz-border rounded-md pl-10 pr-4 py-2 text-gisviz-ink focus:ring-2 focus:ring-gisviz-accent outline-none font-mono text-[12px]" />
               </div>
             </div>
-            <button type="submit" disabled={isLoading} className="w-full flex items-center justify-center gap-2 bg-gisviz-ink text-white py-2.5 rounded-md hover:bg-opacity-90 transition-all font-mono text-sm font-bold mt-6">
+            <button type="submit" disabled={isLoading} className="w-full flex items-center justify-center gap-2 bg-gisviz-ink text-white py-2.5 rounded-md hover:bg-opacity-90 transition-all font-mono text-[12px] font-bold mt-6">
               {isLoading ? <Loader2 size={16} className="animate-spin" /> : <><ArrowRight size={16} /> Dispatch Token</>}
             </button>
             <div className="text-center mt-4">

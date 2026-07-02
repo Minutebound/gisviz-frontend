@@ -66,14 +66,14 @@ export default function ModerationDashboard() {
   if (isForbidden) {
     return (
       <div className="max-w-md mx-auto py-20 px-4 text-center">
-        <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
+        <div className="w-16 h-16 bg-red-50 text-gisviz-alert/80 rounded-full flex items-center justify-center mx-auto mb-6">
           <ShieldAlert size={32} />
         </div>
         <h2 className="text-[16px] font-display font-bold text-gisviz-ink mb-2">Access Restricted</h2>
-        <p className="text-gisviz-ink-soft font-mono text-sm mb-8">
+        <p className="text-gisviz-ink-soft font-mono text-[12px] mb-8">
           You do not have the required administrative permissions to view this moderation queue.
         </p>
-        <Link href="/" className="inline-flex items-center gap-2 text-gisviz-accent hover:underline font-mono text-sm">
+        <Link href="/" className="inline-flex items-center gap-2 text-gisviz-accent hover:underline font-mono text-[12px]">
           <ArrowLeft size={16} /> Return to Homepage
         </Link>
       </div>
@@ -85,9 +85,9 @@ export default function ModerationDashboard() {
     <div className="max-w-6xl mx-auto py-10 px-4">
       <div className="mb-8">
         <h1 className="text-[24px] font-display font-bold text-gisviz-ink flex items-center gap-3">
-          <Flag className="text-red-500" size={24} /> Moderation Queue
+          <Flag className="text-gisviz-alert/80" size={24} /> Moderation Queue
         </h1>
-        <p className="text-gisviz-ink-soft font-mono text-sm mt-2">Manage reported content and user access.</p>
+        <p className="text-gisviz-ink-soft font-mono text-[12px] mt-2">Manage reported content and user access.</p>
       </div>
 
       <div className="bg-gisviz-card border border-gisviz-border rounded-sm shadow-sm overflow-hidden">
@@ -126,7 +126,7 @@ export default function ModerationDashboard() {
                   <button 
                     onClick={() => handleDeletePost(report.post_id, report.report_id)}
                     disabled={processing === report.report_id}
-                    className="text-red-500 hover:text-red-700 flex items-center gap-1 font-bold disabled:opacity-50"
+                    className="text-gisviz-alert/80 hover:text-gisviz-alert flex items-center gap-1 font-bold disabled:opacity-50"
                   >
                     {processing === report.report_id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />} Remove
                   </button>

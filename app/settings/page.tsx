@@ -227,12 +227,12 @@ export default function SettingsPage() {
       {/* --- PROFILE CONFIGURATION --- */}
       <div className="bg-gisviz-card border border-gisviz-border shadow-md p-6 sm:p-8 rounded-sm mb-8 relative">
         {successMsg && (
-          <div className="p-4 mb-6 rounded-md text-sm font-mono border bg-emerald-50 text-emerald-700 border-emerald-200">
+          <div className="p-4 mb-6 rounded-md text-[12px] font-mono border bg-gisviz-safe/5  text-gisviz-safe/70       border-gisviz-safe-200">
             {successMsg}
           </div>
         )}
         {errorMsg && (
-          <div className="p-4 mb-6 rounded-md text-sm font-mono border bg-red-50 text-red-600 border-red-200">
+          <div className="p-4 mb-6 rounded-md text-[12px] font-mono border bg-red-50 text-gisviz-alert/90 border-gisviz-alert/60">
             {errorMsg}
           </div>
         )}
@@ -241,7 +241,7 @@ export default function SettingsPage() {
           
           {/* Section: Base Identity */}
           <div className="space-y-4">
-            <h2 className="text-[16px] font-bold text-gisviz-ink border-b border-gisviz-border pb-2 uppercase tracking-wide font-mono text-sm flex items-center gap-2">
+            <h2 className="text-[16px] font-bold text-gisviz-ink border-b border-gisviz-border pb-2 uppercase tracking-wide font-mono text-[12px] flex items-center gap-2">
               <AtSign size={16} /> Identity & Avatar
             </h2>
             
@@ -281,7 +281,7 @@ export default function SettingsPage() {
                 <label className="flex items-center gap-1 text-[12px] font-mono text-gisviz-ink-soft mb-2 uppercase">
                    User Handle <Lock size={12} className="text-gisviz-ink-soft opacity-70"/>
                 </label>
-                <div className="w-full bg-gisviz-canvas/50 border border-gisviz-border/50 rounded-md px-4 py-2.5 text-gisviz-ink font-bold font-mono text-sm shadow-inner">
+                <div className="w-full bg-gisviz-canvas/50 border border-gisviz-border/50 rounded-md px-4 py-2.5 text-gisviz-ink font-bold font-mono text-[12px] shadow-inner">
                   @{user.user_handle}
                 </div>
               </div>
@@ -289,7 +289,7 @@ export default function SettingsPage() {
                 <label className="flex items-center gap-1 text-[12px] font-mono text-gisviz-ink-soft mb-2 uppercase">
                    System Role <Lock size={12} className="text-gisviz-ink-soft opacity-70"/>
                 </label>
-                <div className="w-full bg-gisviz-canvas/50 border border-gisviz-border/50 rounded-md px-4 py-2.5 text-gisviz-accent font-bold font-mono text-sm shadow-inner">
+                <div className="w-full bg-gisviz-canvas/50 border border-gisviz-border/50 rounded-md px-4 py-2.5 text-gisviz-accent font-bold font-mono text-[12px] shadow-inner">
                   {user.role_name?.toUpperCase() || 'VIEWER'}
                 </div>
               </div>
@@ -298,7 +298,7 @@ export default function SettingsPage() {
 
           {/* Section: Professional Info & Location */}
           <div className="space-y-4 pt-4">
-            <h2 className="text-[16px] font-bold text-gisviz-ink border-b border-gisviz-border pb-2 uppercase tracking-wide font-mono text-sm flex items-center gap-2">
+            <h2 className="text-[16px] font-bold text-gisviz-ink border-b border-gisviz-border pb-2 uppercase tracking-wide font-mono text-[12px] flex items-center gap-2">
               <Briefcase size={16} /> Professional Background
             </h2>
             
@@ -311,7 +311,7 @@ export default function SettingsPage() {
                   value={getInputValue(formData.title, !!editingFields.title)}
                   disabled={!editingFields.title}
                   onChange={handleChange}
-                  className={`w-full rounded-md px-4 py-2.5 text-sm outline-none font-mono transition-colors border ${!editingFields.title ? 'bg-gisviz-canvas/50 border-gisviz-border/50 text-gisviz-ink font-bold shadow-inner' : 'bg-gisviz-canvas border-gisviz-border text-gisviz-ink focus:ring-2 focus:ring-gisviz-accent'} ${!formData.title && !editingFields.title ? 'text-gisviz-ink-soft italic font-normal' : ''}`}
+                  className={`w-full rounded-md px-4 py-2.5 text-[12px] outline-none font-mono transition-colors border ${!editingFields.title ? 'bg-gisviz-canvas/50 border-gisviz-border/50 text-gisviz-ink font-bold shadow-inner' : 'bg-gisviz-canvas border-gisviz-border text-gisviz-ink focus:ring-2 focus:ring-gisviz-accent'} ${!formData.title && !editingFields.title ? 'text-gisviz-ink-soft italic font-normal' : ''}`}
                   placeholder="e.g. Senior Cartographer at MapBox"
                 />
               </div>
@@ -323,13 +323,13 @@ export default function SettingsPage() {
                   value={getInputValue(locationQuery, !!editingFields.location)}
                   disabled={!editingFields.location}
                   onChange={(e) => searchLocation(e.target.value)}
-                  className={`w-full rounded-md px-4 py-2.5 text-sm outline-none font-mono transition-colors border ${!editingFields.location ? 'bg-gisviz-canvas/50 border-gisviz-border/50 text-gisviz-ink font-bold shadow-inner' : 'bg-gisviz-canvas border-gisviz-border text-gisviz-ink focus:ring-2 focus:ring-gisviz-accent'} ${!locationQuery && !editingFields.location ? 'text-gisviz-ink-soft italic font-normal' : ''}`}
+                  className={`w-full rounded-md px-4 py-2.5 text-[12px] outline-none font-mono transition-colors border ${!editingFields.location ? 'bg-gisviz-canvas/50 border-gisviz-border/50 text-gisviz-ink font-bold shadow-inner' : 'bg-gisviz-canvas border-gisviz-border text-gisviz-ink focus:ring-2 focus:ring-gisviz-accent'} ${!locationQuery && !editingFields.location ? 'text-gisviz-ink-soft italic font-normal' : ''}`}
                   placeholder="e.g. Boulder, Colorado..."
                 />
                 {isSearchingLocation && <Loader2 className="absolute right-3 top-9 animate-spin text-gisviz-ink-soft" size={16} />}
                 
                 {editingFields.location && locationSuggestions.length > 0 && (
-                  <ul className="absolute z-10 w-full mt-1 bg-gisviz-card border border-gisviz-border shadow-lg rounded-md overflow-hidden font-mono text-sm max-h-48 overflow-y-auto">
+                  <ul className="absolute z-10 w-full mt-1 bg-gisviz-card border border-gisviz-border shadow-lg rounded-md overflow-hidden font-mono text-[12px] max-h-48 overflow-y-auto">
                     {locationSuggestions.map((item, i) => (
                       <li key={i} onClick={() => selectLocation(item)} className="px-4 py-2 hover:bg-gisviz-accent hover:text-white cursor-pointer border-b border-gisviz-border last:border-0 truncate transition-colors text-gisviz-ink">
                         {item.display_name}
@@ -343,24 +343,24 @@ export default function SettingsPage() {
 
           {/* Section: Social Graph */}
           <div className="space-y-4 pt-4">
-            <h2 className="text-[16px] font-bold text-gisviz-ink border-b border-gisviz-border pb-2 uppercase tracking-wide font-mono text-sm flex items-center gap-2">
+            <h2 className="text-[16px] font-bold text-gisviz-ink border-b border-gisviz-border pb-2 uppercase tracking-wide font-mono text-[12px] flex items-center gap-2">
               <LinkIcon size={16} /> Network Links
             </h2>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <LabelWithEdit label="LinkedIn URL" fieldName="linkedin" />
-                <input type="url" name="linkedin_url" value={getInputValue(formData.linkedin_url, !!editingFields.linkedin)} disabled={!editingFields.linkedin} onChange={handleChange} className={`w-full rounded-md px-4 py-2.5 text-sm outline-none font-mono border ${!editingFields.linkedin ? 'bg-gisviz-canvas/50 border-gisviz-border/50 text-gisviz-ink font-bold shadow-inner' : 'bg-gisviz-canvas border-gisviz-border focus:ring-2 focus:ring-gisviz-accent'} ${!formData.linkedin_url && !editingFields.linkedin ? 'text-gisviz-ink-soft italic font-normal' : ''}`} placeholder="https://linkedin.com/in/..." />
+                <input type="url" name="linkedin_url" value={getInputValue(formData.linkedin_url, !!editingFields.linkedin)} disabled={!editingFields.linkedin} onChange={handleChange} className={`w-full rounded-md px-4 py-2.5 text-[12px] outline-none font-mono border ${!editingFields.linkedin ? 'bg-gisviz-canvas/50 border-gisviz-border/50 text-gisviz-ink font-bold shadow-inner' : 'bg-gisviz-canvas border-gisviz-border focus:ring-2 focus:ring-gisviz-accent'} ${!formData.linkedin_url && !editingFields.linkedin ? 'text-gisviz-ink-soft italic font-normal' : ''}`} placeholder="https://linkedin.com/in/..." />
               </div>
 
               <div>
                 <LabelWithEdit label="Medium URL" fieldName="medium" />
-                <input type="url" name="medium_url" value={getInputValue(formData.medium_url, !!editingFields.medium)} disabled={!editingFields.medium} onChange={handleChange} className={`w-full rounded-md px-4 py-2.5 text-sm outline-none font-mono border ${!editingFields.medium ? 'bg-gisviz-canvas/50 border-gisviz-border/50 text-gisviz-ink font-bold shadow-inner' : 'bg-gisviz-canvas border-gisviz-border focus:ring-2 focus:ring-gisviz-accent'} ${!formData.medium_url && !editingFields.medium ? 'text-gisviz-ink-soft italic font-normal' : ''}`} placeholder="https://medium.com/@..." />
+                <input type="url" name="medium_url" value={getInputValue(formData.medium_url, !!editingFields.medium)} disabled={!editingFields.medium} onChange={handleChange} className={`w-full rounded-md px-4 py-2.5 text-[12px] outline-none font-mono border ${!editingFields.medium ? 'bg-gisviz-canvas/50 border-gisviz-border/50 text-gisviz-ink font-bold shadow-inner' : 'bg-gisviz-canvas border-gisviz-border focus:ring-2 focus:ring-gisviz-accent'} ${!formData.medium_url && !editingFields.medium ? 'text-gisviz-ink-soft italic font-normal' : ''}`} placeholder="https://medium.com/@..." />
               </div>
 
               <div className="md:col-span-2">
                 <LabelWithEdit label="Personal Website / Portfolio" fieldName="website" />
-                <input type="url" name="website_url" value={getInputValue(formData.website_url, !!editingFields.website)} disabled={!editingFields.website} onChange={handleChange} className={`w-full rounded-md px-4 py-2.5 text-sm outline-none font-mono border ${!editingFields.website ? 'bg-gisviz-canvas/50 border-gisviz-border/50 text-gisviz-ink font-bold shadow-inner' : 'bg-gisviz-canvas border-gisviz-border focus:ring-2 focus:ring-gisviz-accent'} ${!formData.website_url && !editingFields.website ? 'text-gisviz-ink-soft italic font-normal' : ''}`} placeholder="https://yourdomain.com" />
+                <input type="url" name="website_url" value={getInputValue(formData.website_url, !!editingFields.website)} disabled={!editingFields.website} onChange={handleChange} className={`w-full rounded-md px-4 py-2.5 text-[12px] outline-none font-mono border ${!editingFields.website ? 'bg-gisviz-canvas/50 border-gisviz-border/50 text-gisviz-ink font-bold shadow-inner' : 'bg-gisviz-canvas border-gisviz-border focus:ring-2 focus:ring-gisviz-accent'} ${!formData.website_url && !editingFields.website ? 'text-gisviz-ink-soft italic font-normal' : ''}`} placeholder="https://yourdomain.com" />
               </div>
             </div>
           </div>
@@ -371,7 +371,7 @@ export default function SettingsPage() {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="flex items-center gap-2 bg-gisviz-accent text-white py-3 px-8 rounded-full hover:bg-opacity-90 transition-all font-mono text-sm shadow-[0_8px_30px_rgb(0,0,0,0.12)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.2)] disabled:opacity-70"
+                className="flex items-center gap-2 bg-gisviz-accent text-white py-3 px-8 rounded-full hover:bg-opacity-90 transition-all font-mono text-[12px] shadow-[0_8px_30px_rgb(0,0,0,0.12)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.2)] disabled:opacity-70"
               >
                 {isLoading ? <Loader2 size={18} className="animate-spin" /> : <><Save size={18} /> Save Active Changes</>}
               </button>
@@ -419,33 +419,33 @@ export default function SettingsPage() {
                     setPwdMsg({ type: '', text: '' })
                     setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' })
                   }}
-                  className={`text-[12px] font-mono hover:underline flex items-center gap-1 uppercase px-2 py-1 rounded transition-colors ${editingFields.password ? 'bg-red-50 text-red-600' : 'bg-gisviz-accent/10 text-gisviz-accent'}`}
+                  className={`text-[12px] font-mono hover:underline flex items-center gap-1 uppercase px-2 py-1 rounded transition-colors ${editingFields.password ? 'bg-red-50 text-gisviz-alert/90' : 'bg-gisviz-accent/10 text-gisviz-accent'}`}
                 >
                   {editingFields.password ? <><X size={10}/> Cancel</> : <><Edit2 size={10}/> Change Password</>}
                 </button>
               </div>
 
               {!editingFields.password ? (
-                <div className="w-full bg-gisviz-canvas border border-gisviz-border/50 rounded-md px-4 py-2.5 text-gisviz-ink-soft font-mono text-sm cursor-not-allowed shadow-inner tracking-[0.3em]">
+                <div className="w-full bg-gisviz-canvas border border-gisviz-border/50 rounded-md px-4 py-2.5 text-gisviz-ink-soft font-mono text-[12px] cursor-not-allowed shadow-inner tracking-[0.3em]">
                   ••••••••••••
                 </div>
               ) : (
                 <form onSubmit={handlePasswordSubmit} className="space-y-4 plate-enter">
                   {pwdMsg.text && (
-                    <div className={`p-3 rounded-md text-[12px] font-mono border ${pwdMsg.type === 'error' ? 'bg-red-50 text-red-600 border-red-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>
+                    <div className={`p-3 rounded-md text-[12px] font-mono border ${pwdMsg.type === 'error' ? 'bg-red-50 text-gisviz-alert/90 border-gisviz-alert/60' : 'bg-gisviz-safe/5  text-gisviz-safe/70       border-gisviz-safe-200'}`}>
                       {pwdMsg.text}
                     </div>
                   )}
                   <div>
-                    <input type="password" name="currentPassword" required value={passwordData.currentPassword} onChange={handlePasswordChange} placeholder="Current Password" className="w-full bg-white dark:bg-black border border-gisviz-border rounded-md px-4 py-2.5 text-gisviz-ink focus:ring-2 focus:ring-gisviz-accent outline-none font-mono text-sm" />
+                    <input type="password" name="currentPassword" required value={passwordData.currentPassword} onChange={handlePasswordChange} placeholder="Current Password" className="w-full bg-white dark:bg-black border border-gisviz-border rounded-md px-4 py-2.5 text-gisviz-ink focus:ring-2 focus:ring-gisviz-accent outline-none font-mono text-[12px]" />
                   </div>
                   <div>
-                    <input type="password" name="newPassword" required value={passwordData.newPassword} onChange={handlePasswordChange} placeholder="New Password" className="w-full bg-white dark:bg-black border border-gisviz-border rounded-md px-4 py-2.5 text-gisviz-ink focus:ring-2 focus:ring-gisviz-accent outline-none font-mono text-sm" />
+                    <input type="password" name="newPassword" required value={passwordData.newPassword} onChange={handlePasswordChange} placeholder="New Password" className="w-full bg-white dark:bg-black border border-gisviz-border rounded-md px-4 py-2.5 text-gisviz-ink focus:ring-2 focus:ring-gisviz-accent outline-none font-mono text-[12px]" />
                   </div>
                   <div>
-                    <input type="password" name="confirmPassword" required value={passwordData.confirmPassword} onChange={handlePasswordChange} placeholder="Confirm New Password" className="w-full bg-white dark:bg-black border border-gisviz-border rounded-md px-4 py-2.5 text-gisviz-ink focus:ring-2 focus:ring-gisviz-accent outline-none font-mono text-sm" />
+                    <input type="password" name="confirmPassword" required value={passwordData.confirmPassword} onChange={handlePasswordChange} placeholder="Confirm New Password" className="w-full bg-white dark:bg-black border border-gisviz-border rounded-md px-4 py-2.5 text-gisviz-ink focus:ring-2 focus:ring-gisviz-accent outline-none font-mono text-[12px]" />
                   </div>
-                  <button type="submit" disabled={isPasswordLoading} className="w-full bg-gisviz-ink text-gisviz-canvas py-2.5 px-4 rounded-md hover:bg-opacity-90 transition-all font-mono text-sm shadow-md disabled:opacity-70 flex items-center justify-center gap-2">
+                  <button type="submit" disabled={isPasswordLoading} className="w-full bg-gisviz-ink text-gisviz-canvas py-2.5 px-4 rounded-md hover:bg-opacity-90 transition-all font-mono text-[12px] shadow-md disabled:opacity-70 flex items-center justify-center gap-2">
                     {isPasswordLoading && <Loader2 size={14} className="animate-spin" />} Update Secure Password
                   </button>
                 </form>

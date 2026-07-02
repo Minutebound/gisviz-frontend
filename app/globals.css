@@ -1,5 +1,16 @@
 @import "tailwindcss";
 
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities {
+  .text-camelcase {
+    /* Note: This only capitalizes the first letter of each word. It cannot remove spaces. */
+    text-transform: capitalize; 
+  }
+}
+
 /* 1. Tailwind v4 Custom Theme Variables */
 @theme {
   --color-gisviz-ink: var(--ink);
@@ -15,7 +26,9 @@
   --color-gisviz-survey-soft: var(--survey-soft);
   --color-gisviz-border: var(--border);
   --color-gisviz-grid: var(--grid);            /* graticule / hairline */
-
+  --color-gisviz-alert: var(--alert);
+  --color-gisviz-safe: var(--safe);
+  
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-sora), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-plex-mono), ui-monospace, SFMono-Regular, monospace;
@@ -37,7 +50,8 @@
     --survey-soft: #f6e6d4;
     --border: #cbd9d1;       /* tinted sage border */
     --grid: #b9cdc2;         /* graticule hairline */
-    --alert:#ff0000;
+    --alert:#ff0000;          /* vivid red for errors */
+    --safe: #2DB67E;          /* safe green */
    }
 
   .dark {

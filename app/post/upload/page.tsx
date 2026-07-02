@@ -3,8 +3,8 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { UploadCloud, Image as ImageIcon, Loader2, Map as MapIcon, X, Tag, Info, Link as LinkIcon, Send } from 'lucide-react'
-import { useAuth } from '../../context/AuthContext'
-import { gisvizApi } from '../../services/api'
+import { useAuth } from '../../../context/AuthContext'
+import { gisvizApi } from '../../../services/api'
 
 export default function UploadPage() {
   const router = useRouter()
@@ -38,7 +38,7 @@ export default function UploadPage() {
   // Redirect if not logged in
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
-      router.push('/auth?redirect=/upload')
+      router.push('/auth?redirect=/post/upload')
     }
   }, [isAuthenticated, authLoading, router])
 
@@ -134,7 +134,7 @@ export default function UploadPage() {
     <div className="max-w-5xl mx-auto px-4 py-8 pb-24">
       
       <div className="mb-8">
-        <h1 className="text-3xl font-display font-bold text-gisviz-ink flex items-center gap-3">
+        <h1 className="text-[24px] font-display font-bold text-gisviz-ink flex items-center gap-3">
           <UploadCloud className="text-gisviz-accent" size={32} />
           Publish Spatial Data
         </h1>
@@ -142,14 +142,14 @@ export default function UploadPage() {
       </div>
 
       {errorMsg && (
-        <div className="p-4 mb-6 rounded-md text-sm font-mono border bg-red-50 text-red-600 border-red-200 flex items-center justify-between">
+        <div className="p-4 mb-6 rounded-md text-[12px] font-mono border bg-red-50 text-gisviz-alert/90 border-gisviz-alert/60 flex items-center justify-between">
           <span>{errorMsg}</span>
           <button onClick={() => setErrorMsg('')}><X size={16}/></button>
         </div>
       )}
       
       {successMsg && (
-        <div className="p-4 mb-6 rounded-md text-sm font-mono border bg-emerald-50 text-emerald-700 border-emerald-200 flex items-center justify-between">
+        <div className="p-4 mb-6 rounded-md text-[12px] font-mono border bg-gisviz-safe/5  text-gisviz-safe/70       border-gisviz-safe/20    flex items-center justify-between">
           <span>{successMsg}</span>
           <button onClick={() => setSuccessMsg('')}><X size={16}/></button>
         </div>
@@ -170,22 +170,22 @@ export default function UploadPage() {
                 <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
                 <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white">
                   <UploadCloud size={32} className="mb-2" />
-                  <span className="font-mono text-sm font-bold uppercase tracking-wider">Change Visual</span>
+                  <span className="font-mono text-[12px] font-bold text-sentence-camelcase tracking-wider">Change Visual</span>
                 </div>
               </>
             ) : (
               <div className="text-center p-6 text-gisviz-ink-soft group-hover:text-gisviz-accent transition-colors">
                 <ImageIcon size={48} className="mx-auto mb-4 opacity-50" />
-                <p className="font-bold text-sm mb-1">Click to browse or drag & drop</p>
-                <p className="font-mono text-xs uppercase opacity-75">JPG, PNG, WebP • Max 10MB</p>
+                <p className="font-bold text-[12px] mb-1">Click to browse or drag & drop</p>
+                <p className="font-mono text-xs text-sentence-camelcase opacity-75">JPG, PNG, WebP • Max 10MB</p>
               </div>
             )}
             <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
           </div>
 
           <div className="bg-gisviz-rail border border-gisviz-border rounded-xl p-4 text-xs font-mono text-gisviz-ink-soft">
-            <h4 className="font-bold text-gisviz-ink mb-2 uppercase tracking-wider flex items-center gap-2">
-              <MapIcon size={14} /> Publication Guidelines
+            <h4 className="font-bold text-gisviz-ink-soft mb-2 uppercase tracking-wider flex items-center gap-2">
+              <MapIcon size={14} /> Post Guidelines
             </h4>
             <ul className="space-y-1.5 list-inside list-disc opacity-80">
               <li>Ensure maps have appropriate legends or scale bars.</li>
@@ -201,13 +201,13 @@ export default function UploadPage() {
             
             {/* Title */}
             <div>
-              <label className="block text-xs font-mono text-gisviz-ink-soft mb-2 uppercase tracking-wider">Publication Title <span className="text-red-500">*</span></label>
+              <label className="block text-xs font-mono text-gisviz-ink-soft mb-2 uppercase tracking-wider">Publication Title <span className="text-gisviz-alert/80">*</span></label>
               <input
                 type="text"
                 value={title}
                 onChange={e => setTitle(e.target.value)}
                 placeholder="e.g. Boulder County LiDAR Elevation Model"
-                className="w-full bg-gisviz-canvas border border-gisviz-border rounded-md px-4 py-3 text-gisviz-ink font-display font-medium text-lg focus:ring-2 focus:ring-gisviz-accent outline-none"
+                className="w-full bg-gisviz-canvas text-camelcase border border-gisviz-border rounded-md px-4 py-3 text-gisviz-ink font-display font-medium text-[16px] focus:ring-2 focus:ring-gisviz-accent outline-none"
                 required
               />
             </div>
@@ -219,7 +219,7 @@ export default function UploadPage() {
                 value={description}
                 onChange={e => setDescription(e.target.value)}
                 placeholder="Describe the data sources, methodology, or interesting findings..."
-                className="w-full bg-gisviz-canvas border border-gisviz-border rounded-md px-4 py-3 text-gisviz-ink font-sans text-sm focus:ring-2 focus:ring-gisviz-accent outline-none min-h-[120px] resize-y"
+                className="w-full bg-gisviz-canvas border text-camelcase border-gisviz-border rounded-md px-4 py-3 text-gisviz-ink font-sans text-[12px] focus:ring-2 focus:ring-gisviz-accent outline-none min-h-[120px] resize-y"
               />
             </div>
 
@@ -234,7 +234,7 @@ export default function UploadPage() {
                   value={note}
                   onChange={e => setNote(e.target.value)}
                   placeholder="e.g. Data may contain copyright boundaries. Used with permission."
-                  className="w-full bg-gisviz-canvas border border-gisviz-border rounded-md px-3 py-2 text-gisviz-ink text-sm focus:ring-1 focus:ring-gisviz-accent outline-none"
+                  className="w-full bg-gisviz-canvas border text-camelcase border-gisviz-border rounded-md px-3 py-2 text-gisviz-ink text-[12px] focus:ring-1 focus:ring-gisviz-accent outline-none"
                 />
               </div>
 
@@ -245,7 +245,7 @@ export default function UploadPage() {
                   value={sourceName}
                   onChange={e => setSourceName(e.target.value)}
                   placeholder="e.g. OpenStreetMap / USGS"
-                  className="w-full bg-gisviz-canvas border border-gisviz-border rounded-md px-3 py-2 text-gisviz-ink text-sm focus:ring-1 focus:ring-gisviz-accent outline-none"
+                  className="w-full bg-gisviz-canvas border text-camelcase border-gisviz-border rounded-md px-3 py-2 text-gisviz-ink text-[12px] focus:ring-1 focus:ring-gisviz-accent outline-none"
                 />
               </div>
 
@@ -258,7 +258,7 @@ export default function UploadPage() {
                   value={sourceUrl}
                   onChange={e => setSourceUrl(e.target.value)}
                   placeholder="https://..."
-                  className="w-full bg-gisviz-canvas border border-gisviz-border rounded-md px-3 py-2 text-gisviz-ink text-sm focus:ring-1 focus:ring-gisviz-accent outline-none"
+                  className="w-full bg-gisviz-canvas border border-gisviz-border rounded-md px-3 py-2 text-gisviz-ink text-[12px] focus:ring-1 focus:ring-gisviz-accent outline-none"
                 />
               </div>
             </div>
@@ -273,9 +273,9 @@ export default function UploadPage() {
                   {selectedCategoryIds.map(id => {
                     const cat = availableCategories.find(c => c.category_id === id)
                     return cat ? (
-                      <span key={id} className="flex items-center gap-1.5 px-3 py-1 bg-gisviz-accent text-white rounded-md font-mono text-xs shadow-sm uppercase tracking-wider">
+                      <span key={id} className="flex items-center gap-1.5 px-3 py-1 bg-gisviz-accent text-white rounded-md font-mono text-xs shadow-sm text-camelcase tracking-wider">
                         {cat.label}
-                        <button type="button" onClick={() => removeCategory(id)} className="hover:text-red-200"><X size={12}/></button>
+                        <button type="button" onClick={() => removeCategory(id)} className="hover:text-gisviz-alert/60"><X size={12}/></button>
                       </span>
                     ) : null
                   })}
@@ -289,7 +289,7 @@ export default function UploadPage() {
                     <select 
                       onChange={addCategory}
                       defaultValue=""
-                      className="w-full bg-gisviz-canvas border border-gisviz-border rounded-md px-3 py-2.5 text-gisviz-ink text-sm focus:ring-2 focus:ring-gisviz-accent outline-none font-mono"
+                      className="w-full bg-gisviz-canvas border text-camelcase border-gisviz-border rounded-md px-3 py-2.5 text-gisviz-ink text-[12px] focus:ring-2 focus:ring-gisviz-accent outline-none font-mono"
                     >
                       <option value="" disabled>+ Add an existing Category...</option>
                       {availableCategories.map(cat => (
@@ -307,13 +307,13 @@ export default function UploadPage() {
                       value={customCategoryLabel}
                       onChange={e => setCustomCategoryLabel(e.target.value)}
                       placeholder="Propose custom..."
-                      className="w-full bg-gisviz-canvas border border-gisviz-border rounded-md px-3 py-2 text-gisviz-ink font-mono text-sm focus:ring-1 focus:ring-gisviz-accent outline-none"
+                      className="w-full bg-gisviz-canvas border border-gisviz-border text-camelcase rounded-md px-3 py-2 text-gisviz-ink font-mono text-[12px] focus:ring-1 focus:ring-gisviz-accent outline-none"
                     />
                     <button
                       type="button"
                       onClick={handleSuggestCategory}
                       disabled={!customCategoryLabel || isSubmittingCustom}
-                      className="px-3 py-2 bg-gisviz-rail-soft text-gisviz-ink border border-gisviz-border rounded-md hover:border-gisviz-accent hover:text-gisviz-accent transition-colors disabled:opacity-50"
+                      className="px-3 py-2 bg-gisviz-rail-soft text-gisviz-ink text-camelcase border border-gisviz-border rounded-md hover:border-gisviz-accent hover:text-gisviz-accent transition-colors disabled:opacity-50"
                       title="Submit for Approval"
                     >
                       {isSubmittingCustom ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
@@ -334,16 +334,16 @@ export default function UploadPage() {
                 value={keywordString}
                 onChange={e => setKeywordString(e.target.value)}
                 placeholder="e.g. lidar, topography, urban-planning"
-                className="w-full bg-gisviz-canvas border border-gisviz-border rounded-md px-4 py-2.5 text-gisviz-ink font-mono text-sm focus:ring-2 focus:ring-gisviz-accent outline-none"
+                className="w-full bg-gisviz-canvas border border-gisviz-border text-camelcase rounded-md px-4 py-2.5 text-gisviz-ink font-mono text-[12px] focus:ring-2 focus:ring-gisviz-accent outline-none"
               />
             </div>
 
             {/* Submit */}
             <div className="pt-6 border-t border-gisviz-border flex justify-end gap-4">
-              <button type="button" onClick={() => router.back()} disabled={isLoading} className="px-6 py-2.5 rounded-md font-mono text-sm border border-gisviz-border text-gisviz-ink-soft hover:bg-gisviz-rail transition-colors">
+              <button type="button" onClick={() => router.back()} disabled={isLoading} className="px-6 py-2.5 rounded-md font-mono text-[12px] border border-gisviz-border text-gisviz-ink-soft hover:bg-gisviz-rail transition-colors">
                 Cancel
               </button>
-              <button type="submit" disabled={isLoading} className="flex items-center gap-2 bg-gisviz-accent text-white py-2.5 px-8 rounded-md hover:bg-opacity-90 transition-all font-mono text-sm font-bold shadow-md disabled:opacity-70">
+              <button type="submit" disabled={isLoading} className="flex items-center gap-2 bg-gisviz-accent text-white py-2.5 px-8 rounded-md hover:bg-opacity-90 transition-all font-mono text-[12px] font-bold shadow-md disabled:opacity-70">
                 {isLoading ? <Loader2 size={18} className="animate-spin" /> : <UploadCloud size={18} />}
                 {isLoading ? 'Publishing...' : 'Publish to Feed'}
               </button>

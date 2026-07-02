@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
 // 1. Create the instance and bake in the /api/v1 path
 const axiosInstance = axios.create({
@@ -52,7 +52,7 @@ export const gisvizApi = {
   uploadAvatar: async (file: File) => {
     const formData = new FormData();
     formData.append('file', file);
-    const res = await axiosInstance.post(`/uploads/avatar`, formData, {
+    const res = await axiosInstance.post(`/post/uploads/avatar`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
     return res.data;
@@ -70,6 +70,13 @@ export const gisvizApi = {
     return res.data;
   },
 
+  // Globalsearch
+  globalSearch: async (q: string) => {
+    // FIXED: Added /posts to match the router prefix
+    const res = await axiosInstance.get(`/search/global`, { params: { q } });
+    return res.data;
+  },
+  
   // ----- Users Endpoints -----
   fetchUserProfile: async (handle: string, currentUserId?: string) => {
     const params: any = {};
@@ -104,7 +111,7 @@ export const gisvizApi = {
     return res.data;
   },
 
-  searchPosts: async (q: string, skip = 0, limit = 50) => {
+  searchPosts: async (q: string, skip = 0, limit = 25) => {
     const res = await axiosInstance.get(`/posts/search`, { params: { q, skip, limit } });
     return res.data;
   },
@@ -117,7 +124,7 @@ export const gisvizApi = {
   uploadVisual: async (file: File) => {
     const formData = new FormData()
     formData.append("file", file)
-    const res = await axiosInstance.post('/uploads/visual', formData, {
+    const res = await axiosInstance.post('/post/uploads/visual', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     })
     return res.data

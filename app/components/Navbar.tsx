@@ -114,22 +114,22 @@ export default function Navbar() {
                       onError={() => setImageError(true)}
                     />
                   ) : (
-                    <div className="w-full h-full bg-gradient-to-tr from-gisviz-accent to-emerald-400 flex items-center justify-center text-white text-[12px] font-bold uppercase font-mono shadow-inner">
+                    <div className="w-full h-full bg-gradient-to-tr from-gisviz-accent to-gisviz-safe  0 flex items-center justify-center text-white text-[16px] font-bold uppercase font-mono shadow-inner">
                       {displayHandle.charAt(0)}
                     </div>
                   )}
                 </div>
 
                 {isProfileOpen && (
-                  <div className="absolute top-12 right-0 w-52 bg-gisviz-card border border-gisviz-border rounded-xl shadow-lg py-2 flex flex-col z-50 plate-enter">
-                    <div className=" text-sm px-4 py-2 border-b border-gisviz-border mb-2">
-                     User handle <p className="font-bold text-gisviz-accent/80">@{displayHandle}</p>
+                  <div className="absolute top-12 right-0 w-48 bg-gisviz-card border border-gisviz-border rounded-xl shadow-lg py-2 flex flex-col z-50 plate-enter">
+                    <div className=" text-[16px] px-4 py-2 border-b border-gisviz-border mb-2">
+                     <p className="font-bold text-gisviz-accent/80">@{displayHandle}</p>
                     </div>
                     
                     <Link 
                       href="/" 
                       onClick={() => setIsProfileOpen(false)}
-                      className="flex items-center gap-3 px-4 py-2 hover:bg-gisviz-canvas hover:text-gisviz-accent text-sm text-gisviz-ink transition-colors"
+                      className="flex items-center gap-3 px-4 py-2 hover:bg-gisviz-canvas hover:text-gisviz-accent text-[16px] text-gisviz-ink transition-colors"
                     >
                       <Home size={16} /> Home
                     </Link>
@@ -137,7 +137,7 @@ export default function Navbar() {
                     <Link 
                       href={`/profile/${displayHandle}`} 
                       onClick={() => setIsProfileOpen(false)}
-                      className="flex items-center gap-3 px-4 py-2 hover:bg-gisviz-canvas hover:text-gisviz-accent text-sm text-gisviz-ink transition-colors"
+                      className="flex items-center gap-3 px-4 py-2 hover:bg-gisviz-canvas hover:text-gisviz-accent text-[16px] text-gisviz-ink transition-colors"
                     >
                       <User size={16} /> Profile
                     </Link>
@@ -147,14 +147,14 @@ export default function Navbar() {
                     <Link 
                       href="/settings" 
                       onClick={() => setIsProfileOpen(false)}
-                      className="flex items-center gap-3 px-4 py-2 hover:bg-gisviz-canvas hover:text-gisviz-accent text-sm text-gisviz-ink transition-colors"
+                      className="flex items-center gap-3 px-4 py-2 hover:bg-gisviz-canvas hover:text-gisviz-accent text-[16px] text-gisviz-ink transition-colors"
                     >
                       <Settings size={16} /> Settings
                     </Link>
 
                     <button
                       onClick={() => { logoutSession(); setIsProfileOpen(false) }}
-                      className="flex items-center w-full gap-3 px-4 py-2 hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-red-600 text-sm text-gisviz-ink text-left transition-colors"
+                      className="flex items-center w-full gap-3 px-4 py-2 hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-gisviz-alert/90 text-[16px] text-gisviz-ink text-left transition-colors"
                     >
                       <LogOut size={16} /> Sign out
                     </button>
@@ -164,7 +164,7 @@ export default function Navbar() {
             ) : (
               <Link
                 href="/auth"
-                className="flex items-center gap-2 px-5 py-2 bg-gisviz-accent text-white rounded-md hover:bg-opacity-90 transition-all font-mono text-sm shadow-sm"
+                className="flex items-center gap-2 px-5 py-2 bg-gisviz-accent text-white rounded-md hover:bg-opacity-90 transition-all font-mono text-[16px] shadow-sm"
               >
                 <LogIn size={16} />
                 <span className="hidden sm:inline">Log in / Sign up</span>

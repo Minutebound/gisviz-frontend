@@ -34,14 +34,27 @@ interface Post {
   total_likes_count: number
   total_comments_count: number
   created_timestamp: string
-  note:string | null;
-  source_name:string|null;
-  source_url: string |null;
+  note: string | null;
+  source_name: string | null;
+  source_url: string | null;
   updated_timestamp?: string
 }
 
 const POSTS_PER_PAGE = 25;
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
+
+// Helper to format timestamps cleanly
+const formatTimeAgo = (timestamp: string) => {
+  const diff = Date.now() - new Date(timestamp).getTime();
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+  
+  if (minutes < 1) return 'Just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  if (hours < 24) return `${hours}h ago`;
+  return `${days}d ago`;
+}
 
 export default function Feed() {
   const [posts, setPosts] = useState<Post[]>([])
@@ -55,13 +68,14 @@ export default function Feed() {
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null)
   const [shareModalPost, setShareModalPost] = useState<Post | null>(null)
   const [reportModalId, setReportModalId] = useState<string | null>(null)
-  const [fullscreenImage, setFullscreenImage] = useState<string | null>(null)
+  
   const [offset, setOffset] = useState(0)
   const [hasMore, setHasMore] = useState(true)
 
   useEffect(() => {
     const localSaves = JSON.parse(localStorage.getItem('gisviz_saved') || '[]')
     setSavedPosts(localSaves)
+    fetchPosts(0, true)
   }, [])
 
   useEffect(() => {
@@ -77,16 +91,9 @@ export default function Feed() {
     
     try {
       const data = await gisvizApi.fetchGlobalStream(currentOffset, POSTS_PER_PAGE)
-      
-      if (data.length < POSTS_PER_PAGE) {
-        setHasMore(false)
-      }
-      
-      if (isInitial) {
-        setPosts(data)
-      } else {
-        setPosts((prev) => [...prev, ...data])
-      }
+      if (data.length < POSTS_PER_PAGE) setHasMore(false)
+      if (isInitial) setPosts(data)
+      else setPosts((prev) => [...prev, ...data])
       
       setOffset(currentOffset + POSTS_PER_PAGE)
     } catch (error) {
@@ -98,31 +105,16 @@ export default function Feed() {
     }
   }
 
-  useEffect(() => {
-    fetchPosts(0, true)
-  }, [])
-
- const handleLike = async (postId: string) => {
+  const handleLike = async (postId: string) => {
     if (likeBusy) return
     setLikeBusy(postId)
-
     try {
-      // The backend returns { liked: boolean, total_likes_count: number }
       const res = await gisvizApi.toggleLike(postId)
-      
       setPosts((prev) =>
-        prev.map((p) =>
-          p.post_id === postId
-            ? { ...p, total_likes_count: res.total_likes_count }
-            : p
-        )
+        prev.map((p) => p.post_id === postId ? { ...p, total_likes_count: res.total_likes_count } : p)
       )
-
-      // Use the absolute truth from the server instead of guessing!
       setLikedPosts((prev) =>
-        res.liked
-          ? [...new Set([...prev, postId])] // Add it safely (Set prevents duplicates)
-          : prev.filter((id) => id !== postId) // Remove it
+        res.liked ? [...new Set([...prev, postId])] : prev.filter((id) => id !== postId)
       )
     } catch (error) {
       console.error("Like interaction failure:", error)
@@ -133,14 +125,7 @@ export default function Feed() {
 
   const handleSave = (postId: string) => {
     const isCurrentlySaved = savedPosts.includes(postId)
-    let updatedSaves: string[]
-
-    if (isCurrentlySaved) {
-      updatedSaves = savedPosts.filter((id) => id !== postId)
-    } else {
-      updatedSaves = [...savedPosts, postId]
-    }
-
+    let updatedSaves = isCurrentlySaved ? savedPosts.filter((id) => id !== postId) : [...savedPosts, postId]
     setSavedPosts(updatedSaves)
     localStorage.setItem('gisviz_saved', JSON.stringify(updatedSaves))
   }
@@ -150,28 +135,30 @@ export default function Feed() {
     setOpenDropdownId(openDropdownId === id ? null : id)
   }
 
-  if (isLoading)
+  if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gisviz-accent"></div>
       </div>
     )
+  }
 
-  if (posts.length === 0)
+  if (posts.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-64 text-center gap-3">
         <p className="text-gisviz-ink-soft">No posts found in database.</p>
-        <Link href="/upload" className="flex items-center gap-2 bg-gisviz-accent/10 text-gisviz-accent border border-gisviz-accent/20 hover:bg-gisviz-accent hover:text-white px-5 py-2 rounded-full text-sm font-bold transition-all">
+        <Link href="/post/upload" className="flex items-center gap-2 bg-gisviz-accent/10 text-gisviz-accent border border-gisviz-accent/20 hover:bg-gisviz-accent hover:text-white px-5 py-2 rounded-full text-[12px] font-bold transition-all">
           <Plus size={16} /> Upload the first Visual
         </Link>
       </div>
     )
+  }
 
   return (
     <div className="h-[calc(100vh-4rem)] md:h-auto overflow-y-scroll md:overflow-visible snap-y snap-mandatory md:snap-none scroll-smooth [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] pb-24 pt-4 md:pt-0 relative">
 
       <div className="flex justify-center mb-6 snap-start">
-        <Link href="/upload" className="flex items-center gap-2 bg-gisviz-accent/10 text-gisviz-accent border border-gisviz-accent/20 hover:bg-gisviz-accent hover:text-white px-5 py-2 rounded-full text-sm font-bold transition-all shadow-sm">
+        <Link href="/post/upload" className="flex items-center gap-2 bg-gisviz-accent/10 text-gisviz-accent border border-gisviz-accent/20 hover:bg-gisviz-accent hover:text-white px-5 py-2 rounded-full text-[12px] font-bold transition-all shadow-sm">
           <Plus size={16} /> Publish a Visual
         </Link>
       </div>
@@ -180,36 +167,43 @@ export default function Feed() {
         const isPostLiked = likedPosts.includes(post.post_id)
         const isPostSaved = savedPosts.includes(post.post_id)
 
+        // Combine categories and tags for the pill layout
+        const allTags = [
+          ...post.categories.map(c => c.label),
+          ...post.keywords.map(k => k.word)
+        ];
+
         return (
           <div key={post.post_id} className="snap-start snap-always md:snap-align-none w-full pb-8">
-            <article className="bg-gisviz-card border border-gisviz-border rounded-xl p-5 shadow-sm transition-all hover:shadow-md overflow-hidden relative">
-
+            <article className="bg-gisviz-card border border-gisviz-border rounded-xl p-5 shadow-sm transition-shadow hover:shadow-md relative">
+              
+              {/* Title & Dropdown */}
               <div className="flex justify-between items-start mb-4 gap-4">
-                <Link href={`/post/${post.post_id}`} className="hover:opacity-70 transition-opacity flex-1">
-                  <h2 className="text-[16px] md:text-[24px] font-display font-medium text-gisviz-ink uppercase tracking-wide leading-snug cursor-pointer hover:underline">
-                    {post.title}
+                <Link href={`/post/${post.post_id}`} className="hover:opacity-80 transition-opacity block flex-1">
+                  <h2 className="text-[16px] md:text-[24px] font-bold text-gisviz-ink uppercase leading-snug tracking-tight">
+                    <span className=" px-1.5 py-0.5 box-decoration-clone rounded-sm">
+                      {post.title}
+                    </span>
                   </h2>
                 </Link>
-                <div className="flex items-center gap-2 pt-1 relative">
-                  <span className="text-[12px] font-mono font-medium text-gisviz-ink-soft whitespace-nowrap bg-gisviz-canvas px-2 py-1 rounded-md border border-gisviz-border">
-                    {new Date(post.created_timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                  </span>
-                  
+                
+                
+                <div className="relative pt-1">
                   <button 
                     onClick={(e) => toggleDropdown(e, post.post_id)}
-                    className="p-1 text-gisviz-ink-soft hover:text-gisviz-accent hover:bg-gisviz-rail-soft rounded-full transition-colors"
+                    className="p-1 text-gisviz-ink-soft hover:text-gisviz-ink hover:bg-gisviz-rail-soft rounded-full transition-colors -mr-1"
                   >
                     <MoreHorizontal size={20} />
                   </button>
 
                   {openDropdownId === post.post_id && (
-                    <div className="absolute right-0 top-full mt-2 w-40 bg-gisviz-card border border-gisviz-border rounded-xl shadow-lg z-20 plate-enter overflow-hidden py-1" onClick={e => e.stopPropagation()}>
+                    <div className="absolute right-0 top-full mt-2 w-40 bg-gisviz-card border border-gisviz-border rounded-xl shadow-lg z-20 overflow-hidden py-1" onClick={e => e.stopPropagation()}>
                       <button 
                         onClick={() => {
                           setShareModalPost(post)
                           setOpenDropdownId(null)
                         }}
-                        className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gisviz-ink hover:bg-gisviz-canvas hover:text-gisviz-accent transition-colors"
+                        className="w-full flex items-center gap-3 px-4 py-2 text-[12px] text-gisviz-ink hover:bg-gisviz-canvas hover:text-gisviz-accent transition-colors"
                       >
                         <Share2 size={16} /> Share Post
                       </button>
@@ -219,137 +213,142 @@ export default function Feed() {
                           setReportModalId(post.post_id)
                           setOpenDropdownId(null)
                         }}
-                        className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                        className="w-full flex items-center gap-3 px-4 py-2 text-[12px] text-gisviz-alert hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
                       >
                         <Flag size={16} /> Report
                       </button>
                     </div>
                   )}
+                  
                 </div>
               </div>
 
-              <div className="flex flex-wrap gap-2 mb-4">
-                {post.categories.map((cat) => (
-                  <span
-                    key={cat.category_id}
-                    className="px-3 py-1 text-[12px] font-bold tracking-wider uppercase bg-gisviz-rail-soft text-gisviz-ink rounded-md border border-gisviz-border/30"
-                  >
-                    {cat.label}
-                  </span>
-                ))}
-
-                    {post.keywords.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {post.keywords.map((kw) => (
-                  <span key={kw.keyword_id} className="text-[12px] font-mono font-bold text-gisviz-ink-soft border border-gisviz-border bg-gisviz-canvas px-2 py-0.5 rounded-sm">
-                    #{kw.word}
-                  </span>
-                ))}
-              </div>
-            )}
-              </div>
-
-              {/* Professional Visual Image Render with Dominant Color Blur */}
-                <div className="w-[calc(100%+2.5rem)] -mx-5 border-y border-gisviz-border overflow-hidden mb-3 rounded-none relative flex items-center justify-center bg-black">
+                  {/* Tags / Categories */}
+                    {allTags.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {allTags.map((tag, idx) => (
+                          <span
+                            key={idx}
+                            className="px-2 py-0.5 text-[12px] text-camelcase mb-2 font-medium bg-gisviz-canvas border border-gisviz-border text-gisviz-ink-soft rounded-md tracking-wide whitespace-nowrap"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    
+              {/* Map/Visual Image */}
+              <Link href={`/post/${post.post_id}`} className="block mb-4">
+                <div className="w-full rounded-xl overflow-hidden bg-gisviz-canvas border border-gisviz-border relative flex items-center justify-center min-h-[200px]">
                   {post.visual_image_path ? (
-                    <>
-                      {/* Blurred Backdrop for matching dominant color */}
-                      <div 
-                        className="absolute inset-0 bg-cover bg-center opacity-60 blur-3xl scale-125 saturate-150"
-                        style={{ backgroundImage: `url(${API_BASE_URL}${post.visual_image_path})` }}
-                      />
-                      {/* Clear Foreground Image: 
-                          w-full forces it to touch the left/right edges.
-                          h-auto allows vertical images to grow as tall as needed natively!
-                      */}
-                      <img 
-                        src={`${API_BASE_URL}${post.visual_image_path}`} 
-                        alt={post.title} 
-                        className="w-full h-auto relative z-10 drop-shadow-2xl"
-                      />
-                    </>
+                    <img 
+                      src={`${API_BASE_URL}${post.visual_image_path}`} 
+                      alt={post.title} 
+                      className="w-full h-auto object-cover"
+                    />
                   ) : (
-                    <div className="absolute inset-0 w-full h-full flex flex-col items-center justify-center text-gisviz-ink-soft gap-2 bg-gisviz-canvas z-10">
+                    <div className="flex flex-col items-center text-gisviz-ink-soft py-12 gap-2">
                       <ImageIcon size={32} />
-                      <span className="font-mono text-sm uppercase">No Visual Provided</span>
+                      <span className="font-mono text-[12px] uppercase">No Visual</span>
                     </div>
                   )}
                 </div>
+              </Link>
+
+              {/* Profile, Tags & Metadata block */}
+              <div className="flex items-start justify-between mb-5 gap-4">
                 
-             {/* Visual Credit Profile Block */}
-             <div className="flex items-center justify-between text-gisviz-ink-soft font-mono mb-3">
-               
-                <div className="flex flex-col items-end gap-1.5">
-                  <Link 
-                    href={`/profile/${post.publisher_handle}`} 
-                    className="flex items-center gap-1.5 transition-colors group/author"
-                  >
+                {/* Author Info & Tags Stack */}
+                <div className="flex items-center gap-3 overflow-hidden">
+                  <Link href={`/profile/${post.publisher_handle}`} className="shrink-0">
                     {post.publisher_avatar_path ? (
-                      <img src={`${API_BASE_URL}${post.publisher_avatar_path}`} className="w-10 h-10 rounded-full object-cover" alt={post.publisher_handle} />
+                      <img 
+                        src={`${API_BASE_URL}${post.publisher_avatar_path}`} 
+                        className="w-11 h-11 rounded-full object-cover border border-gisviz-border" 
+                        alt={post.publisher_handle} 
+                      />
                     ) : (
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-gisviz-accent to-emerald-400 flex items-center justify-center text-white text-[10px] font-bold font-mono">
-                        {post.publisher_handle.charAt(0)}
+                      <div className="w-11 h-11 rounded-full bg-gradient-to-tr from-gisviz-accent to-gisviz-safe  0 flex items-center justify-center text-white text-[16px] font-bold">
+                        {post.publisher_handle.charAt(0).toUpperCase()}
                       </div>
                     )}
-                    <span className="font-bold text-gisviz-ink text-[16px] group-hover/author:text-gisviz-accent transition-colors">
-                      @{post.publisher_handle}
-                    </span>
                   </Link>
+                  
+                  <div className="flex flex-col justify-center gap-1.5 min-w-0">
+                    {/* Handle & Time */}
+                    <div className="text-[16px] text-gisviz-ink flex items-center">
+                      <Link href={`/profile/${post.publisher_handle}`} className="font-semibold hover:underline truncate max-w-[200px]">
+                        @{post.publisher_handle}
+                      </Link>
+                      <span className="text-gisviz-ink-soft mx-1.5">•</span>
+                      <span className="text-gisviz-ink-soft whitespace-nowrap">
+                        {formatTimeAgo(post.created_timestamp)}
+                      </span>
+                    </div>
+                    
+                  
+                  </div>
                 </div>
 
-                {/* Note & Source URL*/}
-                <div className="flex flex-col items-end gap-1.5 w-2/3 pr-4a italic  text-gisviz-ink-soft ">
-               
-                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px]">
+                {/* Source and Note */}
+                {(post.source_name || post.note) && (
+                  <div className="flex flex-col items-end gap-1 text-[12px] text-gisviz-ink-soft shrink-0 max-w-[150px] text-right pt-1">
                     {post.source_name && (
-                      <span className="tracking-wider">
-                        Source: {' '}
+                      <span className="truncate w-full">
+                        Source:{' '}
                         {post.source_url ? (
-                          <a href={post.source_url.startsWith('http') ? post.source_url : `https://${post.source_url}`} target="_blank" rel="noopener noreferrer" className="text-gisviz-accent hover:underline uppercase">
+                          <a href={post.source_url.startsWith('http') ? post.source_url : `https://${post.source_url}`} target="_blank" rel="noopener noreferrer" className="text-gisviz-accent hover:underline">
                             {post.source_name}
                           </a>
                         ) : (
-                          <span className="text-gisviz-accent">{post.source_name}</span>
+                          <span className="font-medium text-gisviz-ink">{post.source_name}</span>
                         )}
                       </span>
                     )}
-                    
+                    {post.note && (
+                      <span className="truncate w-full opacity-80" title={post.note}>
+                        Note: {post.note}
+                      </span>
+                    )}
                   </div>
-                  {post.note && (
-                    <span className="text-[10px] leading-tight opacity-80 pl-2">
-                     Note: {post.note}
-                    </span>
-                  )}
-                </div>
+                )}
               </div>
 
-              <div className="border-t border-gisviz-border pt-4 grid grid-cols-3 divide-x divide-gisviz-border text-gisviz-ink-soft">
+              {/* Interaction Footer */}
+              <div className="flex items-center justify-between text-gisviz-ink pt-3 border-t border-gisviz-border/50">
+                <div className="flex items-center gap-6 font-medium text-[16px]">
+                  <button
+                    onClick={() => handleLike(post.post_id)}
+                    disabled={likeBusy === post.post_id}
+                    className={`flex items-center gap-2 transition-colors disabled:opacity-50 ${
+                      isPostLiked ? 'text-gisviz-accent' : 'hover:text-gisviz-accent text-gisviz-ink-soft'
+                    }`}
+                  >
+                    <ThumbsUp 
+                      size={20} 
+                      className={isPostLiked ? 'fill-current' : ''} 
+                    />
+                    <span>{post.total_likes_count > 0 ? (post.total_likes_count >= 1000 ? (post.total_likes_count/1000).toFixed(1) + 'K' : post.total_likes_count) : ''} Likes</span>
+                  </button>
+                  
+                  <Link 
+                    href={`/post/${post.post_id}`} 
+                    className="flex items-center gap-2 hover:text-gisviz-accent text-gisviz-ink-soft transition-colors"
+                  >
+                    <MessageSquare size={20} />
+                    <span>{post.total_comments_count} Comments</span>
+                  </Link>
+                </div>
+
                 <button 
                   onClick={() => handleSave(post.post_id)}
-                  className={`flex items-center justify-center gap-2 hover:text-gisviz-accent transition-colors text-sm font-medium group ${isPostSaved ? 'text-gisviz-accent' : ''}`}
-                >
-                  <Bookmark size={18} className={isPostSaved ? 'fill-current' : 'group-hover:fill-gisviz-accent/20'} />
-                  <span>{isPostSaved ? 'Saved' : 'Save'}</span>
-                </button>
-                
-                <button
-                  onClick={() => handleLike(post.post_id)}
-                  disabled={likeBusy === post.post_id}
-                  className={`flex items-center justify-center gap-2 transition-colors text-sm font-medium group disabled:opacity-50 ${
-                    isPostLiked ? 'text-gisviz-accent' : 'text-gisviz-ink hover:text-gisviz-accent'
+                  className={`flex items-center gap-2 font-medium text-[16px] transition-colors ${
+                    isPostSaved ? 'text-gisviz-ink' : 'text-gisviz-ink-soft hover:text-gisviz-ink'
                   }`}
                 >
-                  <ThumbsUp 
-                    size={18} 
-                    className={isPostLiked ? 'fill-current' : 'fill-none group-hover:fill-gisviz-accent/20'} 
-                  />
-                  <span>{post.total_likes_count || 'Like'}</span>
+                  <Bookmark size={20} className={isPostSaved ? 'fill-current' : ''} />
+                  <span className="hidden sm:inline">Bookmark</span>
                 </button>
-                
-                <Link href={`/post/${post.post_id}`} className="flex items-center justify-center gap-2 hover:text-gisviz-ink transition-colors text-sm font-medium group">
-                  <MessageSquare size={18} className="group-hover:text-gisviz-ink" />
-                  <span>{post.total_comments_count || 0} Comments</span>
-                </Link>
               </div>
 
             </article>
@@ -362,20 +361,20 @@ export default function Feed() {
           <button 
             onClick={() => fetchPosts(offset)}
             disabled={isLoadingMore}
-            className="flex items-center gap-2 bg-gisviz-canvas text-gisviz-ink-soft border border-gisviz-border hover:border-gisviz-accent hover:text-gisviz-accent px-6 py-3 rounded-full text-sm font-bold transition-all shadow-sm disabled:opacity-50"
+            className="flex items-center gap-2 bg-gisviz-canvas text-gisviz-ink-soft border border-gisviz-border hover:border-gisviz-accent hover:text-gisviz-accent px-6 py-3 rounded-full text-[12px] font-bold transition-all shadow-sm disabled:opacity-50"
           >
             {isLoadingMore ? (
               <>
-                <Loader2 size={16} className="animate-spin" /> Fetching Posts...
+                <Loader2 size={16} className="animate-spin" /> Fetching...
               </>
             ) : (
-              'Load More Publications'
+              'Load More'
             )}
           </button>
         </div>
       ) : (
-        <div className="text-center py-8 text-[12px] font-mono text-gisviz-ink-soft uppercase tracking-widest border-t border-gisviz-border/50 mt-4 mx-8">
-          — No more in Feed —
+        <div className="text-center py-8 text-[12px] font-mono text-gisviz-ink-soft uppercase tracking-widest mt-4 mx-8">
+          — You are caught up —
         </div>
       )}
 
@@ -398,4 +397,4 @@ export default function Feed() {
 
     </div>
   )
-} 
+}

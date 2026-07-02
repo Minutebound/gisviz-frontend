@@ -2,12 +2,7 @@
 
 import React from 'react'
 import Link from 'next/link'
-// Some environments may not have `next/navigation` available (or its types).
-// Provide a small fallback hook that uses the browser location when needed.
-function usePathname(): string {
-  if (typeof window !== 'undefined') return window.location.pathname
-  return '/'
-}
+import { usePathname } from 'next/navigation' // <-- Use the official Next.js hook
 import { ChevronLeft } from 'lucide-react'
 
 // 1. The navigation links to display
@@ -17,29 +12,24 @@ const navLinks = [
 ]
 
 // 2. Define the base paths where the SubNavbar should be visible.
-// Because it uses `.startsWith()`, adding '/post' will automatically 
-// cover all dynamic post routes like '/post/123' or '/post/[id]'.
 const VISIBLE_ROUTES = [
-  '/post',     // Displays on all single publication pages
-  '/profile',  // Displays on /profile/[handle] (if you use a /profile/ prefix)
-  '/settings', // Displays on the settings page
+     
+  '/profile',  
+  '/settings', 
+  '/post/upload'    // Added /post/upload here so it explicitly shows up on the upload page
 ]
 
 export default function SubNavbar() {
-  const pathname = usePathname()
+  const pathname = usePathname() || '/' // Safely fallback to '/' if null
 
   // 3. Check if the current URL matches any of our allowed routes
   const isStandardRoute = VISIBLE_ROUTES.some((route) => pathname.startsWith(route))
   
-  // NOTE: If your profile pages are hosted directly at the root (e.g., `/[handle]`)
-  // rather than `/profile/[handle]`, you can use an exclusion check instead to ensure 
-  // it shows on handles but hides on the main feed and auth pages:
   const isRootHandleRoute = pathname !== '/' && pathname !== '/auth' && !pathname.startsWith('/api')
 
   // Determine final visibility
-  const shouldShow = isStandardRoute || isRootHandleRoute // Remove `|| isRootHandleRoute` if you explicitly use /profile/[handle]
+  const shouldShow = isStandardRoute || isRootHandleRoute
 
-  // If the current path is not in the array, render nothing (null)
   if (!shouldShow) return null
 
   return (

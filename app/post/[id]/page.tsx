@@ -35,6 +35,9 @@ interface Post {
   total_comments_count: number
   created_timestamp: string
   share_url: string
+  source_name: string | null
+  source_url: string | null
+  note: string | null
 }
 
 interface CommentData {
@@ -62,6 +65,7 @@ export default function PostDetail() {
   const [likeCount, setLikeCount] = useState(0)
   const [isSaved, setIsSaved] = useState(false)
   const [likeBusy, setLikeBusy] = useState(false)
+  const [isImageFullscreen, setIsImageFullscreen] = useState(false)
   
   // Commenting
   const [newComment, setNewComment] = useState('')
@@ -132,10 +136,8 @@ export default function PostDetail() {
 
     setIsSubmittingComment(true)
     try {
-      // Pass the replyingTo ID if we are in a nested reply mode
       await gisvizApi.addComment(postId, newComment, replyingTo?.id)
       
-      // Re-fetch comments to get the fresh tree directly from backend
       const updatedComments = await gisvizApi.fetchComments(postId)
       setComments(updatedComments)
       
@@ -164,17 +166,16 @@ export default function PostDetail() {
       <div className="flex-1">
         <div className="bg-gisviz-canvas/50 rounded-sm p-3 border border-gisviz-border/50">
           <div className="flex justify-between items-start mb-1">
-            <Link href={`/profile/${comment.publisher_handle}`} className="text-xs font-bold font-mono text-gisviz-ink hover:text-gisviz-accent transition-colors">
+            <Link href={`/profile/${comment.publisher_handle}`} className="text-[12px] font-bold font-mono text-gisviz-ink hover:text-gisviz-accent transition-colors">
               @{comment.publisher_handle || 'Unknown'}
             </Link>
             <span className="text-[12px] font-mono text-gisviz-ink-soft">
               {new Date(comment.created_timestamp).toLocaleDateString()}
             </span>
           </div>
-          <p className="text-sm text-gisviz-ink">{comment.content}</p>
+          <p className="text-[12px] text-gisviz-ink">{comment.content}</p>
         </div>
         
-        {/* Reply Button (Only on top-level comments to keep tree clean) */}
         {!isReply && isAuthenticated && (
           <button 
             onClick={() => setReplyingTo({ id: comment.comment_id, handle: comment.publisher_handle })}
@@ -184,7 +185,6 @@ export default function PostDetail() {
           </button>
         )}
 
-        {/* Render Replies */}
         {comment.replies && comment.replies.length > 0 && (
           <div className="mt-2">
             {comment.replies.map(reply => renderComment(reply, true))}
@@ -207,19 +207,48 @@ export default function PostDetail() {
         {/* LEFT COLUMN: Visual, Actions, and Description */}
         <div className="lg:col-span-8 flex flex-col gap-6">
           <div className="relative bg-gisviz-card border border-gisviz-border rounded-sm shadow-md plate-enter p-2">
-            <div className="w-full max-h-[75vh] flex items-center justify-center bg-black overflow-hidden rounded-sm relative z-10 border border-gisviz-border/50">
+            
+            {/* Visual Image Container (Clickable for Fullscreen) */}
+            <div 
+              className={`w-full max-h-[75vh] flex items-center justify-center bg-black overflow-hidden rounded-sm relative z-10 border border-gisviz-border/50 ${post.visual_image_path ? 'cursor-pointer group' : ''}`}
+              onClick={() => { if (post.visual_image_path) setIsImageFullscreen(true) }}
+            >
               {post.visual_image_path ? (
                 <>
-                  <div className="absolute inset-0 bg-cover bg-center opacity-60 blur-3xl scale-125 saturate-150" style={{ backgroundImage: `url(${API_BASE_URL}${post.visual_image_path})` }} />
-                  <img src={`${API_BASE_URL}${post.visual_image_path}`} alt={post.title} className="w-full h-auto max-h-[75vh] object-contain relative z-10 drop-shadow-2xl" />
+                  <div className="absolute inset-0 bg-cover bg-center opacity-60 blur-3xl scale-125 saturate-150 transition-opacity group-hover:opacity-40" style={{ backgroundImage: `url(${API_BASE_URL}${post.visual_image_path})` }} />
+                  <img src={`${API_BASE_URL}${post.visual_image_path}`} alt={post.title} className="w-full h-auto max-h-[75vh] object-contain relative z-10 drop-shadow-2xl transition-transform duration-300 group-hover:scale-[1.02]" />
                 </>
               ) : (
                 <div className="flex flex-col items-center justify-center py-32 text-gisviz-ink-soft opacity-50 bg-gisviz-canvas w-full">
                   <ImageIcon size={64} className="mb-4" />
-                  <span className="font-mono uppercase text-sm">No Visual Attached</span>
+                  <span className="font-mono uppercase text-[12px]">No Visual Attached</span>
                 </div>
               )}
             </div>
+
+            {/* Source & Note Render (Directly below the visual) */}
+            {(post.source_name || post.note) && (
+              <div className="flex flex-col gap-1 mt-3 px-2">
+                {post.source_name && (
+                  <div className="text-[12px] text-gisviz-ink-soft">
+                    <span className="font-bold text-gisviz-ink">Source: </span>
+                    {post.source_url ? (
+                      <a href={post.source_url.startsWith('http') ? post.source_url : `https://${post.source_url}`} target="_blank" rel="noopener noreferrer" className="text-gisviz-accent hover:underline">
+                        {post.source_name}
+                      </a>
+                    ) : (
+                      <span className="text-gisviz-ink">{post.source_name}</span>
+                    )}
+                  </div>
+                )}
+                {post.note && (
+                  <div className="text-[12px] text-gisviz-ink-soft italic">
+                    <span className="font-bold text-gisviz-ink not-italic">Note: </span>
+                    {post.note}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Actions */}
@@ -227,7 +256,7 @@ export default function PostDetail() {
             <button 
               onClick={handleLike} 
               disabled={likeBusy} 
-              className={`bg-gisviz-card border border-gisviz-border py-3 rounded-sm shadow-sm flex items-center justify-center gap-2 font-mono text-sm uppercase tracking-wider transition-colors group disabled:opacity-50 ${
+              className={`bg-gisviz-card border border-gisviz-border py-3 rounded-sm shadow-sm flex items-center justify-center gap-2 font-mono text-[12px] uppercase tracking-wider transition-colors group disabled:opacity-50 ${
                 !isLiked 
                   ? 'text-gisviz-accent bg-gisviz-accent/5 border-gisviz-accent/30' 
                   : 'text-gisviz-ink hover:text-gisviz-accent hover:border-gisviz-accent/50'
@@ -239,21 +268,21 @@ export default function PostDetail() {
               /> 
               <span>{likeCount}</span>
             </button>
-            <button onClick={handleSave} className={`bg-gisviz-card border border-gisviz-border py-3 rounded-sm shadow-sm flex items-center justify-center gap-2 font-mono text-sm uppercase tracking-wider ${isSaved ? 'text-gisviz-accent bg-gisviz-accent/5' : 'text-gisviz-ink hover:text-gisviz-accent'}`}>
-              <Bookmark size={18} className={isSaved ? 'fill-current' : ''} /> <span>{isSaved ? 'Saved' : 'Save'}</span>
+            <button onClick={handleSave} className={`bg-gisviz-card border border-gisviz-border py-3 rounded-sm shadow-sm flex items-center justify-center gap-2 font-mono text-[12px] uppercase tracking-wider ${isSaved ? 'text-gisviz-accent bg-gisviz-accent/5' : 'text-gisviz-ink hover:text-gisviz-accent'}`}>
+              <Bookmark size={18} className={isSaved ? 'fill-current' : ''} /> <span>{isSaved ? 'Bookmarked' : 'Bookmark'}</span>
             </button>
-            <button onClick={() => setIsShareModalOpen(true)} className="bg-gisviz-card border border-gisviz-border py-3 rounded-sm shadow-sm flex items-center justify-center gap-2 text-gisviz-ink hover:text-gisviz-accent font-mono text-sm uppercase tracking-wider">
+            <button onClick={() => setIsShareModalOpen(true)} className="bg-gisviz-card border border-gisviz-border py-3 rounded-sm shadow-sm flex items-center justify-center gap-2 text-gisviz-ink hover:text-gisviz-accent font-mono text-[12px] uppercase tracking-wider">
               <Share2 size={18} /> Share
             </button>
           </div>
 
-          {/* Description Moved Below Actions */}
+          {/* Description */}
           {post.description && (
             <div className="bg-gisviz-card border border-gisviz-border rounded-sm p-6 shadow-sm mt-2">
-              <h3 className="font-display font-bold text-gisviz-ink mb-4 uppercase tracking-wide text-sm flex items-center gap-2">
+              <h3 className="font-display font-bold text-gisviz-ink mb-4 uppercase tracking-wide text-[12px] flex items-center gap-2">
                 <span className="w-2 h-2 bg-gisviz-survey rounded-sm"></span> Description
               </h3>
-              <p className="text-sm text-gisviz-ink leading-relaxed whitespace-pre-wrap">
+              <p className="text-[12px] text-gisviz-ink leading-relaxed whitespace-pre-wrap">
                 {post.description}
               </p>
             </div>
@@ -265,38 +294,34 @@ export default function PostDetail() {
           
           {/* Post Info Container */}
           <div className="bg-gisviz-card border border-gisviz-border rounded-sm p-6 shadow-md shrink-0">
-            {/* 1. Highlighted Category */}
             {post.categories.length > 0 && (
               <span className="inline-block px-2.5 py-1 bg-gisviz-rail-soft text-gisviz-ink text-[12px] font-mono font-bold tracking-widest uppercase rounded-sm mb-4">
                 {post.categories[0].label}
               </span>
             )}
             
-            {/* 2. Title */}
             <h1 className="text-[16px] lg:text-[24px] font-display font-bold text-gisviz-ink mb-4 leading-tight uppercase tracking-wide">
               {post.title}
             </h1>
 
-            {/* 3 & 4. Published On / By */}
-            <div className="flex flex-col gap-3 pb-5 mb-5">
-              <div className="text-xs font-mono text-gisviz-ink-soft">
+            <div className="flex flex-col gap-3 pb-3 mb-2">
+              <div className="text-[12px] font-mono text-gisviz-ink-soft">
                 Published on {new Date(post.created_timestamp).toLocaleDateString()}
               </div>
               <div className="flex items-center gap-3">
                 <Link href={`/profile/${displayHandle}`} className="flex items-center gap-2 hover:opacity-80 transition-opacity">
                   {avatarUrl ? (
-                    <img src={avatarUrl} className="w-6 h-6 rounded-full border border-gisviz-border object-cover" alt={displayHandle} />
+                    <img src={avatarUrl} className="w-8 h-8 rounded-full border border-gisviz-border object-cover" alt={displayHandle} />
                   ) : (
-                    <div className="w-6 h-6 rounded-full border border-gisviz-border bg-gradient-to-tr from-gisviz-accent to-emerald-400 flex items-center justify-center text-white font-mono text-[12px] font-bold">
+                    <div className="w-8 h-8 rounded-full border border-gisviz-border bg-gradient-to-tr from-gisviz-accent to-gisviz-safe 0 flex items-center justify-center text-white font-mono text-[12px] font-bold">
                       {displayHandle.charAt(0).toUpperCase()}
                     </div>
                   )}
-                  <span className="font-bold font-mono text-gisviz-ink text-sm hover:text-gisviz-accent transition-colors">@{displayHandle}</span>
+                  <span className="font-bold font-mono text-gisviz-ink text-[16px] hover:text-gisviz-accent transition-colors">@{displayHandle}</span>
                 </Link>
               </div>
             </div>
 
-            {/* 5. Keywords */}
             {post.keywords.length > 0 && (
               <div className="flex flex-wrap gap-2">
                 {post.keywords.map((kw) => (
@@ -308,23 +333,23 @@ export default function PostDetail() {
             )}
           </div>
 
-          {/* Discussion Thread / Comments Plate */}
+          {/* Discussion Thread */}
           <div className="bg-gisviz-card border border-gisviz-border rounded-sm shadow-md flex-1 flex flex-col min-h-0 h-[500px] lg:h-auto">
             <div className="p-4 border-b border-gisviz-border bg-gisviz-canvas/50 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2">
                 <MessageSquare size={18} className="text-gisviz-accent" />
-                <h3 className="font-display font-bold text-gisviz-ink text-sm uppercase tracking-wide">
+                <h3 className="font-display font-bold text-gisviz-ink text-[12px] uppercase tracking-wide">
                   Discussion Thread
                 </h3>
               </div>
-              <span className="text-xs font-mono font-bold text-gisviz-ink-soft bg-gisviz-rail-soft px-2 py-0.5 rounded-sm">
+              <span className="text-[12px] font-mono font-bold text-gisviz-ink-soft bg-gisviz-rail-soft px-2 py-0.5 rounded-sm">
                 {post.total_comments_count}
               </span>
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 scroll-smooth space-y-2">
               {comments.length === 0 ? (
-                <p className="text-center text-xs font-mono text-gisviz-ink-soft py-8">No analysis submitted yet.</p>
+                <p className="text-center text-[12px] font-mono text-gisviz-ink-soft py-8">No analysis submitted yet.</p>
               ) : (
                 comments.map(comment => renderComment(comment, false))
               )}
@@ -338,7 +363,7 @@ export default function PostDetail() {
                       <span className="text-[12px] uppercase tracking-wider font-mono font-bold text-gisviz-accent">
                         Replying to @{replyingTo.handle}
                       </span>
-                      <button type="button" onClick={() => setReplyingTo(null)} className="text-gisviz-accent hover:text-red-500 transition-colors">
+                      <button type="button" onClick={() => setReplyingTo(null)} className="text-gisviz-accent hover:text-gisviz-alert/80 transition-colors">
                         <X size={14} />
                       </button>
                     </div>
@@ -349,7 +374,7 @@ export default function PostDetail() {
                       value={newComment}
                       onChange={(e) => setNewComment(e.target.value)}
                       placeholder={replyingTo ? "Write a reply..." : "Submit analysis or inquiry..."}
-                      className="w-full bg-gisviz-card border border-gisviz-border rounded-sm py-2.5 pl-3 pr-12 text-sm text-gisviz-ink focus:ring-2 focus:ring-gisviz-accent outline-none font-sans shadow-inner"
+                      className="w-full bg-gisviz-card border border-gisviz-border rounded-sm py-2.5 pl-3 pr-12 text-[12px] text-gisviz-ink focus:ring-2 focus:ring-gisviz-accent outline-none font-sans shadow-inner"
                     />
                     <button 
                       type="submit"
@@ -359,11 +384,11 @@ export default function PostDetail() {
                       {isSubmittingComment ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
                     </button>
                   </div>
-                  {commentError && <p className="text-xs text-red-500 font-mono mt-1">{commentError}</p>}
+                  {commentError && <p className="text-[12px] text-gisviz-alert/80 font-mono mt-1">{commentError}</p>}
                 </form>
               ) : (
                 <div className="text-center p-3 border border-dashed border-gisviz-border rounded-sm">
-                  <p className="text-xs font-mono text-gisviz-ink-soft">
+                  <p className="text-[12px] font-mono text-gisviz-ink-soft">
                     <Link href="/auth" className="text-gisviz-accent font-bold hover:underline">Authenticate</Link> to join the Discussion Thread.
                   </p>
                 </div>
@@ -382,6 +407,30 @@ export default function PostDetail() {
           title={post.title}
         />
       )}
+
+      {/* Fullscreen Image Modal */}
+      {isImageFullscreen && post.visual_image_path && (
+        <div 
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-gisviz-canvas/90 backdrop-blur-sm p-4 sm:p-12 transition-opacity"
+          onClick={() => setIsImageFullscreen(false)}
+        >
+          <div className="relative max-w-6xl w-full max-h-full flex items-center justify-center">
+            <button 
+              onClick={(e) => { e.stopPropagation(); setIsImageFullscreen(false); }}
+              className="absolute -top-12 right-0 p-2 text-gisviz-ink-soft hover:text-gisviz-accent bg-gisviz-card rounded-full shadow-lg border border-gisviz-border transition-colors z-50"
+            >
+              <X size={24} />
+            </button>
+            <img 
+              src={`${API_BASE_URL}${post.visual_image_path}`} 
+              alt={post.title} 
+              className="max-w-full max-h-[85vh] object-contain rounded-md shadow-2xl border border-gisviz-border"
+              onClick={(e) => e.stopPropagation()} 
+            />
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }

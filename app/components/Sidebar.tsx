@@ -16,7 +16,7 @@ export default function Sidebar() {
   const { user, isAuthenticated } = useAuth() as any;
 
   const RAW_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
-  // Strip '/api/v1' explicitly to target the base mount where '/uploads' lives
+  // Strip '/api/v1' explicitly to target the base mount where '/post/uploads' lives
   const API_BASE_URL = RAW_API_URL.replace('/api/v1', '');
 
   useEffect(() => {
@@ -91,7 +91,7 @@ export default function Sidebar() {
     }
   };
 
-  // Ensure robust formatting to prevent 404 double slashes (http://url.com//uploads/...)
+  // Ensure robust formatting to prevent 404 double slashes (http://url.com//post/uploads/...)
   const getAvatarUrl = (path: string | null) => {
     if (!path) return null;
     if (path.startsWith("http")) return path; // Already full external URL
@@ -118,7 +118,7 @@ export default function Sidebar() {
             ) : (
               trending.map((cat) => (
                 <div key={cat.category_id} className="flex justify-between items-center gap-2 p-3 rounded-xl group hover:bg-gisviz-canvas cursor-pointer transition-colors">
-                  <p className="text-sm font-bold text-gisviz-ink group-hover:text-gisviz-accent transition-colors leading-tight">
+                  <p className="text-[16px] font-bold text-gisviz-ink group-hover:text-gisviz-accent transition-colors leading-tight">
                     {cat.label}
                   </p>
                   <p className="text-[12px] text-gisviz-ink-soft whitespace-nowrap font-mono">
@@ -168,12 +168,12 @@ export default function Sidebar() {
                           }}
                         />
                         {/* Fallback Icon div specifically for onError above */}
-                        <div className="hidden w-10 h-10 rounded-full border border-gisviz-border bg-gradient-to-tr from-gisviz-accent to-emerald-400 items-center justify-center text-white text-sm font-bold uppercase font-mono shadow-inner flex-shrink-0">
+                        <div className="hidden w-10 h-10 rounded-full border border-gisviz-border bg-gradient-to-tr from-gisviz-accent to-gisviz-safe/5  0items-center justify-center text-white text-[12px] font-bold uppercase font-mono shadow-inner flex-shrink-0">
                             {pub.user_handle.charAt(0)}
                         </div>
                       </>
                     ) : (
-                      <div className="w-10 h-10 rounded-full border border-gisviz-border bg-gradient-to-tr from-gisviz-accent to-emerald-400 flex items-center justify-center text-white text-sm font-bold uppercase font-mono shadow-inner flex-shrink-0">
+                      <div className="w-10 h-10 rounded-full border border-gisviz-border bg-gradient-to-tr from-gisviz-accent to-gisviz-safe/5  0flex items-center justify-center text-white text-[12px] font-bold uppercase font-mono shadow-inner flex-shrink-0">
                         {pub.user_handle.charAt(0)}
                       </div>
                     )}
@@ -195,7 +195,7 @@ export default function Sidebar() {
                       title={pub.is_followed ? "Unfollow" : "Follow"}
                       className={`group/btn flex items-center justify-center w-10 h-8 rounded-full transition-all flex-shrink-0 border shadow-sm ${
                         pub.is_followed 
-                          ? 'bg-gisviz-rail-soft text-gisviz-ink border-transparent hover:border-red-300 hover:text-gisviz-alert hover:bg-red-50' 
+                          ? 'bg-gisviz-rail-soft text-gisviz-ink border-transparent hover:border-gisviz-alert/60 hover:text-gisviz-alert hover:bg-red-50' 
                           : 'bg-transparent text-gisviz-ink border-gisviz-border hover:border-gisviz-accent hover:text-gisviz-accent hover:bg-gisviz-rail-soft'
                       }`}
                     >
@@ -229,7 +229,7 @@ export default function Sidebar() {
         </div>
         
         <div className="relative z-10">
-          <h4 className="font-display font-semibold text-sm text-white mb-1.5 leading-snug group-hover:text-gisviz-accent transition-colors">
+          <h4 className="font-display font-semibold text-[12px] text-white mb-1.5 leading-snug group-hover:text-gisviz-accent transition-colors">
             Enterprise Spatial Analytics
           </h4>
           <p className="text-[12px] text-slate-400 mb-3 leading-relaxed font-sans">

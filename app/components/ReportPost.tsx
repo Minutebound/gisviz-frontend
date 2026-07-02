@@ -69,7 +69,7 @@ export default function ReportModal({ isOpen, onClose, publicationId }: ReportMo
 
         <div className="flex justify-between items-start mb-6">
           <h3 className="font-display font-bold text-[16px] text-gisviz-ink flex items-center gap-2">
-            <Flag className="text-red-500" size={20} /> Report Quality Issue
+            <Flag className="text-gisviz-alert/80" size={20} /> Report Quality Issue
           </h3>
           <button onClick={onClose} className="text-gisviz-ink-soft hover:text-gisviz-accent transition-colors">
             <X size={20} />
@@ -78,14 +78,14 @@ export default function ReportModal({ isOpen, onClose, publicationId }: ReportMo
 
         {submitted ? (
           <div className="text-center py-6">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400 mb-4">
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gisviz-safe/10   text-gisviz-safe/60      dark:bg-gisviz-safe/90       /30 dark:text-gisviz-safe/5  0mb-4">
               <Check size={24} />
             </div>
             <h4 className="font-bold text-gisviz-ink mb-2">Report Logged Successfully</h4>
-            <p className="text-sm font-mono text-gisviz-ink-soft mb-6">
+            <p className="text-[12px] font-mono text-gisviz-ink-soft mb-6">
               Our team will review Publication #{publicationId.slice(0,8)} shortly.
             </p>
-            <button onClick={onClose} className="bg-gisviz-canvas border border-gisviz-border hover:bg-gisviz-rail-soft text-gisviz-ink px-6 py-2 rounded-md font-mono text-sm transition-colors">
+            <button onClick={onClose} className="bg-gisviz-canvas border border-gisviz-border hover:bg-gisviz-rail-soft text-gisviz-ink px-6 py-2 rounded-md font-mono text-[12px] transition-colors">
               Close Window
             </button>
           </div>
@@ -106,7 +106,7 @@ export default function ReportModal({ isOpen, onClose, publicationId }: ReportMo
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 required
-                className="w-full bg-gisviz-canvas border border-gisviz-border rounded-md px-3 py-2.5 text-sm text-gisviz-ink focus:ring-2 focus:ring-gisviz-accent outline-none font-mono appearance-none"
+                className="w-full bg-gisviz-canvas border border-gisviz-border rounded-md px-3 py-2.5 text-[12px] text-gisviz-ink focus:ring-2 focus:ring-gisviz-accent outline-none font-mono appearance-none"
               >
                 <option value="" disabled>Select a reason...</option>
                 <option value="inaccurate_data">Inaccurate/Fabricated Data</option>
@@ -125,7 +125,7 @@ export default function ReportModal({ isOpen, onClose, publicationId }: ReportMo
                 value={details}
                 onChange={(e) => setDetails(e.target.value)}
                 placeholder="Provide specific details about the issue..."
-                className="w-full bg-gisviz-canvas border border-gisviz-border rounded-md px-3 py-2 text-sm text-gisviz-ink focus:ring-2 focus:ring-gisviz-accent outline-none font-sans min-h-[100px] resize-none"
+                className="w-full bg-gisviz-canvas border border-gisviz-border rounded-md px-3 py-2 text-[12px] text-gisviz-ink focus:ring-2 focus:ring-gisviz-accent outline-none font-sans min-h-[100px] resize-none"
               />
             </div>
 
@@ -133,14 +133,14 @@ export default function ReportModal({ isOpen, onClose, publicationId }: ReportMo
               <button 
                 type="button" 
                 onClick={onClose}
-                className="px-4 py-2 font-mono text-sm text-gisviz-ink-soft hover:text-gisviz-ink transition-colors"
+                className="px-4 py-2 font-mono text-[12px] text-gisviz-ink-soft hover:text-gisviz-ink transition-colors"
               >
                 Cancel
               </button>
               <button 
                 type="submit"
                 disabled={isSubmitting || !reason}
-                className="flex items-center justify-center gap-2 bg-gisviz-alert text-white px-5 py-2 rounded-md hover:bg-red-700 transition-all font-mono text-sm shadow-sm disabled:opacity-50"
+                className="flex items-center justify-center gap-2 bg-gisviz-alert text-white px-5 py-2 rounded-md hover:bg-gisviz-alert transition-all font-mono text-[12px] shadow-sm disabled:opacity-50"
               >
                 {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Flag size={16} />}
                 Submit Report

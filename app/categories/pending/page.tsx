@@ -63,7 +63,7 @@ export default function PendingCategoriesPage() {
       </div>
 
       {error && (
-        <div className="bg-red-50 text-red-600 p-4 rounded-xl flex items-center gap-2 mb-6">
+        <div className="bg-red-50 text-gisviz-alert/90 p-4 rounded-xl flex items-center gap-2 mb-6">
           <AlertCircle size={20} />
           <span className="font-semibold">{error}</span>
         </div>
@@ -80,7 +80,7 @@ export default function PendingCategoriesPage() {
           <p className="text-theme-secondary/60">There are no pending categories to review.</p>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-theme-secondary/10 shadow-sm overflow-hidden">
+        <div className="bg-theme-card rounded-2xl border border-theme-secondary/10 shadow-sm overflow-hidden">
           <table className="w-full text-left">
             <thead className="bg-theme-secondary/5 text-theme-secondary/60 text-[12px] uppercase tracking-wider font-bold">
               <tr>
@@ -94,28 +94,28 @@ export default function PendingCategoriesPage() {
               {pendingCategories.map((cat) => (
                 <tr key={cat.pending_id} className="hover:bg-theme-secondary/5 transition-colors">
                   <td className="px-6 py-4 font-bold text-theme-secondary">{cat.label}</td>
-                  <td className="px-6 py-4 text-theme-secondary/70 font-mono text-sm">
+                  <td className="px-6 py-4 text-theme-secondary/70 font-mono text-[12px]">
                     {cat.normalized_slug}
                   </td>
-                  <td className="px-6 py-4 text-theme-secondary/60 text-sm">
+                  <td className="px-6 py-4 text-theme-secondary/60 text-[12px]">
                     {new Date(cat.created_timestamp).toLocaleDateString()}
                   </td>
                   <td className="px-6 py-4 text-right flex justify-end gap-2">
                     <button
                       onClick={() => handleApprove(cat.pending_id)}
-                      className="bg-green-100 text-green-700 hover:bg-green-200 p-2 rounded-lg font-bold flex items-center gap-1 transition-colors"
+                      className="bg-gisviz-safe/10    text-gisviz-safe hover:bg-gisviz-safe/30     p-2 rounded-lg font-bold flex items-center gap-1 transition-colors"
                       title="Approve"
                     >
                       <Check size={18} />
-                      <span className="text-sm">Approve</span>
+                      <span className="text-[12px]">Approve</span>
                     </button>
                     <button
                       onClick={() => handleReject(cat.pending_id)}
-                      className="bg-red-100 text-red-700 hover:bg-red-200 p-2 rounded-lg font-bold flex items-center gap-1 transition-colors"
+                      className="bg-gisviz-alert/10 text-gisviz-alert hover:bg-gisviz-alert/30 p-2 rounded-lg font-bold flex items-center gap-1 transition-colors"
                       title="Reject"
                     >
                       <X size={18} />
-                      <span className="text-sm">Reject</span>
+                      <span className="text-[12px]">Reject</span>
                     </button>
                   </td>
                 </tr>
