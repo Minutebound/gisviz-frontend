@@ -66,7 +66,7 @@ export default function SharePost({ isOpen, onClose, url, title }: ShareModalPro
         <div className="reg-mark reg-br"></div> */}
 
         <div className="flex justify-between items-start mb-6">
-          <h3 className="font-display font-bold text-[16px] text-gisviz-ink">Share Publication</h3>
+          <h3 className="font-display font-bold text-[16px] text-gisviz-ink">Share Post</h3>
           <button onClick={onClose} className="text-gisviz-ink-soft hover:text-gisviz-accent transition-colors">
             <X size={20} />
           </button>

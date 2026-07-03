@@ -172,14 +172,12 @@ export default function ProfileHandlePage() {
             <p className="text-[16px] font-mono text-gisviz-ink-soft flex items-center flex-wrap gap-3">
               <span>{profile.title || 'Platform Analyst'}</span>
               
-              {profile.location && (
-                <>
-                  <span className="flex items-center gap-1.5 text-gisviz-ink">
-                    <MapPin size={13} className="text-gisviz-accent" />
-                    {profile.location}
-                  </span>
-                </>
-              )}
+              {profile.location?.formatted_string && (
+  <span className="flex items-center gap-1.5 text-gisviz-ink">
+    <MapPin size={13} className="text-gisviz-accent" />
+    {profile.location.formatted_string}
+  </span>
+)}
             </p>
           </div>
 
@@ -212,7 +210,7 @@ export default function ProfileHandlePage() {
                onClick={() => setActiveTab('saved')}
                className={`pb-1 border-b-2 transition-colors ${activeTab === 'saved' ? 'border-gisviz-accent text-gisviz-ink font-bold' : 'border-transparent text-gisviz-ink-soft hover:text-gisviz-ink'}`}
              >
-               Saved Posts
+              Bookmarks
              </button>
            </div>
 
@@ -258,7 +256,7 @@ export default function ProfileHandlePage() {
       <div className="flex justify-between items-center mb-4 mt-8">
         <h2 className="text-[16px] font-display font-bold text-gisviz-ink flex items-center gap-2">
           <Activity size={18} className="text-gisviz-accent" />
-          {activeTab === 'publications' ? 'Recent Publications' : 'Saved Bookmarks'}
+          {activeTab === 'publications' ? 'Recent Posts' : 'Saved Bookmarks'}
         </h2>
         
         {/* Updated Sort Toggle Button */}

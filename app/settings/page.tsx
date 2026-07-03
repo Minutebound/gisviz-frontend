@@ -2,146 +2,220 @@
 
 import React, { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Settings, Save, Loader2, Image as ImageIcon, MapPin, Briefcase, Link as LinkIcon, AtSign, Mail, Shield, Edit2, X, Lock } from 'lucide-react'
+import {
+  Settings, Save, Loader2, Image as ImageIcon, MapPin, Briefcase,
+  Link as LinkIcon, AtSign, Shield, Edit2, X, Lock, Mail, Trash2,
+  Eye, EyeOff, ShieldCheck,
+} from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { gisvizApi } from '../../services/api'
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
+const RAW_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
+const API_BASE_URL = RAW_API_URL.replace('/api/v1', '').replace(/\/$/, '')
 
 const parseError = (err: any, fallback: string): string => {
-  const detail = err.response?.data?.detail;
-  if (typeof detail === 'string') return detail;
+  const detail = err?.response?.data?.detail
+  if (typeof detail === 'string') return detail
   if (Array.isArray(detail) && detail.length > 0) {
-    const loc = detail[0].loc ? detail[0].loc[detail[0].loc.length - 1] : 'Field';
-    return `${loc}: ${detail[0].msg}`;
+    const loc = detail[0].loc ? detail[0].loc[detail[0].loc.length - 1] : 'Field'
+    return `${loc}: ${detail[0].msg}`
   }
-  return err.message || fallback;
+  return err?.message || fallback
+}
+
+const getAvatarUrl = (path: string | null | undefined): string | null => {
+  if (!path) return null
+  if (path.startsWith('http')) return path
+  return `${API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`
 }
 
 export default function SettingsPage() {
   const router = useRouter()
-  const { user, isAuthenticated, isLoading: authLoading, refreshProfile } = useAuth()
-  
-  const [isLoading, setIsLoading] = useState(false)
-  const [successMsg, setSuccessMsg] = useState('')
-  const [errorMsg, setErrorMsg] = useState('')
+  const { user, isAuthenticated, isLoading: authLoading, refreshProfile, logoutSession } = useAuth() as any
 
-  // Inline Edit State tracking
+  const [pageLoading, setPageLoading] = useState(true)
+  const [saving, setSaving] = useState<Record<string, boolean>>({})
+  const [msgs, setMsgs] = useState<Record<string, { type: 'success' | 'error'; text: string } | null>>({})
   const [editingFields, setEditingFields] = useState<Record<string, boolean>>({})
 
-  // Form State
-  const [formData, setFormData] = useState({
-    title: '',
-    linkedin_url: '',
-    medium_url: '',
-    website_url: '',
-    place: '',
-    state: '',
-    country: '',
-    formatted_string: ''
-  })
+  const setSave = (s: string, v: boolean) => setSaving(p => ({ ...p, [s]: v }))
+  const setMsg = (s: string, m: { type: 'success' | 'error'; text: string } | null) => setMsgs(p => ({ ...p, [s]: m }))
+  const toggleEdit = (f: string) => setEditingFields(p => ({ ...p, [f]: !p[f] }))
 
-  // Location State
+  // ---- Profile form ----
+  const [formData, setFormData] = useState({
+    title: '', linkedin_url: '', medium_url: '', website_url: '',
+    place: '', state: '', country: '', formatted_string: '',
+  })
   const [locationQuery, setLocationQuery] = useState('')
   const [locationSuggestions, setLocationSuggestions] = useState<any[]>([])
   const [isSearchingLocation, setIsSearchingLocation] = useState(false)
-
-  // Avatar State
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Security State
-  const [isPasswordLoading, setIsPasswordLoading] = useState(false)
-  const [pwdMsg, setPwdMsg] = useState({ type: '', text: '' })
+  // ---- Handle form ----
+  const [handleVal, setHandleVal] = useState('')
+
+  // ---- Email — 3-step flow ----
+  // step: 'idle' | 'form' | 'otp'
+  const [emailStep, setEmailStep] = useState<'idle' | 'form' | 'otp'>('idle')
+  const [emailForm, setEmailForm] = useState({ new_email: '', current_password: '' })
+  const [emailOtp, setEmailOtp] = useState('')
+  const [devOtp, setDevOtp] = useState('')   // shown in dev mode
+
+  // ---- Password form ----
   const [passwordData, setPasswordData] = useState({
-    currentPassword: '',
-    newPassword: '',
-    confirmPassword: ''
+    currentPassword: '', newPassword: '', confirmPassword: '',
   })
+  const [showPwd, setShowPwd] = useState<Record<string, boolean>>({})
 
+  // ---- Delete account ----
+  const [deletePassword, setDeletePassword] = useState('')
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
+
+  // ---------------------------------------------------------------
+  // Hydrate
+  // ---------------------------------------------------------------
   useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      router.push('/auth')
-    } else if (user) {
-      const loc = (user as any).location || {};
-      
-      setFormData({
-        title: user.title || '',
-        linkedin_url: user.linkedin_url || '',
-        medium_url: (user as any).medium_url || '',
-        website_url: user.website_url || '',
-        place: loc.place || '',
-        state: loc.state || '',
-        country: loc.country || '',
-        formatted_string: loc.formatted_string || ''
-      })
-      setLocationQuery(loc.formatted_string || '')
-      setAvatarPreview(user.avatar_path ? `${API_BASE_URL}${user.avatar_path}` : null)
-    }
-  }, [user, isAuthenticated, authLoading, router])
+    if (authLoading) return
+    if (!isAuthenticated) { router.push('/auth'); return }
+    if (!user) return
 
-  // --- Handlers ---
-  const toggleEdit = (field: string) => {
-    setEditingFields(prev => ({ ...prev, [field]: !prev[field] }))
-  }
+    const loc = user.location || {}
+    setFormData({
+      title: user.title || '',
+      linkedin_url: user.linkedin_url || '',
+      medium_url: user.medium_url || '',
+      website_url: user.website_url || '',
+      place: loc.place || '',
+      state: loc.state || '',
+      country: loc.country || '',
+      formatted_string: loc.formatted_string || '',
+    })
+    setHandleVal(user.user_handle || '')
+    setLocationQuery(loc.formatted_string || '')
+    setAvatarPreview(getAvatarUrl(user.avatar_path))
+    setPageLoading(false)
+  }, [authLoading, isAuthenticated, user, router])
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value })
-  }
+  // ---------------------------------------------------------------
+  // Helpers
+  // ---------------------------------------------------------------
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) =>
+    setFormData(p => ({ ...p, [e.target.name]: e.target.value }))
 
-  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setPasswordData({ ...passwordData, [e.target.name]: e.target.value })
-  }
-
-  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0]
-      setAvatarFile(file)
-      setAvatarPreview(URL.createObjectURL(file))
-    }
-  }
+  const getInputValue = (value: string, isEditing: boolean) =>
+    isEditing ? value : (value || 'Not provided')
 
   const searchLocation = async (query: string) => {
     setLocationQuery(query)
-    if (query.length < 3) {
-      setLocationSuggestions([])
-      return
-    }
+    if (query.length < 3) { setLocationSuggestions([]); return }
     setIsSearchingLocation(true)
     try {
-      const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&addressdetails=1&limit=5`)
-      const data = await res.json()
-      setLocationSuggestions(data)
-    } catch (err) {
-      console.error("Location search failed", err)
-    } finally {
-      setIsSearchingLocation(false)
-    }
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&addressdetails=1&limit=5`
+      )
+      setLocationSuggestions(await res.json())
+    } catch { /* swallow */ }
+    finally { setIsSearchingLocation(false) }
   }
 
   const selectLocation = (item: any) => {
-    const address = item.address
-    const place = address.city || address.town || address.village || address.county || ''
-    const state = address.state || ''
-    const country = address.country || ''
-    
-    setFormData(prev => ({ ...prev, place, state, country }))
+    const a = item.address
+    const place = a.city || a.town || a.village || a.county || ''
+    const state = a.state || ''
+    const country = a.country || ''
+    setFormData(p => ({ ...p, place, state, country }))
     setLocationQuery(item.display_name)
     setLocationSuggestions([])
   }
 
-  const handleProfileSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
-    setErrorMsg('')
-    setSuccessMsg('')
+  // ---------------------------------------------------------------
+  // Sub-components — matching original style exactly
+  // ---------------------------------------------------------------
+  const LabelWithEdit = ({ label, fieldName }: { label: string; fieldName: string }) => (
+    <div className="flex items-center justify-between mb-2">
+      <label className="text-[16px] font-mono text-gisviz-ink-soft uppercase tracking-wider">{label}</label>
+      <button
+        type="button"
+        onClick={() => toggleEdit(fieldName)}
+        className={`text-[10px] font-mono px-2 py-0.5 rounded border transition-colors flex items-center gap-1 ${
+          editingFields[fieldName]
+            ? 'border-gisviz-alert/40 text-gisviz-alert bg-gisviz-alert/5'
+            : 'border-gisviz-border text-gisviz-ink-soft hover:border-gisviz-accent hover:text-gisviz-accent'
+        }`}
+      >
+        {editingFields[fieldName] ? <><X size={10} /> Cancel</> : <><Edit2 size={10} /> Edit</>}
+      </button>
+    </div>
+  )
 
+  const SectionMsg = ({ section }: { section: string }) => {
+    const m = msgs[section]
+    if (!m) return null
+    return (
+      <div className={`p-4 mb-4 rounded-md text-[16px] font-mono border ${
+        m.type === 'success'
+          ? 'bg-gisviz-safe/5 text-gisviz-safe/70 border-gisviz-safe/20'
+          : 'bg-red-50 text-gisviz-alert/90 border-gisviz-alert/60'
+      }`}>
+        {m.text}
+      </div>
+    )
+  }
+
+  const PwdInput = ({ name, label, placeholder, value, onChange }: {
+    name: string; label: string; placeholder: string; value: string;
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => void
+  }) => (
+    <div>
+      <label className="text-[16px] font-mono text-gisviz-ink-soft uppercase tracking-wider block mb-2">{label}</label>
+      <div className="relative">
+        <input
+          type={showPwd[name] ? 'text' : 'password'}
+          name={name}
+          value={value}
+          onChange={onChange}
+          placeholder={placeholder}
+          className="w-full bg-gisviz-canvas border border-gisviz-border rounded-md px-4 py-2.5 text-gisviz-ink text-[16px] font-mono focus:ring-2 focus:ring-gisviz-accent outline-none pr-10"
+        />
+        <button
+          type="button"
+          onClick={() => setShowPwd(p => ({ ...p, [name]: !p[name] }))}
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-gisviz-ink-soft hover:text-gisviz-ink"
+        >
+          {showPwd[name] ? <EyeOff size={13} /> : <Eye size={13} />}
+        </button>
+      </div>
+    </div>
+  )
+
+  const SaveBtn = ({ section, label = 'Save Changes' }: { section: string; label?: string }) => (
+    <button
+      type="submit"
+      disabled={!!saving[section]}
+      className="flex items-center gap-2 bg-gisviz-accent text-white px-6 py-2.5 rounded-md text-[16px] font-mono font-bold hover:bg-gisviz-accent/90 disabled:opacity-60 transition-colors"
+    >
+      {saving[section] ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+      {saving[section] ? 'Saving…' : label}
+    </button>
+  )
+
+  const hasActiveProfileEdits =
+    Object.keys(editingFields).some(k => !['password', 'handle', 'email', 'delete'].includes(k) && editingFields[k]) ||
+    avatarFile !== null
+
+  // ---------------------------------------------------------------
+  // Submit handlers
+  // ---------------------------------------------------------------
+
+  const submitProfile = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSave('profile', true); setMsg('profile', null)
     try {
       if (avatarFile) await gisvizApi.uploadAvatar(avatarFile)
-
-      // Only fire settings update if something was actually being edited
-      if (Object.keys(editingFields).some(k => k !== 'password' && editingFields[k])) {
+      if (Object.keys(editingFields).some(k => !['password', 'handle', 'email', 'delete'].includes(k) && editingFields[k])) {
         await gisvizApi.updateSettings({
           title: formData.title,
           linkedin_url: formData.linkedin_url,
@@ -149,70 +223,120 @@ export default function SettingsPage() {
           website_url: formData.website_url,
           place: formData.place,
           state: formData.state,
-          country: formData.country
+          country: formData.country,
         })
       }
-
       await refreshProfile()
-      setSuccessMsg('Profile configuration updated successfully.')
       setAvatarFile(null)
-      setEditingFields({}) // Lock all fields again after saving
+      setEditingFields(p => {
+        const n = { ...p }
+        Object.keys(n).forEach(k => { if (!['password', 'handle', 'email', 'delete'].includes(k)) delete n[k] })
+        return n
+      })
+      setMsg('profile', { type: 'success', text: 'Profile updated successfully.' })
     } catch (err: any) {
-      setErrorMsg(parseError(err, 'Failed to update settings'))
-    } finally {
-      setIsLoading(false)
-    }
+      setMsg('profile', { type: 'error', text: parseError(err, 'Failed to update profile.') })
+    } finally { setSave('profile', false) }
   }
 
-  const handlePasswordSubmit = async (e: React.FormEvent) => {
+  const submitHandle = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSave('handle', true); setMsg('handle', null)
+    try {
+      await gisvizApi.updateHandle(handleVal)
+      localStorage.setItem('gisviz_handle', handleVal.replace(/^@/, ''))
+      await refreshProfile()
+      setMsg('handle', { type: 'success', text: 'Handle updated successfully.' })
+      toggleEdit('handle')
+    } catch (err: any) {
+      // 409 = taken, 400 = same as current / invalid
+      setMsg('handle', { type: 'error', text: parseError(err, 'Failed to update handle.') })
+    } finally { setSave('handle', false) }
+  }
+
+  // Email step 1 — request OTP
+  const submitEmailRequest = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSave('email', true); setMsg('email', null)
+    try {
+      const res = await gisvizApi.requestEmailChange(emailForm.new_email, emailForm.current_password)
+      setDevOtp(res.dev_otp || '')   // remove in production
+      setEmailStep('otp')
+      setMsg('email', { type: 'success', text: `Verification code sent to ${emailForm.new_email}` })
+    } catch (err: any) {
+      setMsg('email', { type: 'error', text: parseError(err, 'Failed to send verification code.') })
+    } finally { setSave('email', false) }
+  }
+
+  // Email step 2 — verify OTP
+  const submitEmailVerify = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSave('email', true); setMsg('email', null)
+    try {
+      await gisvizApi.verifyEmailChange(emailForm.new_email, emailOtp)
+      await refreshProfile()
+      setMsg('email', { type: 'success', text: 'Email updated successfully.' })
+      // Reset entire email flow
+      setEmailStep('idle')
+      setEmailForm({ new_email: '', current_password: '' })
+      setEmailOtp('')
+      setDevOtp('')
+      toggleEdit('email')
+    } catch (err: any) {
+      setMsg('email', { type: 'error', text: parseError(err, 'Invalid or expired code.') })
+    } finally { setSave('email', false) }
+  }
+
+  const submitPassword = async (e: React.FormEvent) => {
     e.preventDefault()
     if (passwordData.newPassword !== passwordData.confirmPassword) {
-      setPwdMsg({ type: 'error', text: 'New passwords do not match.' })
-      return
+      setMsg('password', { type: 'error', text: 'New passwords do not match.' }); return
     }
-
-    setIsPasswordLoading(true)
-    setPwdMsg({ type: '', text: '' })
-
+    setSave('password', true); setMsg('password', null)
     try {
       await gisvizApi.changePassword({
         current_password: passwordData.currentPassword,
-        new_password: passwordData.newPassword
+        new_password: passwordData.newPassword,
       })
-      
-      setPwdMsg({ type: 'success', text: 'Password changed successfully.' })
       setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' })
-      setEditingFields(prev => ({ ...prev, password: false }))
+      setMsg('password', { type: 'success', text: 'Password changed successfully.' })
+      toggleEdit('password')
     } catch (err: any) {
-      setPwdMsg({ type: 'error', text: parseError(err, 'Failed to change password') })
-    } finally {
-      setIsPasswordLoading(false)
+      setMsg('password', { type: 'error', text: parseError(err, 'Password change failed.') })
+    } finally { setSave('password', false) }
+  }
+
+  const submitDelete = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (deleteConfirmText !== user?.user_handle) {
+      setMsg('delete', { type: 'error', text: `Type your exact handle to confirm: ${user?.user_handle}` }); return
+    }
+    setSave('delete', true); setMsg('delete', null)
+    try {
+      // Clear auth BEFORE the API call so the 401 interceptor doesn't
+      // race with our own cleanup when the account ceases to exist
+      logoutSession()
+      await gisvizApi.deleteAccount(deletePassword)
+      router.push('/')
+    } catch (err: any) {
+      // If we get here the deletion failed — restore state so they can try again
+      setSave('delete', false)
+      setMsg('delete', { type: 'error', text: parseError(err, 'Deletion failed. Please try again.') })
     }
   }
 
-  // --- UI Helpers ---
-  const LabelWithEdit = ({ label, fieldName }: { label: string, fieldName: string }) => (
-    <div className="flex items-center justify-between mb-2">
-      <label className="text-[12px] font-mono text-gisviz-ink-soft uppercase tracking-wider">{label}</label>
-      <button 
-        type="button" 
-        onClick={() => toggleEdit(fieldName)}
-        className="text-[12px] font-mono text-gisviz-accent hover:underline flex items-center gap-1 uppercase"
-      >
-        {editingFields[fieldName] ? <><X size={10}/> Cancel</> : <><Edit2 size={10}/> Edit</>}
-      </button>
-    </div>
-  )
-
-  const getInputValue = (value: string, isEditing: boolean) => {
-    if (isEditing) return value;
-    return value || 'Not provided';
+  // ---------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------
+  if (authLoading || pageLoading) {
+    return (
+      <div className="py-20 text-center">
+        <Loader2 className="animate-spin mx-auto text-gisviz-accent" size={32} />
+      </div>
+    )
   }
 
-  // Determine if Save button should be visible
-  const hasActiveProfileEdits = Object.keys(editingFields).some(k => k !== 'password' && editingFields[k]) || avatarFile !== null;
-
-  if (authLoading || !user) return <div className="py-20 text-center"><Loader2 className="animate-spin mx-auto text-gisviz-accent" size={32} /></div>
+  if (!user) return null
 
   return (
     <div className="py-8 max-w-4xl mx-auto px-4 md:px-0">
@@ -221,241 +345,441 @@ export default function SettingsPage() {
           <Settings className="text-gisviz-accent" size={32} />
           Profile Settings
         </h1>
-        <p className="text-gisviz-ink-soft font-mono mt-2">Manage your public identity, roles, and access credentials.</p>
+        <p className="text-gisviz-ink-soft font-mono mt-2">
+          Manage your public identity, roles, and access credentials.
+        </p>
       </div>
 
-      {/* --- PROFILE CONFIGURATION --- */}
-      <div className="bg-gisviz-card border border-gisviz-border shadow-md p-6 sm:p-8 rounded-sm mb-8 relative">
-        {successMsg && (
-          <div className="p-4 mb-6 rounded-md text-[12px] font-mono border bg-gisviz-safe/5  text-gisviz-safe/70       border-gisviz-safe-200">
-            {successMsg}
-          </div>
-        )}
-        {errorMsg && (
-          <div className="p-4 mb-6 rounded-md text-[12px] font-mono border bg-red-50 text-gisviz-alert/90 border-gisviz-alert/60">
-            {errorMsg}
-          </div>
-        )}
+      {/* ============================================================ */}
+      {/* PROFILE                                                        */}
+      {/* ============================================================ */}
+      <div className="bg-gisviz-card border border-gisviz-border shadow-md p-6 sm:p-8 rounded-sm mb-6">
+        <SectionMsg section="profile" />
 
-        <form onSubmit={handleProfileSubmit} className="space-y-8">
-          
-          {/* Section: Base Identity */}
+        <form onSubmit={submitProfile} className="space-y-8">
+
+          {/* Identity & Avatar */}
           <div className="space-y-4">
-            <h2 className="text-[16px] font-bold text-gisviz-ink border-b border-gisviz-border pb-2 uppercase tracking-wide font-mono text-[12px] flex items-center gap-2">
-              <AtSign size={16} /> Identity & Avatar
+            <h2 className="text-[16px] font-bold text-gisviz-ink border-b border-gisviz-border pb-2 uppercase tracking-wide font-mono flex items-center gap-2">
+              <AtSign size={14} /> Identity & Avatar
             </h2>
-            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              
-              {/* Avatar Upload - Always Active */}
+              {/* Avatar */}
               <div className="md:col-span-2 flex items-center gap-6">
-                <div 
+                <div
                   className="w-24 h-24 shrink-0 rounded-full bg-gisviz-canvas border-2 border-dashed border-gisviz-border overflow-hidden flex items-center justify-center relative group cursor-pointer hover:border-gisviz-accent transition-colors"
                   onClick={() => fileInputRef.current?.click()}
                 >
-                  {avatarPreview ? (
-                    <img src={avatarPreview} alt="Preview" className="w-full h-full object-cover" />
-                  ) : (
-                    <ImageIcon className="text-gisviz-ink-soft" size={32} />
-                  )}
-                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white text-[12px] font-mono">
+                  {avatarPreview
+                    ? <img src={avatarPreview} alt="Preview" className="w-full h-full object-cover" />
+                    : <ImageIcon className="text-gisviz-ink-soft" size={32} />
+                  }
+                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white text-[16px] font-mono">
                     Upload
                   </div>
                 </div>
                 <div>
-                  <label className="text-[12px] font-mono text-gisviz-ink-soft uppercase tracking-wider block mb-1">Profile Avatar</label>
-                  <p className="text-[12px] text-gisviz-ink-soft font-mono mb-3">JPG, PNG or WebP. Max size 2MB.</p>
-                  <button 
-                    type="button" 
-                    onClick={() => fileInputRef.current?.click()}
-                    className="text-[12px] font-mono bg-gisviz-canvas border border-gisviz-border px-3 py-1.5 rounded hover:bg-gray-50 transition-colors"
-                  >
+                  <label className="text-[16px] font-mono text-gisviz-ink-soft uppercase tracking-wider block mb-1">Profile Avatar</label>
+                  <p className="text-[16px] text-gisviz-ink-soft font-mono mb-3">JPG, PNG or WebP. Max size 2MB.</p>
+                  <button type="button" onClick={() => fileInputRef.current?.click()}
+                    className="text-[16px] font-mono bg-gisviz-canvas border border-gisviz-border px-3 py-1.5 rounded hover:bg-gray-50 transition-colors">
                     Select File
                   </button>
-                  <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleAvatarChange} />
+                  <input type="file" ref={fileInputRef} className="hidden" accept="image/*"
+                    onChange={e => {
+                      const f = e.target.files?.[0]; if (!f) return
+                      setAvatarFile(f); setAvatarPreview(URL.createObjectURL(f))
+                    }}
+                  />
+                  {avatarFile && <p className="text-[11px] font-mono text-gisviz-accent mt-2">✓ New avatar selected</p>}
                 </div>
               </div>
 
-              {/* System Locked Identity Stats */}
+              {/* Role — locked */}
               <div>
-                <label className="flex items-center gap-1 text-[12px] font-mono text-gisviz-ink-soft mb-2 uppercase">
-                   User Handle <Lock size={12} className="text-gisviz-ink-soft opacity-70"/>
+                <label className="flex items-center gap-1 text-[16px] font-mono text-gisviz-ink-soft mb-2 uppercase">
+                  System Role <Lock size={12} className="text-gisviz-ink-soft opacity-70" />
                 </label>
-                <div className="w-full bg-gisviz-canvas/50 border border-gisviz-border/50 rounded-md px-4 py-2.5 text-gisviz-ink font-bold font-mono text-[12px] shadow-inner">
-                  @{user.user_handle}
-                </div>
-              </div>
-              <div>
-                <label className="flex items-center gap-1 text-[12px] font-mono text-gisviz-ink-soft mb-2 uppercase">
-                   System Role <Lock size={12} className="text-gisviz-ink-soft opacity-70"/>
-                </label>
-                <div className="w-full bg-gisviz-canvas/50 border border-gisviz-border/50 rounded-md px-4 py-2.5 text-gisviz-accent font-bold font-mono text-[12px] shadow-inner">
+                <div className="w-full bg-gisviz-canvas/50 border border-gisviz-border/50 rounded-md px-4 py-2.5 text-gisviz-accent font-bold font-mono text-[16px] shadow-inner">
                   {user.role_name?.toUpperCase() || 'VIEWER'}
                 </div>
               </div>
-            </div>
-          </div>
 
-          {/* Section: Professional Info & Location */}
-          <div className="space-y-4 pt-4">
-            <h2 className="text-[16px] font-bold text-gisviz-ink border-b border-gisviz-border pb-2 uppercase tracking-wide font-mono text-[12px] flex items-center gap-2">
-              <Briefcase size={16} /> Professional Background
-            </h2>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Title */}
               <div>
                 <LabelWithEdit label="Current Title / Position" fieldName="title" />
-                <input
-                  type="text"
-                  name="title"
+                <input type="text" name="title"
                   value={getInputValue(formData.title, !!editingFields.title)}
                   disabled={!editingFields.title}
                   onChange={handleChange}
-                  className={`w-full rounded-md px-4 py-2.5 text-[12px] outline-none font-mono transition-colors border ${!editingFields.title ? 'bg-gisviz-canvas/50 border-gisviz-border/50 text-gisviz-ink font-bold shadow-inner' : 'bg-gisviz-canvas border-gisviz-border text-gisviz-ink focus:ring-2 focus:ring-gisviz-accent'} ${!formData.title && !editingFields.title ? 'text-gisviz-ink-soft italic font-normal' : ''}`}
                   placeholder="e.g. Senior Cartographer at MapBox"
+                  className={`w-full rounded-md px-4 py-2.5 text-[16px] outline-none font-mono transition-colors border ${
+                    !editingFields.title
+                      ? 'bg-gisviz-canvas/50 border-gisviz-border/50 text-gisviz-ink font-bold shadow-inner'
+                      : 'bg-gisviz-canvas border-gisviz-border text-gisviz-ink focus:ring-2 focus:ring-gisviz-accent'
+                  } ${!formData.title && !editingFields.title ? 'text-gisviz-ink-soft italic font-normal' : ''}`}
                 />
-              </div>
-
-              <div className="relative">
-                <LabelWithEdit label="Base Location" fieldName="location" />
-                <input
-                  type="text"
-                  value={getInputValue(locationQuery, !!editingFields.location)}
-                  disabled={!editingFields.location}
-                  onChange={(e) => searchLocation(e.target.value)}
-                  className={`w-full rounded-md px-4 py-2.5 text-[12px] outline-none font-mono transition-colors border ${!editingFields.location ? 'bg-gisviz-canvas/50 border-gisviz-border/50 text-gisviz-ink font-bold shadow-inner' : 'bg-gisviz-canvas border-gisviz-border text-gisviz-ink focus:ring-2 focus:ring-gisviz-accent'} ${!locationQuery && !editingFields.location ? 'text-gisviz-ink-soft italic font-normal' : ''}`}
-                  placeholder="e.g. Boulder, Colorado..."
-                />
-                {isSearchingLocation && <Loader2 className="absolute right-3 top-9 animate-spin text-gisviz-ink-soft" size={16} />}
-                
-                {editingFields.location && locationSuggestions.length > 0 && (
-                  <ul className="absolute z-10 w-full mt-1 bg-gisviz-card border border-gisviz-border shadow-lg rounded-md overflow-hidden font-mono text-[12px] max-h-48 overflow-y-auto">
-                    {locationSuggestions.map((item, i) => (
-                      <li key={i} onClick={() => selectLocation(item)} className="px-4 py-2 hover:bg-gisviz-accent hover:text-white cursor-pointer border-b border-gisviz-border last:border-0 truncate transition-colors text-gisviz-ink">
-                        {item.display_name}
-                      </li>
-                    ))}
-                  </ul>
-                )}
               </div>
             </div>
           </div>
 
-          {/* Section: Social Graph */}
+          {/* Location */}
           <div className="space-y-4 pt-4">
-            <h2 className="text-[16px] font-bold text-gisviz-ink border-b border-gisviz-border pb-2 uppercase tracking-wide font-mono text-[12px] flex items-center gap-2">
-              <LinkIcon size={16} /> Network Links
+            <h2 className="text-[16px] font-bold text-gisviz-ink border-b border-gisviz-border pb-2 uppercase tracking-wide font-mono flex items-center gap-2">
+              <MapPin size={14} /> Base Location
             </h2>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <LabelWithEdit label="LinkedIn URL" fieldName="linkedin" />
-                <input type="url" name="linkedin_url" value={getInputValue(formData.linkedin_url, !!editingFields.linkedin)} disabled={!editingFields.linkedin} onChange={handleChange} className={`w-full rounded-md px-4 py-2.5 text-[12px] outline-none font-mono border ${!editingFields.linkedin ? 'bg-gisviz-canvas/50 border-gisviz-border/50 text-gisviz-ink font-bold shadow-inner' : 'bg-gisviz-canvas border-gisviz-border focus:ring-2 focus:ring-gisviz-accent'} ${!formData.linkedin_url && !editingFields.linkedin ? 'text-gisviz-ink-soft italic font-normal' : ''}`} placeholder="https://linkedin.com/in/..." />
-              </div>
-
-              <div>
-                <LabelWithEdit label="Medium URL" fieldName="medium" />
-                <input type="url" name="medium_url" value={getInputValue(formData.medium_url, !!editingFields.medium)} disabled={!editingFields.medium} onChange={handleChange} className={`w-full rounded-md px-4 py-2.5 text-[12px] outline-none font-mono border ${!editingFields.medium ? 'bg-gisviz-canvas/50 border-gisviz-border/50 text-gisviz-ink font-bold shadow-inner' : 'bg-gisviz-canvas border-gisviz-border focus:ring-2 focus:ring-gisviz-accent'} ${!formData.medium_url && !editingFields.medium ? 'text-gisviz-ink-soft italic font-normal' : ''}`} placeholder="https://medium.com/@..." />
-              </div>
-
-              <div className="md:col-span-2">
-                <LabelWithEdit label="Personal Website / Portfolio" fieldName="website" />
-                <input type="url" name="website_url" value={getInputValue(formData.website_url, !!editingFields.website)} disabled={!editingFields.website} onChange={handleChange} className={`w-full rounded-md px-4 py-2.5 text-[12px] outline-none font-mono border ${!editingFields.website ? 'bg-gisviz-canvas/50 border-gisviz-border/50 text-gisviz-ink font-bold shadow-inner' : 'bg-gisviz-canvas border-gisviz-border focus:ring-2 focus:ring-gisviz-accent'} ${!formData.website_url && !editingFields.website ? 'text-gisviz-ink-soft italic font-normal' : ''}`} placeholder="https://yourdomain.com" />
-              </div>
+            <div className="relative">
+              <LabelWithEdit label="Location" fieldName="location" />
+              <input
+                type="text"
+                value={getInputValue(locationQuery, !!editingFields.location)}
+                disabled={!editingFields.location}
+                onChange={e => searchLocation(e.target.value)}
+                placeholder="e.g. Nairobi, Kenya"
+                className={`w-full rounded-md px-4 py-2.5 text-[16px] outline-none font-mono transition-colors border ${
+                  !editingFields.location
+                    ? 'bg-gisviz-canvas/50 border-gisviz-border/50 text-gisviz-ink font-bold shadow-inner'
+                    : 'bg-gisviz-canvas border-gisviz-border text-gisviz-ink focus:ring-2 focus:ring-gisviz-accent'
+                } ${!locationQuery && !editingFields.location ? 'text-gisviz-ink-soft italic font-normal' : ''}`}
+              />
+              {isSearchingLocation && (
+                <div className="absolute right-3 top-9"><Loader2 size={14} className="animate-spin text-gisviz-accent" /></div>
+              )}
+              {locationSuggestions.length > 0 && editingFields.location && (
+                <div className="absolute z-10 w-full mt-1 bg-gisviz-card border border-gisviz-border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                  {locationSuggestions.map((item, i) => (
+                    <button key={i} type="button" onClick={() => selectLocation(item)}
+                      className="w-full text-left px-4 py-2.5 text-[16px] font-mono hover:bg-gisviz-canvas transition-colors border-b border-gisviz-border/50 last:border-0 flex items-start gap-2">
+                      <MapPin size={12} className="text-gisviz-accent shrink-0 mt-0.5" />
+                      <span className="truncate">{item.display_name}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {editingFields.location && (formData.place || formData.state || formData.country) && (
+                <div className="flex gap-4 mt-3">
+                  {[['City', formData.place], ['State', formData.state], ['Country', formData.country]].map(([l, v]) =>
+                    v ? (
+                      <div key={l} className="bg-gisviz-canvas border border-gisviz-border/50 rounded px-3 py-1.5">
+                        <p className="text-[10px] font-mono text-gisviz-ink-soft uppercase mb-0.5">{l}</p>
+                        <p className="text-[11px] font-mono font-bold text-gisviz-ink">{v}</p>
+                      </div>
+                    ) : null
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Floating Save Button */}
+          {/* Online Presence */}
+          <div className="space-y-4 pt-4">
+            <h2 className="text-[16px] font-bold text-gisviz-ink border-b border-gisviz-border pb-2 uppercase tracking-wide font-mono flex items-center gap-2">
+              <LinkIcon size={14} /> Online Presence
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {[
+                { name: 'linkedin_url', label: 'LinkedIn URL', placeholder: 'https://linkedin.com/in/...' },
+                { name: 'medium_url', label: 'Medium URL', placeholder: 'https://medium.com/@...' },
+                { name: 'website_url', label: 'Personal Website', placeholder: 'https://yoursite.com' },
+              ].map(field => (
+                <div key={field.name}>
+                  <LabelWithEdit label={field.label} fieldName={field.name} />
+                  <input type="url" name={field.name}
+                    value={getInputValue(formData[field.name as keyof typeof formData], !!editingFields[field.name])}
+                    disabled={!editingFields[field.name]}
+                    onChange={handleChange}
+                    placeholder={field.placeholder}
+                    className={`w-full rounded-md px-4 py-2.5 text-[16px] outline-none font-mono transition-colors border ${
+                      !editingFields[field.name]
+                        ? 'bg-gisviz-canvas/50 border-gisviz-border/50 text-gisviz-ink font-bold shadow-inner'
+                        : 'bg-gisviz-canvas border-gisviz-border text-gisviz-ink focus:ring-2 focus:ring-gisviz-accent'
+                    } ${!formData[field.name as keyof typeof formData] && !editingFields[field.name] ? 'text-gisviz-ink-soft italic font-normal' : ''}`}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
           {hasActiveProfileEdits && (
-            <div className="sticky bottom-4 z-50 pt-4 flex justify-end plate-enter">
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="flex items-center gap-2 bg-gisviz-accent text-white py-3 px-8 rounded-full hover:bg-opacity-90 transition-all font-mono text-[12px] shadow-[0_8px_30px_rgb(0,0,0,0.12)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.2)] disabled:opacity-70"
-              >
-                {isLoading ? <Loader2 size={18} className="animate-spin" /> : <><Save size={18} /> Save Active Changes</>}
-              </button>
+            <div className="pt-4 flex justify-end">
+              <SaveBtn section="profile" />
             </div>
           )}
         </form>
       </div>
 
-      {/* --- NEW SECTION: ACCESS & SECURITY --- */}
-      <div className="bg-gisviz-card border-2 border-gisviz-border shadow-sm p-6 sm:p-8 rounded-sm overflow-hidden relative">
-        {/* Subtle background decoration */}
-        <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none">
-          <Shield size={120} />
-        </div>
+      {/* ============================================================ */}
+      {/* HANDLE                                                         */}
+      {/* ============================================================ */}
+      <div className="bg-gisviz-card border border-gisviz-border shadow-md p-6 sm:p-8 rounded-sm mb-6">
+        <h2 className="text-[16px] font-bold text-gisviz-ink border-b border-gisviz-border pb-2 uppercase tracking-wide font-mono flex items-center gap-2 mb-6">
+          <AtSign size={14} /> Username Handle
+        </h2>
+        <SectionMsg section="handle" />
+        <LabelWithEdit label="Handle (@ prefix required)" fieldName="handle" />
 
-        <div className="relative z-10">
-          <h2 className="text-[16px] font-display font-bold text-gisviz-ink mb-1 flex items-center gap-2">
-            Access & Security
-          </h2>
-          <p className="text-[12px] font-mono text-gisviz-ink-soft mb-8">Protect your account credentials and system access.</p>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            
-            {/* Email Display Card */}
-            <div className="bg-gisviz-canvas/50 border border-gisviz-border rounded-md p-5 shadow-inner flex flex-col justify-center">
-              <label className="flex items-center gap-2 text-[12px] font-mono text-gisviz-ink-soft mb-2 uppercase tracking-wide">
-                <Mail size={14}/> Registered Email <Lock size={12} className="ml-1 opacity-50"/>
-              </label>
-              <div className="text-gisviz-ink font-bold font-mono text-base truncate">
-                {(user as any).email_address || (user as any).email || 'No email registered'}
-              </div>
-              <p className="text-[12px] font-mono text-gisviz-ink-soft mt-2">Email addresses are managed via system administrators.</p>
+        {!editingFields.handle ? (
+          <div className="w-full bg-gisviz-canvas/50 border border-gisviz-border/50 rounded-md px-4 py-2.5 text-gisviz-ink font-bold font-mono text-[16px] shadow-inner">
+            @{user.user_handle}
+          </div>
+        ) : (
+          <form onSubmit={submitHandle} className="space-y-4">
+            <div className="relative">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[16px] font-mono text-gisviz-ink-soft select-none">@</span>
+              <input
+                type="text"
+                value={handleVal}
+                onChange={e => setHandleVal(e.target.value.replace(/^@/, ''))}
+                placeholder={user.user_handle}
+                className="w-full bg-gisviz-canvas border border-gisviz-border rounded-md pl-8 pr-4 py-2.5 text-gisviz-ink text-[16px] font-mono focus:ring-2 focus:ring-gisviz-accent outline-none"
+              />
             </div>
+            <p className="text-[11px] font-mono text-gisviz-ink-soft">
+              Letters, numbers and underscores only · 3–30 characters · must be unique
+            </p>
+            <div className="flex justify-end">
+              <SaveBtn section="handle" label="Update Handle" />
+            </div>
+          </form>
+        )}
+      </div>
 
-            {/* Password Management */}
-            <div className="bg-gisviz-canvas/30 border border-gisviz-border rounded-md p-5">
-              <div className="flex items-center justify-between mb-4">
-                <label className="text-[12px] font-mono text-gisviz-ink-soft uppercase tracking-wider flex items-center gap-2">
-                  <Shield size={14}/> Account Password
-                </label>
-                <button 
-                  type="button" 
-                  onClick={() => {
-                    toggleEdit('password')
-                    setPwdMsg({ type: '', text: '' })
-                    setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' })
-                  }}
-                  className={`text-[12px] font-mono hover:underline flex items-center gap-1 uppercase px-2 py-1 rounded transition-colors ${editingFields.password ? 'bg-red-50 text-gisviz-alert/90' : 'bg-gisviz-accent/10 text-gisviz-accent'}`}
-                >
-                  {editingFields.password ? <><X size={10}/> Cancel</> : <><Edit2 size={10}/> Change Password</>}
+      {/* ============================================================ */}
+      {/* SECURITY                                                       */}
+      {/* ============================================================ */}
+      <div className="bg-gisviz-card border border-gisviz-border shadow-md p-6 sm:p-8 rounded-sm mb-6">
+        <h2 className="text-[16px] font-bold text-gisviz-ink border-b border-gisviz-border pb-2 uppercase tracking-wide font-mono flex items-center gap-2 mb-6">
+          <Shield size={14} /> Security
+        </h2>
+
+        {/* ---- Email — 3-step flow ---- */}
+        <div className="mb-6 pb-6 border-b border-gisviz-border">
+          <SectionMsg section="email" />
+
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <p className="text-[16px] font-mono font-bold text-gisviz-ink">Email Address</p>
+              <p className="text-[16px] font-mono text-gisviz-ink-soft">{user.email_address}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                if (editingFields.email) {
+                  // Cancel — reset everything
+                  setEmailStep('idle')
+                  setEmailForm({ new_email: '', current_password: '' })
+                  setEmailOtp('')
+                  setDevOtp('')
+                  setMsg('email', null)
+                }
+                toggleEdit('email')
+              }}
+              className={`text-[10px] font-mono px-2 py-0.5 rounded border transition-colors flex items-center gap-1 ${
+                editingFields.email
+                  ? 'border-gisviz-alert/40 text-gisviz-alert bg-gisviz-alert/5'
+                  : 'border-gisviz-border text-gisviz-ink-soft hover:border-gisviz-accent hover:text-gisviz-accent'
+              }`}
+            >
+              {editingFields.email ? <><X size={10} /> Cancel</> : <><Edit2 size={10} /> Change</>}
+            </button>
+          </div>
+
+          {editingFields.email && emailStep === 'form' && (
+            <form onSubmit={submitEmailRequest} className="space-y-4">
+              <div>
+                <label className="text-[16px] font-mono text-gisviz-ink-soft uppercase tracking-wider block mb-2">New Email Address</label>
+                <input type="email" value={emailForm.new_email}
+                  onChange={e => setEmailForm(p => ({ ...p, new_email: e.target.value }))}
+                  placeholder={user.email_address}
+                  className="w-full bg-gisviz-canvas border border-gisviz-border rounded-md px-4 py-2.5 text-gisviz-ink text-[16px] font-mono focus:ring-2 focus:ring-gisviz-accent outline-none"
+                />
+              </div>
+              <PwdInput name="emailPwd" label="Current Password (to confirm)"
+                placeholder="Enter your password"
+                value={emailForm.current_password}
+                onChange={e => setEmailForm(p => ({ ...p, current_password: e.target.value }))}
+              />
+              <div className="flex justify-end">
+                <button type="submit" disabled={!!saving.email}
+                  className="flex items-center gap-2 bg-gisviz-accent text-white px-6 py-2.5 rounded-md text-[16px] font-mono font-bold hover:bg-gisviz-accent/90 disabled:opacity-60 transition-colors">
+                  {saving.email ? <Loader2 size={14} className="animate-spin" /> : <Mail size={14} />}
+                  {saving.email ? 'Sending Code…' : 'Send Verification Code'}
                 </button>
               </div>
+            </form>
+          )}
 
-              {!editingFields.password ? (
-                <div className="w-full bg-gisviz-canvas border border-gisviz-border/50 rounded-md px-4 py-2.5 text-gisviz-ink-soft font-mono text-[12px] cursor-not-allowed shadow-inner tracking-[0.3em]">
-                  ••••••••••••
+          {editingFields.email && emailStep === 'idle' && !editingFields.email && null}
+
+          {/* Show form by default when editing is toggled on */}
+          {editingFields.email && emailStep === 'idle' && (
+            <form onSubmit={submitEmailRequest} className="space-y-4">
+              <div>
+                <label className="text-[16px] font-mono text-gisviz-ink-soft uppercase tracking-wider block mb-2">New Email Address</label>
+                <input type="email" value={emailForm.new_email}
+                  onChange={e => setEmailForm(p => ({ ...p, new_email: e.target.value }))}
+                  placeholder="new@example.com"
+                  className="w-full bg-gisviz-canvas border border-gisviz-border rounded-md px-4 py-2.5 text-gisviz-ink text-[16px] font-mono focus:ring-2 focus:ring-gisviz-accent outline-none"
+                />
+              </div>
+              <PwdInput name="emailPwd" label="Current Password (to confirm)"
+                placeholder="Enter your password"
+                value={emailForm.current_password}
+                onChange={e => setEmailForm(p => ({ ...p, current_password: e.target.value }))}
+              />
+              <div className="flex justify-end">
+                <button type="submit" disabled={!!saving.email}
+                  className="flex items-center gap-2 bg-gisviz-accent text-white px-6 py-2.5 rounded-md text-[16px] font-mono font-bold hover:bg-gisviz-accent/90 disabled:opacity-60 transition-colors">
+                  {saving.email ? <Loader2 size={14} className="animate-spin" /> : <Mail size={14} />}
+                  {saving.email ? 'Sending Code…' : 'Send Verification Code'}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* OTP step */}
+          {editingFields.email && emailStep === 'otp' && (
+            <form onSubmit={submitEmailVerify} className="space-y-4">
+              <p className="text-[16px] font-mono text-gisviz-ink-soft">
+                A 6-digit code was sent to <span className="font-bold text-gisviz-ink">{emailForm.new_email}</span>. Enter it below to confirm the change.
+              </p>
+              {devOtp && (
+                <div className="p-3 bg-yellow-50 border border-yellow-300 rounded-md text-[11px] font-mono text-yellow-800">
+                  DEV MODE — OTP: <span className="font-bold tracking-widest">{devOtp}</span>
                 </div>
-              ) : (
-                <form onSubmit={handlePasswordSubmit} className="space-y-4 plate-enter">
-                  {pwdMsg.text && (
-                    <div className={`p-3 rounded-md text-[12px] font-mono border ${pwdMsg.type === 'error' ? 'bg-red-50 text-gisviz-alert/90 border-gisviz-alert/60' : 'bg-gisviz-safe/5  text-gisviz-safe/70       border-gisviz-safe-200'}`}>
-                      {pwdMsg.text}
-                    </div>
-                  )}
-                  <div>
-                    <input type="password" name="currentPassword" required value={passwordData.currentPassword} onChange={handlePasswordChange} placeholder="Current Password" className="w-full bg-white dark:bg-black border border-gisviz-border rounded-md px-4 py-2.5 text-gisviz-ink focus:ring-2 focus:ring-gisviz-accent outline-none font-mono text-[12px]" />
-                  </div>
-                  <div>
-                    <input type="password" name="newPassword" required value={passwordData.newPassword} onChange={handlePasswordChange} placeholder="New Password" className="w-full bg-white dark:bg-black border border-gisviz-border rounded-md px-4 py-2.5 text-gisviz-ink focus:ring-2 focus:ring-gisviz-accent outline-none font-mono text-[12px]" />
-                  </div>
-                  <div>
-                    <input type="password" name="confirmPassword" required value={passwordData.confirmPassword} onChange={handlePasswordChange} placeholder="Confirm New Password" className="w-full bg-white dark:bg-black border border-gisviz-border rounded-md px-4 py-2.5 text-gisviz-ink focus:ring-2 focus:ring-gisviz-accent outline-none font-mono text-[12px]" />
-                  </div>
-                  <button type="submit" disabled={isPasswordLoading} className="w-full bg-gisviz-ink text-gisviz-canvas py-2.5 px-4 rounded-md hover:bg-opacity-90 transition-all font-mono text-[12px] shadow-md disabled:opacity-70 flex items-center justify-center gap-2">
-                    {isPasswordLoading && <Loader2 size={14} className="animate-spin" />} Update Secure Password
-                  </button>
-                </form>
               )}
+              <div>
+                <label className="text-[16px] font-mono text-gisviz-ink-soft uppercase tracking-wider block mb-2">Verification Code</label>
+                <input
+                  type="text"
+                  maxLength={6}
+                  value={emailOtp}
+                  onChange={e => setEmailOtp(e.target.value.replace(/\D/g, ''))}
+                  placeholder="••••••"
+                  className="w-full text-center tracking-[0.5em] bg-gisviz-canvas border border-gisviz-border rounded-md px-4 py-3 text-gisviz-ink text-[20px] font-bold focus:ring-2 focus:ring-gisviz-accent outline-none font-mono"
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <button type="button"
+                  onClick={() => { setEmailStep('idle'); setEmailOtp(''); setDevOtp(''); setMsg('email', null) }}
+                  className="text-[11px] font-mono text-gisviz-ink-soft hover:text-gisviz-accent underline">
+                  ← Back / resend code
+                </button>
+                <button type="submit" disabled={!!saving.email || emailOtp.length < 6}
+                  className="flex items-center gap-2 bg-gisviz-accent text-white px-6 py-2.5 rounded-md text-[16px] font-mono font-bold hover:bg-gisviz-accent/90 disabled:opacity-60 transition-colors">
+                  {saving.email ? <Loader2 size={14} className="animate-spin" /> : <ShieldCheck size={14} />}
+                  {saving.email ? 'Verifying…' : 'Confirm Email Change'}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+
+        {/* ---- Password ---- */}
+        <div>
+          <SectionMsg section="password" />
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <p className="text-[16px] font-mono font-bold text-gisviz-ink">Password</p>
+              <p className="text-[16px] font-mono text-gisviz-ink-soft">Change your account password</p>
             </div>
-            
+            <button type="button" onClick={() => toggleEdit('password')}
+              className={`text-[10px] font-mono px-2 py-0.5 rounded border transition-colors flex items-center gap-1 ${
+                editingFields.password
+                  ? 'border-gisviz-alert/40 text-gisviz-alert bg-gisviz-alert/5'
+                  : 'border-gisviz-border text-gisviz-ink-soft hover:border-gisviz-accent hover:text-gisviz-accent'
+              }`}>
+              {editingFields.password ? <><X size={10} /> Cancel</> : <><Edit2 size={10} /> Change</>}
+            </button>
           </div>
+
+          {editingFields.password && (
+            <form onSubmit={submitPassword} className="space-y-4">
+              <PwdInput name="currentPassword" label="Current Password"
+                placeholder="Enter current password"
+                value={passwordData.currentPassword}
+                onChange={e => setPasswordData(p => ({ ...p, currentPassword: e.target.value }))}
+              />
+              <PwdInput name="newPassword" label="New Password"
+                placeholder="Min 8 characters"
+                value={passwordData.newPassword}
+                onChange={e => setPasswordData(p => ({ ...p, newPassword: e.target.value }))}
+              />
+              <PwdInput name="confirmPassword" label="Confirm New Password"
+                placeholder="Repeat new password"
+                value={passwordData.confirmPassword}
+                onChange={e => setPasswordData(p => ({ ...p, confirmPassword: e.target.value }))}
+              />
+              <div className="flex justify-end">
+                <button type="submit" disabled={!!saving.password}
+                  className="flex items-center gap-2 bg-gisviz-accent text-white px-6 py-2.5 rounded-md text-[16px] font-mono font-bold hover:bg-gisviz-accent/90 disabled:opacity-60 transition-colors">
+                  {saving.password ? <Loader2 size={14} className="animate-spin" /> : <Lock size={14} />}
+                  Update Password
+                </button>
+              </div>
+            </form>
+          )}
         </div>
       </div>
 
+      {/* ============================================================ */}
+      {/* DELETION                                                    */}
+      {/* ============================================================ */}
+      <div className="bg-gisviz-card border border-gisviz-alert/30 shadow-md p-6 sm:p-8 rounded-sm">
+        <h2 className="text-[16px] font-bold text-gisviz-alert border-b border-gisviz-alert/20 pb-2 uppercase tracking-wide font-mono flex items-center gap-2 mb-6">
+          <Trash2 size={14} /> DELETION
+        </h2>
+        <SectionMsg section="delete" />
+
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <p className="text-[16px] font-mono font-bold text-gisviz-ink">Delete Account</p>
+            <p className="text-[16px] font-mono text-gisviz-ink-soft">
+              Permanently erase your account, posts, and all data. Irreversible.
+            </p>
+          </div>
+          <button type="button" onClick={() => toggleEdit('delete')}
+            className={`text-[10px] font-mono px-2 py-0.5 rounded border transition-colors flex items-center gap-1 ${
+              editingFields.delete
+                ? 'border-gisviz-border text-gisviz-ink-soft hover:border-gisviz-accent hover:text-gisviz-accent'
+                : 'border-gisviz-alert/40 text-gisviz-alert bg-gisviz-alert/5 hover:bg-gisviz-alert/10'
+            }`}>
+            {editingFields.delete ? <><X size={10} /> Cancel</> : <><Trash2 size={10} /> Delete</>}
+          </button>
+        </div>
+
+        {editingFields.delete && (
+          <form onSubmit={submitDelete} className="space-y-4">
+            <div className="p-4 bg-gisviz-alert/5 border border-gisviz-alert/20 rounded-md text-[16px] font-mono text-gisviz-alert/80">
+              All your posts, comments, likes, and profile data will be permanently deleted. This cannot be undone.
+            </div>
+            <PwdInput name="deletePassword" label="Current Password"
+              placeholder="Enter your password to confirm"
+              value={deletePassword}
+              onChange={e => setDeletePassword(e.target.value)}
+            />
+            <div>
+              <label className="text-[16px] font-mono text-gisviz-ink-soft uppercase tracking-wider block mb-2">
+                Type your handle to confirm:{' '}
+                <span className="text-gisviz-alert font-bold">@{user.user_handle}</span>
+              </label>
+              <input type="text" value={deleteConfirmText}
+                onChange={e => setDeleteConfirmText(e.target.value)}
+                placeholder={user.user_handle}
+                className="w-full bg-gisviz-canvas border border-gisviz-alert/30 rounded-md px-4 py-2.5 text-gisviz-ink text-[16px] font-mono focus:ring-2 focus:ring-gisviz-alert outline-none"
+              />
+            </div>
+            <div className="flex justify-end">
+              <button type="submit"
+                disabled={!!saving.delete || deleteConfirmText !== user.user_handle || !deletePassword}
+                className="flex items-center gap-2 bg-gisviz-alert text-white px-6 py-2.5 rounded-md text-[16px] font-mono font-bold hover:bg-gisviz-alert/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                {saving.delete ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                Permanently Delete Account
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
     </div>
   )
 }

@@ -284,7 +284,6 @@ The main feed component. Key behaviours:
 
 - Fetches publications via `gisvizApi.fetchGlobalStream(offset, limit)` on mount
 - **Like button:** optimistic update (count changes immediately), then reconciles with server response. Redirects to `/login` if not authenticated.
-- **Save button:** writes post ID to `localStorage` via `useSavedPosts` hook. Per-user key: `gisviz_saved_{handle}`.
 - **Comments link:** navigates to `/{post_id}#comments`.
 - **Share button:** copies share URL to clipboard.
 - Action bar is a separate `<div>` **outside** the card `<Link>` to avoid nested interactive element problems.
@@ -321,12 +320,6 @@ All HTTP calls are centralised here. Uses `fetch` with the `NEXT_PUBLIC_API_URL`
 ### `hooks/useSavedPosts.ts`
 
 ```typescript
-const { savedIds, toggleSave } = useSavedPosts(currentUserHandle)
-// savedIds: Set<string>  — post IDs the user has saved
-// toggleSave(id): void   — add or remove from localStorage
-```
-
-Storage key: `gisviz_saved_{handle}` — one key per user so multiple accounts on the same browser don't share saves.
 
 ### `lib/imageValidation.ts`
 

@@ -10,7 +10,6 @@ import { useAuth } from '../../context/AuthContext'
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
 
 export default function Navbar() {
-  // Added isLoading to safely check hydration state
   const { user, isAuthenticated, logoutSession, isLoading } = useAuth()
   
   const [isProfileOpen, setIsProfileOpen] = useState(false)
@@ -21,7 +20,6 @@ export default function Navbar() {
   
   const dropdownRef = useRef<HTMLDivElement>(null)
 
-  // Wait until mounted to avoid hydration mismatch
   useEffect(() => {
     setMounted(true)
     const storedTheme = localStorage.getItem('theme')
@@ -92,11 +90,11 @@ export default function Navbar() {
               {mounted ? (
                 isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />
               ) : (
-                <div className="w-5 h-5 opacity-0" />
+                /* Replaced the <div> with a valid inline <svg> to prevent HTML nesting hydration mismatches */
+                <svg className="w-5 h-5 opacity-0" aria-hidden="true" />
               )}
             </button>
 
-            {/* HYDRATION FIX: Wait for mount and AuthContext to finish loading */}
             {!mounted || isLoading ? (
               <div className="w-8 h-8 rounded-full bg-gisviz-border animate-pulse" />
             ) : isAuthenticated ? (
@@ -121,8 +119,8 @@ export default function Navbar() {
                 </div>
 
                 {isProfileOpen && (
-                  <div className="absolute top-12 right-0 w-48 bg-gisviz-card border border-gisviz-border rounded-xl shadow-lg py-2 flex flex-col z-50 plate-enter">
-                    <div className=" text-[16px] px-4 py-2 border-b border-gisviz-border mb-2">
+                  <div className="absolute top-10 right-0 w-48 bg-gisviz-card border border-gisviz-border rounded-xl shadow-lg flex flex-col z-50 plate-enter">
+                    <div className=" text-[16px] px-4 py-2 border-b border-gisviz-border">
                      <p className="font-bold text-gisviz-accent/80">@{displayHandle}</p>
                     </div>
                     
@@ -175,7 +173,6 @@ export default function Navbar() {
         </div>
       </header>
 
-      {/* Mobile drawer */}
       {isMobileMenuOpen && (
         <div className="fixed inset-0 z-[100] lg:hidden flex">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)}></div>

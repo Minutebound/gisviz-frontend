@@ -80,7 +80,7 @@ export default function EditPostPage() {
         }
 
       } catch (err) {
-        setErrorMsg("Failed to load publication data.")
+        setErrorMsg("Failed to load posts data.")
       } finally {
         setIsLoading(false)
       }
@@ -176,7 +176,7 @@ export default function EditPostPage() {
       <div className="mb-8">
         <h1 className="text-[24px] font-display font-bold text-gisviz-ink flex items-center gap-3">
           <Edit2 className="text-gisviz-accent" size={32} />
-          Edit Publication
+          Edit Post
         </h1>
         <p className="text-gisviz-ink-soft font-mono mt-2 text-[12px]">Update your visual map, dataset metadata, or sources.</p>
       </div>
@@ -241,7 +241,7 @@ export default function EditPostPage() {
 
           <div className="bg-gisviz-rail border border-gisviz-border rounded-xl p-4 text-[12px] font-mono text-gisviz-ink-soft">
             <h4 className="font-bold text-gisviz-ink-soft mb-2 uppercase tracking-wider flex items-center gap-2 text-[12px]">
-              <MapIcon size={14} /> Publication Guidelines
+              <MapIcon size={14} /> Post Guidelines
             </h4>
             <ul className="space-y-1.5 list-inside list-disc opacity-80 text-[12px]">
               <li>Ensure maps have appropriate legends or scale bars.</li>
@@ -300,13 +300,13 @@ export default function EditPostPage() {
             
             {/* Title */}
             <div>
-              <label className="block text-[12px] font-mono text-gisviz-ink-soft mb-2 uppercase tracking-wider">Publication Title <span className="text-gisviz-alert/80">*</span></label>
+              <label className="block text-[12px] font-mono text-gisviz-ink-soft mb-2 uppercase tracking-wider">Post Title <span className="text-gisviz-alert/80">*</span></label>
               <input
                 type="text"
                 value={title}
                 onChange={e => setTitle(e.target.value)}
                 placeholder="e.g. Boulder County LiDAR Elevation Model"
-                className="w-full bg-gisviz-canvas border border-gisviz-border rounded-md px-4 py-3 text-gisviz-ink font-display font-medium text-[16px] focus:ring-2 focus:ring-gisviz-accent outline-none"
+                className="w-full bg-gisviz-canvas border border-gisviz-border text-camelcase rounded-md px-4 py-3 text-gisviz-ink font-display font-medium text-[16px] focus:ring-2 focus:ring-gisviz-accent outline-none"
                 required
               />
             </div>
@@ -426,7 +426,7 @@ export default function EditPostPage() {
             </button>
             
             {/* The Image */}
-            <img src={previewUrl} alt="Enlarged Publication Visual" className="w-full h-full object-contain rounded-xl" />
+            <img src={previewUrl} alt="Enlarged Post Visual" className="w-full h-full object-contain rounded-xl" />
           </div>
         </div>
       )}

@@ -201,7 +201,7 @@ export default function UploadPage() {
             
             {/* Title */}
             <div>
-              <label className="block text-xs font-mono text-gisviz-ink-soft mb-2 uppercase tracking-wider">Publication Title <span className="text-gisviz-alert/80">*</span></label>
+              <label className="block text-xs font-mono text-gisviz-ink-soft mb-2 uppercase tracking-wider">Post Title <span className="text-gisviz-alert/80">*</span></label>
               <input
                 type="text"
                 value={title}
