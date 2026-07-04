@@ -10,7 +10,7 @@ import {
 import { useAuth } from '../../context/AuthContext'
 import { gisvizApi } from '../../services/api'
 
-const RAW_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
+const RAW_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://'
 const API_BASE_URL = RAW_API_URL.replace('/api/v1', '').replace(/\/$/, '')
 
 // Known URL prefixes — only the username portion is editable

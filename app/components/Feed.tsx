@@ -46,7 +46,7 @@ interface Post {
 }
 
 const POSTS_PER_PAGE = 12
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://'
 
 const formatTimeAgo = (timestamp: string) => {
   const diff = Date.now() - new Date(timestamp).getTime()

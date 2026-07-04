@@ -1,11 +1,11 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
-  Map as MapIcon, Activity, ExternalLink, ArrowUpDown,
-  Loader2, UserCheck, UserPlus, UserMinus, MapPin, Edit2
+  Map as MapIcon, ExternalLink, ArrowUpDown,
+  Loader2, UserCheck, UserPlus, UserMinus, MapPin, Edit2, Image as ImageIcon
 } from 'lucide-react'
 import { useAuth } from '../../../context/AuthContext'
 import { gisvizApi } from '../../../services/api'
@@ -14,14 +14,14 @@ export default function ProfileHandlePage() {
   const params = useParams()
   const router = useRouter()
   const handle = params.handle as string
-  const { user, isAuthenticated } = useAuth() as any
+  const { user, isAuthenticated, refreshProfile } = useAuth() as any
 
   const [activeTab, setActiveTab]     = useState<'publications' | 'saved'>('publications')
   const [sortOption, setSortOption]   = useState<'latest' | 'alphabetical'>('latest')
   const [profile, setProfile]         = useState<any>(null)
   const [posts, setPosts]             = useState<any[]>([])
 
-  // ── Bookmark state — real API, never localStorage ──────────────────────
+  // ── Bookmark state ─────────────────────────────────────────────────────
   const [bookmarks, setBookmarks]               = useState<any[]>([])
   const [bookmarksLoading, setBookmarksLoading] = useState(false)
   const [bookmarksLoaded, setBookmarksLoaded]   = useState(false)
@@ -29,13 +29,18 @@ export default function ProfileHandlePage() {
   const [isLoading, setIsLoading] = useState(true)
   const [errorMsg, setErrorMsg]   = useState('')
 
-  const [isFollowing, setIsFollowing]   = useState(false)
+  const [isFollowing, setIsFollowing]     = useState(false)
   const [followLoading, setFollowLoading] = useState(false)
+
+  // ── Banner state ───────────────────────────────────────────────────────
+  const [bannerPreview, setBannerPreview]     = useState<string | null>(null)
+  const [bannerUploading, setBannerUploading] = useState(false)
+  const bannerInputRef = useRef<HTMLInputElement>(null)
 
   const isOwnProfile = isAuthenticated && user?.user_handle === handle
 
-  const RAW_API_URL  = process.env.NEXT_PUBLIC_API_URL 
-  const API_BASE_URL = `${RAW_API_URL}`.replace('/api/v1', '');
+  const RAW_API_URL  = process.env.NEXT_PUBLIC_API_URL
+  const API_BASE_URL = `${RAW_API_URL}`.replace('/api/v1', '')
 
   const getAvatarUrl = (path: string | null) => {
     if (!path) return null
@@ -49,9 +54,9 @@ export default function ProfileHandlePage() {
   useEffect(() => {
     if (!handle) return
     setIsLoading(true)
-    // Reset bookmark cache whenever the handle changes
     setBookmarks([])
     setBookmarksLoaded(false)
+    setBannerPreview(null)
 
     const loadProfileData = async () => {
       try {
@@ -76,7 +81,7 @@ export default function ProfileHandlePage() {
     loadProfileData()
   }, [handle, isAuthenticated, user])
 
-  // ── Lazy-load bookmarks when the Bookmarks tab is first opened ───────────
+  // ── Lazy-load bookmarks ──────────────────────────────────────────────────
   useEffect(() => {
     if (activeTab !== 'saved' || !isOwnProfile || bookmarksLoaded || bookmarksLoading) return
 
@@ -115,7 +120,32 @@ export default function ProfileHandlePage() {
     }
   }
 
-  // ── Sort — works for both publications and bookmarks ─────────────────────
+  // ── Banner upload ────────────────────────────────────────────────────────
+  const handleBannerChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !file.type.startsWith('image/')) return
+
+    // Optimistic preview
+    setBannerPreview(URL.createObjectURL(file))
+    setBannerUploading(true)
+
+    try {
+      await gisvizApi.uploadBanner(file)
+      // Refresh profile so banner_path is updated without a full page reload
+      const currentUserId = isAuthenticated && user ? user.user_id : undefined
+      const updated = await gisvizApi.fetchUserProfile(handle, currentUserId)
+      setProfile(updated)
+    } catch (err) {
+      console.error('Banner upload failed', err)
+      setBannerPreview(null)
+    } finally {
+      setBannerUploading(false)
+      // Reset input so the same file can be re-selected if needed
+      e.target.value = ''
+    }
+  }
+
+  // ── Sort ─────────────────────────────────────────────────────────────────
   const activeList  = activeTab === 'publications' ? posts : bookmarks
   const sortedPosts = [...activeList].sort((a, b) => {
     if (sortOption === 'latest') {
@@ -145,38 +175,87 @@ export default function ProfileHandlePage() {
     )
   }
 
+  const bannerSrc = bannerPreview ?? getAvatarUrl(profile.banner_path)
+
   return (
     <div className="py-6 mx-auto space-y-6 max-w-5xl px-4">
 
       {/* Identity Plate */}
       <div className="relative bg-gisviz-card border border-gisviz-border shadow-md rounded-sm plate-enter overflow-hidden">
-        
-        {/* Ambient Topographic Header */}
-        <div className="h-32 bg-gradient-to-r from-gisviz-canvas via-gisviz-canvas to-gisviz-accent-soft border-b border-gisviz-border relative overflow-hidden">
-          <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'linear-gradient(var(--color-gisviz-grid) 1px, transparent 1px), linear-gradient(90deg, var(--color-gisviz-grid) 1px, transparent 1px)', backgroundSize: '20px 20px' }}></div>
+
+        {/* ── Banner ──────────────────────────────────────────────────────── */}
+        <div className="h-32 border-b border-gisviz-border relative overflow-hidden group">
+
+          {/* Image or default gradient */}
+          {bannerSrc ? (
+            <img
+              src={bannerSrc}
+              alt="Profile banner"
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div className="h-full bg-gradient-to-r from-gisviz-canvas via-gisviz-canvas to-gisviz-accent-soft">
+              <div
+                className="absolute inset-0 opacity-20"
+                style={{
+                  backgroundImage: 'linear-gradient(var(--color-gisviz-grid) 1px, transparent 1px), linear-gradient(90deg, var(--color-gisviz-grid) 1px, transparent 1px)',
+                  backgroundSize: '20px 20px',
+                }}
+              />
+            </div>
+          )}
+
+          {/* Upload overlay — own profile only */}
+          {isOwnProfile && (
+            <>
+              <div
+                onClick={() => !bannerUploading && bannerInputRef.current?.click()}
+                className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+              >
+                {bannerUploading ? (
+                  <Loader2 size={24} className="text-white animate-spin" />
+                ) : (
+                  <div className="flex flex-col items-center gap-1 text-white">
+                    <ImageIcon size={22} />
+                    <span className="font-mono text-[11px] uppercase tracking-wider">
+                      {profile.banner_path ? 'Change Banner' : 'Upload Banner'}
+                    </span>
+                  </div>
+                )}
+              </div>
+              <input
+                ref={bannerInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleBannerChange}
+              />
+            </>
+          )}
         </div>
 
+        {/* ── Avatar + Info ────────────────────────────────────────────────── */}
         <div className="px-8 py-8 relative flex flex-col sm:flex-row gap-6 items-start sm:items-end -mt-16">
-          
-          {/* Avatar Container */}
+
+          {/* Avatar */}
           <div className="w-24 h-24 rounded-xl border-gisviz-card bg-gisviz-canvas overflow-hidden shadow-sm shrink-0 z-10 relative flex items-center justify-center">
             {profile.avatar_path ? (
               <>
-                <img 
-                  src={getAvatarUrl(profile.avatar_path) as string} 
-                  alt={profile.user_handle} 
-                  className="w-full h-full object-cover" 
+                <img
+                  src={getAvatarUrl(profile.avatar_path) as string}
+                  alt={profile.user_handle}
+                  className="w-full h-full object-cover"
                   onError={(e) => {
                     e.currentTarget.style.display = 'none'
                     e.currentTarget.nextElementSibling?.classList.remove('hidden')
                   }}
                 />
-                <div className="hidden w-full h-full bg-gradient-to-tr from-gisviz-accent to-gisviz-safe  0 flex items-center justify-center text-white text-[24px] font-bold uppercase font-mono shadow-inner">
+                <div className="hidden w-full h-full bg-gradient-to-tr from-gisviz-accent to-gisviz-safe flex items-center justify-center text-white text-[24px] font-bold uppercase font-mono shadow-inner">
                   {profile.user_handle.charAt(0)}
                 </div>
               </>
             ) : (
-              <div className="w-full h-full bg-gradient-to-tr from-gisviz-accent to-gisviz-safe  0 flex items-center justify-center text-white text-[24px] font-bold uppercase font-mono shadow-inner">
+              <div className="w-full h-full bg-gradient-to-tr from-gisviz-accent to-gisviz-safe flex items-center justify-center text-white text-[24px] font-bold uppercase font-mono shadow-inner">
                 {profile.user_handle.charAt(0)}
               </div>
             )}
@@ -186,11 +265,11 @@ export default function ProfileHandlePage() {
             <h1 className="text-[24px] font-display font-bold text-gisviz-ink">
               @{profile.user_handle}
             </h1>
-            <p className="text-[16px] font-mono text-gisviz-ink-soft flex items-center flex-wrap gap-3">
+            <p className="text-[16px] font-mono text-gisviz-ink-soft flex items-center flex-wrap gap-4">
               <span>{profile.title || 'GIS Lover'}</span>
               {profile.location?.formatted_string && (
                 <span className="flex items-center gap-1.5 text-gisviz-ink">
-                  <MapPin size={13} className="text-gisviz-accent" />
+                  <MapPin size={12} className="text-gisviz-accent" />
                   {profile.location.formatted_string}
                 </span>
               )}
@@ -213,71 +292,65 @@ export default function ProfileHandlePage() {
           </div>
         </div>
 
-        {/* Profile Action Bar */}
+        {/* ── Action Bar ───────────────────────────────────────────────────── */}
         <div className="bg-gisviz-canvas/50 border-t border-gisviz-border px-8 py-3 flex justify-between items-center">
-           <div className="flex gap-6 font-mono text-[16px]">
-             <button 
-               onClick={() => setActiveTab('publications')}
-               className={`pb-1 border-b-2 transition-colors ${activeTab === 'publications' ? 'border-gisviz-accent text-gisviz-ink font-bold' : 'border-transparent text-gisviz-ink-soft hover:text-gisviz-ink'}`}
-             >
-               My Posts
-             </button>
-             {/* Bookmarks tab only shown on own profile */}
-             {isOwnProfile && (
-               <button 
-                 onClick={() => setActiveTab('saved')}
-                 className={`pb-1 border-b-2 transition-colors ${activeTab === 'saved' ? 'border-gisviz-accent text-gisviz-ink font-bold' : 'border-transparent text-gisviz-ink-soft hover:text-gisviz-ink'}`}
-               >
+          <div className="flex gap-6 font-mono text-[16px]">
+            <button
+              onClick={() => setActiveTab('publications')}
+              className={`pb-1 border-b-2 transition-colors ${activeTab === 'publications' ? 'border-gisviz-accent text-gisviz-ink font-bold' : 'border-transparent text-gisviz-ink-soft hover:text-gisviz-ink'}`}
+            >
+              My Posts
+            </button>
+            {isOwnProfile && (
+              <button
+                onClick={() => setActiveTab('saved')}
+                className={`pb-1 border-b-2 transition-colors ${activeTab === 'saved' ? 'border-gisviz-accent text-gisviz-ink font-bold' : 'border-transparent text-gisviz-ink-soft hover:text-gisviz-ink'}`}
+              >
                 Bookmarked Posts
-               </button>
-             )}
-           </div>
+              </button>
+            )}
+          </div>
 
-           {!isOwnProfile ? (
-             <button 
-               onClick={handleFollowToggle}
-               disabled={followLoading}
-               className={`group/btn flex items-center justify-center gap-2 px-5 py-2 rounded-full transition-all font-mono text-[16px] font-bold shadow-sm disabled:opacity-50 border ${
-                 isFollowing 
-                  ? 'bg-gisviz-canvas border-gisviz-border text-gisviz-ink hover:bg-red-50 hover:text-gisviz-alert/90 hover:border-gisviz-alert/60' 
+          {!isOwnProfile ? (
+            <button
+              onClick={handleFollowToggle}
+              disabled={followLoading}
+              className={`group/btn flex items-center justify-center gap-2 px-5 py-2 rounded-full transition-all font-mono text-[16px] font-bold shadow-sm disabled:opacity-50 border ${
+                isFollowing
+                  ? 'bg-gisviz-canvas border-gisviz-border text-gisviz-ink hover:bg-red-50 hover:text-gisviz-alert/90 hover:border-gisviz-alert/60'
                   : 'bg-gisviz-accent border-transparent text-white hover:bg-opacity-90'
-               }`}
-             >
-               {followLoading ? (
-                 <Loader2 size={15} className="animate-spin" />
-               ) : isFollowing ? (
-                 <>
-                   <UserCheck size={15} className="block group-hover/btn:hidden text-gisviz-safe/5  0" />
-                   <UserMinus size={15} className="hidden group-hover/btn:block text-gisviz-alert/80" />
-                 </>
-               ) : (
-                 <UserPlus size={15} />
-               )}
-               {isFollowing ? (
-                 <>
-                   <span className="block group-hover/btn:hidden">Following</span>
-                   <span className="hidden group-hover/btn:block">Unfollow</span>
-                 </>
-               ) : (
-                 <span>Follow</span>
-               )}
-             </button>
-           ) : (
-             <Link href="/settings" className="flex items-center gap-2 bg-gisviz-rail-soft border border-gisviz-border text-gisviz-ink px-5 py-2 rounded-full hover:border-gisviz-ink transition-all font-mono text-[16px] shadow-sm font-bold">
-               Configure Profile
-             </Link>
-           )}
+              }`}
+            >
+              {followLoading ? (
+                <Loader2 size={15} className="animate-spin" />
+              ) : isFollowing ? (
+                <>
+                  <UserCheck size={15} className="block group-hover/btn:hidden" />
+                  <UserMinus size={15} className="hidden group-hover/btn:block text-gisviz-alert/80" />
+                </>
+              ) : (
+                <UserPlus size={15} />
+              )}
+              {isFollowing ? (
+                <>
+                  <span className="block group-hover/btn:hidden">Following</span>
+                  <span className="hidden group-hover/btn:block">Unfollow</span>
+                </>
+              ) : (
+                <span>Follow</span>
+              )}
+            </button>
+          ) : (
+            <Link href="/settings" className="flex items-center gap-2 bg-gisviz-rail-soft border border-gisviz-border text-gisviz-ink px-5 py-2 rounded-full hover:border-gisviz-ink transition-all font-mono text-[16px] shadow-sm font-bold">
+              Configure Profile
+            </Link>
+          )}
         </div>
       </div>
 
-      {/* Grid header */}
+      {/* ── Grid header ──────────────────────────────────────────────────────── */}
       <div className="flex justify-between items-center mb-4 mt-8">
-        {/* <h2 className="text-[16px] font-display font-bold text-gisviz-ink flex items-center gap-2">
-          <Activity size={18} className="text-gisviz-accent" />
-          {activeTab === 'publications' ? 'Recent Publications' : 'Saved Bookmarks'}
-        </h2> */}
-        
-        <button 
+        <button
           onClick={() => setSortOption(prev => prev === 'latest' ? 'alphabetical' : 'latest')}
           className="text-[16px] font-mono text-gisviz-ink-soft hover:text-gisviz-ink flex items-center gap-1.5 border border-gisviz-border px-3 py-1.5 rounded-md bg-gisviz-card transition-colors select-none"
         >
@@ -286,7 +359,7 @@ export default function ProfileHandlePage() {
         </button>
       </div>
 
-      {/* ── PUBLICATIONS TAB ─────────────────────────────────────────────── */}
+      {/* ── PUBLICATIONS TAB ─────────────────────────────────────────────────── */}
       {activeTab === 'publications' && (
         sortedPosts.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -336,7 +409,7 @@ export default function ProfileHandlePage() {
         )
       )}
 
-      {/* ── BOOKMARKS TAB ────────────────────────────────────────────────── */}
+      {/* ── BOOKMARKS TAB ────────────────────────────────────────────────────── */}
       {activeTab === 'saved' && (
         bookmarksLoading ? (
           <div className="flex justify-center items-center py-16">

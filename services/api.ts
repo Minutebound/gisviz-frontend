@@ -2,7 +2,7 @@ import axios from 'axios'
 
 // ── Base URL ──────────────────────────────────────────────────────────────────
 //
-// Uses NEXT_PUBLIC_API_URL directly (e.g. http://localhost:8001 in dev,
+// Uses NEXT_PUBLIC_API_URL directly (e.g. http:// in dev,
 // https://api.yourdomain.com in prod). The browser hits the backend directly;
 // Docker exposes port 8001 to the host so this works in every environment.
 //
@@ -385,5 +385,54 @@ export const gisvizApi = {
   updateReportStatus: async (reportId: string, status: 'resolved' | 'dismissed') =>
     (await axiosInstance.put(`/posts/reports/${reportId}/status`, { status })).data,
 
-  
+  // ─── PASTE ALL OF THESE INTO THE gisvizApi OBJECT IN services/api.ts ─────────
+// Add after the existing methods, before the closing brace.
+// These call the new /api/v1/admin/* endpoints registered in main.py.
+
+  // ── Admin — Analytics ────────────────────────────────────────────────────
+  adminFetchOverview: async () =>
+    (await axiosInstance.get('/admin/analytics/overview')).data,
+
+  adminFetchTopPosts: async (by: 'likes' | 'bookmarks' | 'comments' = 'likes', limit = 10) =>
+    (await axiosInstance.get('/admin/analytics/top-posts', { params: { by, limit } })).data,
+
+  adminFetchTopUsers: async (by: 'followers' | 'posts' = 'followers', limit = 10) =>
+    (await axiosInstance.get('/admin/analytics/top-users', { params: { by, limit } })).data,
+
+  adminFetchTopCommenters: async (limit = 10) =>
+    (await axiosInstance.get('/admin/analytics/active-commenters', { params: { limit } })).data,
+
+  // ── Admin — Roles ────────────────────────────────────────────────────────
+  adminFetchRoles: async () =>
+    (await axiosInstance.get('/admin/roles')).data,
+
+  adminCreateRole: async (name: string, permissions: Record<string, boolean>) =>
+    (await axiosInstance.post('/admin/roles', { name, permissions })).data,
+
+  adminUpdateRole: async (roleId: number, name: string, permissions: Record<string, boolean>) =>
+    (await axiosInstance.put(`/admin/roles/${roleId}`, { name, permissions })).data,
+
+  adminDeleteRole: async (roleId: number) =>
+    (await axiosInstance.delete(`/admin/roles/${roleId}`)).data,
+
+  // ── Admin — Comments ─────────────────────────────────────────────────────
+  adminFetchComments: async (skip = 0, limit = 30, q?: string) => {
+    const params: any = { skip, limit }
+    if (q) params.q = q
+    return (await axiosInstance.get('/admin/comments', { params })).data
+  },
+
+  adminDeleteComment: async (commentId: string) =>
+    (await axiosInstance.delete(`/admin/comments/${commentId}`)).data,
+
+  // ── Admin — Unverified Users ─────────────────────────────────────────────
+  adminFetchUnverified: async (olderThanDays = 7) =>
+    (await axiosInstance.get('/admin/users/unverified', { params: { older_than_days: olderThanDays } })).data,
+
+  adminVerifyUser: async (userId: string) =>
+    (await axiosInstance.put(`/admin/users/${userId}/verify`)).data,
+
+  adminBulkDeleteUnverified: async (olderThanDays = 30) =>
+    (await axiosInstance.delete('/admin/users/unverified/bulk', { params: { older_than_days: olderThanDays } })).data,
+
 }

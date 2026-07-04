@@ -81,13 +81,13 @@ function AuthContent() {
   }
 
   const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    clearMessages()
-    setIsLoading(true)
-    try {
-      const params = new URLSearchParams()
-      params.append('username', formData.user_handle || formData.email_address)
-      params.append('password', formData.password)
+  e.preventDefault()
+  clearMessages()
+  setIsLoading(true)
+  try {
+    const params = new URLSearchParams()
+    params.append('username', formData.email_address)  // was: user_handle || email_address
+    params.append('password', formData.password)
       
       const res = await gisvizApi.loginUser(params)
       await loginSession(res.access_token, res.user_handle)
@@ -108,9 +108,6 @@ function AuthContent() {
           if (detail.dev_otp) {
             setDevNotice(`DEV MODE: Your OTP is ${detail.dev_otp}`)
           }
-        } else if (formData.user_handle.includes('@')) {
-          // Fallback if detail object wasn't structured as expected
-          setFormData(prev => ({ ...prev, email_address: formData.user_handle }))
         }
         
         setView('verify') 
@@ -183,10 +180,10 @@ function AuthContent() {
         {view === 'login' && (
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label className="block text-[12px] font-mono text-gisviz-ink-soft mb-1 uppercase tracking-wider">Handle or Email</label>
+              <label className="block text-[12px] font-mono text-gisviz-ink-soft mb-1 uppercase tracking-wider">Email Address</label>
               <div className="relative">
                 <AtSign className="absolute left-3 top-2.5 text-gisviz-ink-soft" size={16} />
-                <input required type="text" name="user_handle" onChange={handleChange}
+                <input required type="email" name="email_address" onChange={handleChange}
                   className="w-full bg-gisviz-canvas border border-gisviz-border rounded-md pl-10 pr-4 py-2 text-gisviz-ink focus:ring-2 focus:ring-gisviz-accent outline-none font-mono text-[12px]" />
               </div>
             </div>
@@ -220,7 +217,6 @@ function AuthContent() {
         {view === 'register' && (
           <form onSubmit={handleRegister} className="space-y-4">
             {[
-              { name: 'user_handle', label: 'Handle', icon: AtSign, type: 'text' },
               { name: 'email_address', label: 'Email Address', icon: Mail, type: 'email' },
               { name: 'password', label: 'Security Key', icon: Lock, type: 'password' },
             ].map(({ name, label, icon: Icon, type }) => (

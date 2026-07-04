@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { Home, User, LogOut, Sun, Moon, Menu, X, LogIn, Settings, Notebook, Phone, ChartArea } from 'lucide-react'
+import { Home, User, LogOut, Sun, Moon, Menu, X, LogIn, Settings, Notebook, Phone, ChartArea, BarChart, ShieldCheck } from 'lucide-react'
 import Sidebar from './Sidebar'
 import Logo from './Logo'
 import { useAuth } from '../../context/AuthContext'
@@ -139,6 +139,25 @@ export default function Navbar() {
                       <Home size={16} /> Home
                     </Link>
                     
+                    {user?.role_name === 'admin' && (
+                    <>
+                      <Link
+                        href="/admin/analytics"
+                        onClick={() => setIsProfileOpen(false)}
+                        className="flex items-center gap-3 px-4 py-2 hover:bg-gisviz-canvas hover:text-gisviz-accent text-[16px] text-gisviz-ink transition-colors"
+                      >
+                        <BarChart size={16} /> Analytics
+                      </Link>
+                      <Link
+                        href="/admin/control"
+                        onClick={() => setIsProfileOpen(false)}
+                        className="flex items-center gap-3 px-4 py-2 hover:bg-gisviz-canvas hover:text-gisviz-accent text-[16px] text-gisviz-ink transition-colors"
+                      >
+                        <ShieldCheck size={16} /> Admin Panel
+                      </Link>
+                    </>
+                  )}
+
                     <Link 
                       href="/settings" 
                       onClick={() => setIsProfileOpen(false)}

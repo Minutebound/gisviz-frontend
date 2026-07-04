@@ -182,9 +182,9 @@ nano .env.local
 # .env.local
 
 # URL the browser uses to reach the FastAPI backend
-# Dev: http://localhost:8001
+# Dev: http://
 # Prod: https://api.yourdomain.com
-NEXT_PUBLIC_API_URL=http://localhost:8001
+NEXT_PUBLIC_API_URL=http://
 ```
 
 > **Important:** only variables prefixed with `NEXT_PUBLIC_` are exposed to the browser bundle. Never put JWT secrets or database passwords here.
@@ -231,7 +231,7 @@ npm install
 
 ```bash
 cp .env.local.example .env.local
-# Default value (http://localhost:8001) works if backend is running locally
+# Default value (http://) works if backend is running locally
 ```
 
 ### Step 5 — Start the backend first
@@ -257,7 +257,7 @@ The app is now running at `http://localhost:3000` with hot-reload. Any change to
 ```bash
 open http://localhost:3000
 # You should see the feed page.
-# If the feed is empty, run: curl http://localhost:8001/seed
+# If the feed is empty, run: curl http:///seed
 ```
 
 ### Useful dev commands
@@ -533,7 +533,7 @@ Restart the dev server after changing env files.
 ### Feed shows "Could not load posts. Check your API connection."
 The backend isn't running or isn't reachable. Verify:
 ```bash
-curl http://localhost:8001/
+curl http:///
 # Should return: {"status":"operational",...}
 ```
 If the backend is running in Docker, make sure you started it with `docker compose up` from the `gisviz-backend` directory.

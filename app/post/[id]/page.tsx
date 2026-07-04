@@ -12,7 +12,7 @@ import { useAuth } from '../../../context/AuthContext'
 import { gisvizApi } from '../../../services/api'
 import ShareModal from '../../components/SharePost'
 
-const RAW_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
+const RAW_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://'
 const API_BASE_URL = RAW_API_URL.replace('/api/v1', '').replace(/\/$/, '')
 
 interface CommentData {
@@ -283,7 +283,7 @@ export default function PostDetail() {
               <button
                 onClick={handleBookmark}
                 disabled={bookmarkBusy}
-                className={`bg-gisviz-card border border-gisviz-border py-3 rounded-sm shadow-sm flex items-center justify-center gap-2 font-mono text-[12px] uppercase tracking-wider transition-colors disabled:opacity-50 ${
+                className={`bg-gisviz-card border border-gisviz-border py-3 rounded-sm shadow-sm flex items-center justify-center gap-2 font-mono text-[12px] tracking-wider transition-colors disabled:opacity-50 ${
                   isBookmarked ? 'text-gisviz-accent bg-gisviz-accent/5 border-gisviz-accent/40' : 'text-gisviz-ink hover:text-gisviz-accent'
                 }`}
               >
@@ -298,7 +298,7 @@ export default function PostDetail() {
             {/* Share */}
             <button
               onClick={() => setIsShareModalOpen(true)}
-              className="bg-gisviz-card border border-gisviz-border py-3 rounded-sm shadow-sm flex items-center justify-center gap-2 text-gisviz-ink hover:text-gisviz-accent font-mono text-[12px] uppercase tracking-wider transition-colors"
+              className="bg-gisviz-card border border-gisviz-border py-3 rounded-sm shadow-sm flex items-center justify-center gap-2 text-gisviz-ink hover:text-gisviz-accent font-mono text-[12px] tracking-wider transition-colors"
             >
               <Share2 size={18} /> Share
             </button>
