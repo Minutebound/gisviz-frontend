@@ -1,5 +1,15 @@
 import axios from 'axios'
 
+// ── Base URL ──────────────────────────────────────────────────────────────────
+//
+// Uses NEXT_PUBLIC_API_URL directly (e.g. http://localhost:8001 in dev,
+// https://api.yourdomain.com in prod). The browser hits the backend directly;
+// Docker exposes port 8001 to the host so this works in every environment.
+//
+// Do NOT use a relative '/api/v1' base — that only works when the Next.js
+// rewrite proxy can resolve the Docker-internal hostname (gisviz-api), which
+// it cannot when the frontend dev server runs outside the Docker network.
+//
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL
 
 const axiosInstance = axios.create({
@@ -26,9 +36,7 @@ axiosInstance.interceptors.response.use(
   }
 )
 
-// ─── Inline TTL cache ────────────────────────────────────────────────────────
-// Self-contained so api.ts has zero extra imports. The cache is a module-level
-// Map — it persists for the lifetime of the browser tab (cleared on reload).
+// ─── Inline TTL cache ─────────────────────────────────────────────────────────
 interface CacheEntry { value: unknown; expiresAt: number }
 const _store = new Map<string, CacheEntry>()
 
@@ -48,14 +56,21 @@ const _cache = {
   },
 }
 
+// Per-user cache key suffix — prevents one user's is_liked/is_bookmarked
+// flags from being served to a different user from the same browser cache.
+function _uid(): string {
+  if (typeof window === 'undefined') return 'anon'
+  return localStorage.getItem('gisviz_handle') || 'anon'
+}
+
 // TTLs in ms
 const TTL = {
-  CATEGORIES:   10 * 60 * 1000,  // 10 min — only changes on admin approval
-  POPULAR:       5 * 60 * 1000,  //  5 min — follower counts shift slowly
-  STREAM:       30 * 1000,        // 30 sec — new posts appear frequently
-  POST:          2 * 60 * 1000,  //  2 min — like/comment counts
+  CATEGORIES:   10 * 60 * 1000,  // 10 min
+  POPULAR:       5 * 60 * 1000,  //  5 min
+  STREAM:       30 * 1000,        // 30 sec
+  POST:          60 * 1000,       //  1 min
   TRENDING:      2 * 60 * 1000,  //  2 min
-  SEARCH:       60 * 1000,        //  1 min
+  SEARCH:        60 * 1000,       //  1 min
 }
 
 async function cached<T>(key: string, ttlMs: number, fn: () => Promise<T>): Promise<T> {
@@ -66,7 +81,7 @@ async function cached<T>(key: string, ttlMs: number, fn: () => Promise<T>): Prom
   return val
 }
 
-// ─── Cookie helpers (lightweight JS-readable, same-origin) ───────────────────
+// ─── Cookie helpers ────────────────────────────────────────────────────────────
 export const cookies = {
   set(name: string, value: string, days?: number) {
     if (typeof document === 'undefined') return
@@ -86,10 +101,10 @@ export const cookies = {
   },
 }
 
-// ════════════════════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════════════════════════
 export const gisvizApi = {
 
-  // ── Identity ────────────────────────────────────────────────────────────
+  // ── Identity ──────────────────────────────────────────────────────────────
   fetchMe: async () => (await axiosInstance.get('/users/me')).data,
 
   updateSettings: async (payload: any) =>
@@ -109,7 +124,7 @@ export const gisvizApi = {
   deleteAccount: async (currentPassword: string) =>
     (await axiosInstance.delete('/users/me', { data: { current_password: currentPassword } })).data,
 
-  // ── Uploads ─────────────────────────────────────────────────────────────
+  // ── Uploads ───────────────────────────────────────────────────────────────
   uploadAvatar: async (file: File) => {
     const fd = new FormData(); fd.append('file', file)
     return (await axiosInstance.post('/uploads/avatar', fd, {
@@ -137,7 +152,7 @@ export const gisvizApi = {
   deactivateUser: async (userId: string, active: boolean) =>
     (await axiosInstance.put(`/users/${userId}/status`, null, { params: { is_active: active } })).data,
 
-  // ── Users ────────────────────────────────────────────────────────────────
+  // ── Users ─────────────────────────────────────────────────────────────────
   fetchUserProfile: async (handle: string, currentUserId?: string) => {
     const params: any = {}
     if (currentUserId) params.current_user_id = currentUserId
@@ -156,22 +171,26 @@ export const gisvizApi = {
     })
   },
 
-  // ── Search ───────────────────────────────────────────────────────────────
+  // ── Search ────────────────────────────────────────────────────────────────
   globalSearch: async (q: string) =>
     cached(`gsearch:${q}`, TTL.SEARCH, async () =>
       (await axiosInstance.get('/search/global', { params: { q } })).data
     ),
 
-  // ── Posts ────────────────────────────────────────────────────────────────
-  fetchPost: async (postId: string) =>
-    cached(`post:${postId}`, TTL.POST, async () =>
+  // ── Posts ─────────────────────────────────────────────────────────────────
+  // Cache keys include _uid() so different logged-in users each get their own
+  // is_liked / is_bookmarked flags and don't share stale responses.
+  fetchPost: async (postId: string) => {
+    const key = `post:${postId}:${_uid()}`
+    return cached(key, TTL.POST, async () =>
       (await axiosInstance.get(`/posts/${postId}`)).data
-    ),
+    )
+  },
 
   fetchGlobalStream: async (skip = 0, limit = 50) => {
-    // Cache only page 0 — subsequent pages are too dynamic
     if (skip === 0) {
-      return cached(`stream:0:${limit}`, TTL.STREAM, async () =>
+      const key = `stream:0:${limit}:${_uid()}`
+      return cached(key, TTL.STREAM, async () =>
         (await axiosInstance.get('/posts/stream', { params: { skip, limit } })).data
       )
     }
@@ -179,7 +198,7 @@ export const gisvizApi = {
   },
 
   searchPosts: async (q: string, skip = 0, limit = 25) =>
-    cached(`search:${q}`, TTL.SEARCH, async () =>
+    cached(`search:${q}:${_uid()}`, TTL.SEARCH, async () =>
       (await axiosInstance.get('/posts/search', { params: { q, skip, limit } })).data
     ),
 
@@ -194,7 +213,7 @@ export const gisvizApi = {
     note?: string | null; source_name?: string | null; source_url?: string | null
   }) => {
     const res = (await axiosInstance.post('/posts', payload)).data
-    _cache.delPrefix('stream:')       // new post → bust feed cache
+    _cache.delPrefix('stream:')
     return res
   },
 
@@ -204,14 +223,14 @@ export const gisvizApi = {
     note?: string | null; source_name?: string | null; source_url?: string | null
   }) => {
     const res = (await axiosInstance.put(`/posts/${postId}`, payload)).data
-    _cache.del(`post:${postId}`)
+    _cache.del(`post:${postId}:${_uid()}`)
     _cache.delPrefix('stream:')
     return res
   },
 
   deletePost: async (postId: string) => {
     const res = (await axiosInstance.delete(`/posts/${postId}`)).data
-    _cache.del(`post:${postId}`)
+    _cache.del(`post:${postId}:${_uid()}`)
     _cache.delPrefix('stream:')
     return res
   },
@@ -223,25 +242,28 @@ export const gisvizApi = {
 
   getReports: async () => (await axiosInstance.get('/posts/reports/all')).data,
 
+  // ── Likes ──────────────────────────────────────────────────────────────────
   toggleLike: async (postId: string) => {
     const res = (await axiosInstance.post(`/posts/${postId}/like`)).data
-    _cache.del(`post:${postId}`)      // like count changed
+    _cache.del(`post:${postId}:${_uid()}`)
+    _cache.delPrefix('stream:')
     return res
   },
 
+  // ── Bookmarks ──────────────────────────────────────────────────────────────
   toggleBookmark: async (postId: string) => {
     const res = (await axiosInstance.post(`/posts/${postId}/bookmark`)).data
-    _cache.del(`post:${postId}`)
+    _cache.del(`post:${postId}:${_uid()}`)
+    _cache.delPrefix('stream:')
     return res
   },
 
-fetchUserBookmarks: async (handle: string, skip = 0, limit = 50) => {
-  const res = await axiosInstance.get(`/posts/user/${handle}/bookmarks`, {
-    params: { skip, limit },
-  })
-  return res.data
-},
-  // ── Comments ─────────────────────────────────────────────────────────────
+  fetchUserBookmarks: async (handle: string, skip = 0, limit = 50) =>
+    (await axiosInstance.get(`/posts/user/${handle}/bookmarks`, {
+      params: { skip, limit },
+    })).data,
+
+  // ── Comments ──────────────────────────────────────────────────────────────
   fetchComments: async (postId: string) =>
     (await axiosInstance.get(`/posts/${postId}/comments`)).data,
 
@@ -249,11 +271,11 @@ fetchUserBookmarks: async (handle: string, skip = 0, limit = 50) => {
     const res = (await axiosInstance.post(`/posts/${postId}/comments`, {
       content, parent_comment_id: parentCommentId ?? null,
     })).data
-    _cache.del(`post:${postId}`)      // comment count changed
+    _cache.del(`post:${postId}:${_uid()}`)
     return res
   },
 
-  // ── Categories ───────────────────────────────────────────────────────────
+  // ── Categories ────────────────────────────────────────────────────────────
   listCategories: async () =>
     cached('categories', TTL.CATEGORIES, async () =>
       (await axiosInstance.get('/categories')).data
@@ -267,17 +289,17 @@ fetchUserBookmarks: async (handle: string, skip = 0, limit = 50) => {
 
   approvePendingCategory: async (pendingId: string) => {
     const res = (await axiosInstance.post(`/categories/pending/${pendingId}/approve`)).data
-    _cache.del('categories')          // new category available
+    _cache.del('categories')
     return res
   },
 
   rejectPendingCategory: async (pendingId: string) =>
     (await axiosInstance.post(`/categories/pending/${pendingId}/reject`)).data,
 
-  // ── Social graph ─────────────────────────────────────────────────────────
+  // ── Social graph ──────────────────────────────────────────────────────────
   followUser: async (targetId: string) => {
     const res = (await axiosInstance.post(`/network/${targetId}/follow`)).data
-    _cache.delPrefix('popular:')      // follower counts changed
+    _cache.delPrefix('popular:')
     return res
   },
 
@@ -287,7 +309,7 @@ fetchUserBookmarks: async (handle: string, skip = 0, limit = 50) => {
     return res
   },
 
-  // ── Auth ─────────────────────────────────────────────────────────────────
+  // ── Auth ──────────────────────────────────────────────────────────────────
   registerUser: async (payload: any) =>
     (await axiosInstance.post('/auth/register', payload)).data,
 
@@ -307,4 +329,61 @@ fetchUserBookmarks: async (handle: string, skip = 0, limit = 50) => {
 
   resetPassword: async (token: string, newPassword: string) =>
     (await axiosInstance.post('/auth/reset-password', { token, new_password: newPassword })).data,
+
+   // ── Admin — Users ────────────────────────────────────────────────────────
+  fetchAllUsers: async (skip = 0, limit = 50, q?: string) => {
+    const params: any = { skip, limit }
+    if (q) params.q = q
+    return (await axiosInstance.get('/users/all', { params })).data
+    // returns { total: number, users: User[] }
+  },
+ 
+  deleteUser: async (userId: string) =>
+    (await axiosInstance.delete(`/users/${userId}`)).data,
+ 
+  updateUserRole: async (userId: string, roleName: string) =>
+    (await axiosInstance.put(`/users/${userId}/role`, { role_name: roleName })).data,
+ 
+  setUserStatus: async (userId: string, isActive: boolean) =>
+    (await axiosInstance.put(`/users/${userId}/status`, null, { params: { is_active: isActive } })).data,
+ 
+  // ── Admin — Categories ───────────────────────────────────────────────────
+  createCategory: async (label: string, slug: string) =>
+    (await axiosInstance.post('/categories/', { label, slug })).data,
+ 
+  updateCategory: async (categoryId: number, label: string, slug: string) =>
+    (await axiosInstance.put(`/categories/${categoryId}`, { label, slug })).data,
+ 
+  deleteCategory: async (categoryId: number) =>
+    (await axiosInstance.delete(`/categories/${categoryId}`)).data,
+ 
+  // ── Admin — Keywords ─────────────────────────────────────────────────────
+  fetchAllKeywords: async (skip = 0, limit = 100) =>
+    (await axiosInstance.get('/posts/keywords', { params: { skip, limit } })).data,
+ 
+  deleteKeyword: async (keywordId: number) =>
+    (await axiosInstance.delete(`/posts/keywords/${keywordId}`)).data,
+ 
+  // ── Admin — Posts ────────────────────────────────────────────────────────
+  fetchAllPosts: async (skip = 0, limit = 50, q?: string) => {
+    const params: any = { skip, limit }
+    if (q) params.q = q
+    return (await axiosInstance.get('/posts/stream', { params })).data
+  },
+ 
+  adminDeletePost: async (postId: string) => {
+    const res = (await axiosInstance.delete(`/posts/${postId}`)).data
+    _cache.del(`post:${postId}:${_uid()}`)
+    _cache.delPrefix('stream:')
+    return res
+  },
+ 
+  // ── Admin — Reports ──────────────────────────────────────────────────────
+  fetchReports: async () =>
+    (await axiosInstance.get('/posts/reports/all')).data,
+ 
+  updateReportStatus: async (reportId: string, status: 'resolved' | 'dismissed') =>
+    (await axiosInstance.put(`/posts/reports/${reportId}/status`, { status })).data,
+
+  
 }

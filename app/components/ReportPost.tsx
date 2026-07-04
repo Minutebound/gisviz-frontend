@@ -83,7 +83,7 @@ export default function ReportModal({ isOpen, onClose, publicationId }: ReportMo
             </div>
             <h4 className="font-bold text-gisviz-ink mb-2">Report Logged Successfully</h4>
             <p className="text-[12px] font-mono text-gisviz-ink-soft mb-6">
-              Our team will review Publication #{publicationId.slice(0,8)} shortly.
+              Our team will review this Post #{publicationId.slice(0,8)} shortly.
             </p>
             <button onClick={onClose} className="bg-gisviz-canvas border border-gisviz-border hover:bg-gisviz-rail-soft text-gisviz-ink px-6 py-2 rounded-md font-mono text-[12px] transition-colors">
               Close Window

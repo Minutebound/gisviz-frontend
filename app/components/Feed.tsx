@@ -13,6 +13,8 @@ import {
   Image as ImageIcon
 } from 'lucide-react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { useAuth } from '../../context/AuthContext'
 import { gisvizApi } from '../../services/api'
 import ShareModal from '../components/SharePost'
 import ReportModal from '../components/ReportPost'
@@ -34,52 +36,59 @@ interface Post {
   total_likes_count: number
   total_comments_count: number
   created_timestamp: string
-  note: string | null;
-  source_name: string | null;
-  source_url: string | null;
+  note: string | null
+  source_name: string | null
+  source_url: string | null
   updated_timestamp?: string
+  // Returned by backend when JWT is present; null when not authenticated
+  is_liked: boolean | null
+  is_bookmarked: boolean | null
 }
 
-const POSTS_PER_PAGE = 12; // Updated to 12 as requested
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
+const POSTS_PER_PAGE = 12
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
 
 const formatTimeAgo = (timestamp: string) => {
-  const diff = Date.now() - new Date(timestamp).getTime();
-  const minutes = Math.floor(diff / 60000);
-  const hours = Math.floor(minutes / 60);
-  const days = Math.floor(hours / 24);
-  
-  if (minutes < 1) return 'Just now';
-  if (minutes < 60) return `${minutes}m ago`;
-  if (hours < 24) return `${hours}h ago`;
-  return `${days}d ago`;
+  const diff = Date.now() - new Date(timestamp).getTime()
+  const minutes = Math.floor(diff / 60000)
+  const hours = Math.floor(minutes / 60)
+  const days = Math.floor(hours / 24)
+  if (minutes < 1) return 'Just now'
+  if (minutes < 60) return `${minutes}m ago`
+  if (hours < 24) return `${hours}h ago`
+  return `${days}d ago`
 }
 
 export default function Feed() {
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth() as any
+  const router = useRouter()
+
   const [activeTab, setActiveTab] = useState<'stream' | 'trending'>('stream')
   const [posts, setPosts] = useState<Post[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [likeBusy, setLikeBusy] = useState<string | null>(null)
-  
-  const [likedPosts, setLikedPosts] = useState<string[]>([])
-  const [savedPosts, setSavedPosts] = useState<string[]>([])
-  
-  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null)
-  const [shareModalPost, setShareModalPost] = useState<Post | null>(null)
-  const [reportModalId, setReportModalId] = useState<string | null>(null)
-  
+  const [bookmarkBusy, setBookmarkBusy] = useState<string | null>(null)
+
+  // Keyed by post_id — seeded from server flags on every fetch
+  const [likedPosts, setLikedPosts]           = useState<Record<string, boolean>>({})
+  const [bookmarkedPosts, setBookmarkedPosts] = useState<Record<string, boolean>>({})
+
+  const [openDropdownId, setOpenDropdownId]   = useState<string | null>(null)
+  const [shareModalPost, setShareModalPost]   = useState<Post | null>(null)
+  const [reportModalId, setReportModalId]     = useState<string | null>(null)
+
   const [offset, setOffset] = useState(0)
   const [hasMore, setHasMore] = useState(true)
 
-  // Initialize Data
+  // Wait until AuthContext has finished its initial token check before fetching.
+  // This means we fire exactly once on cold load (with the correct auth state),
+  // and once more only if the user explicitly logs in/out during the session.
   useEffect(() => {
-    const saved = localStorage.getItem('gisviz_saved')
-    if (saved) setSavedPosts(JSON.parse(saved))
-    
+    if (authLoading) return          // auth still resolving — don't fetch yet
     fetchPosts(0, true, 'stream')
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [authLoading, isAuthenticated])
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -97,8 +106,6 @@ export default function Feed() {
       if (tab === 'stream') {
         data = await gisvizApi.fetchGlobalStream(currentOffset, POSTS_PER_PAGE)
       } else {
-        // Since Trending API fetches top 'n' items, we fetch the total amount we need
-        // and then slice off just the new ones we want to append.
         const allTrending = await gisvizApi.fetchTrending(currentOffset + POSTS_PER_PAGE)
         data = allTrending.slice(currentOffset)
       }
@@ -106,9 +113,25 @@ export default function Feed() {
       if (data.length < POSTS_PER_PAGE) setHasMore(false)
       else setHasMore(true)
 
-      if (isInitial) setPosts(data)
-      else setPosts((prev) => [...prev, ...data])
-      
+      // Seed liked / bookmarked maps from server-returned flags.
+      // is_liked / is_bookmarked are non-null only when authenticated.
+      const newLiked: Record<string, boolean>      = {}
+      const newBookmarked: Record<string, boolean> = {}
+      data.forEach((p) => {
+        if (p.is_liked      != null) newLiked[p.post_id]      = p.is_liked
+        if (p.is_bookmarked != null) newBookmarked[p.post_id] = p.is_bookmarked
+      })
+
+      if (isInitial) {
+        setPosts(data)
+        setLikedPosts(newLiked)
+        setBookmarkedPosts(newBookmarked)
+      } else {
+        setPosts((prev) => [...prev, ...data])
+        setLikedPosts((prev) => ({ ...prev, ...newLiked }))
+        setBookmarkedPosts((prev) => ({ ...prev, ...newBookmarked }))
+      }
+
       setOffset(currentOffset + POSTS_PER_PAGE)
     } catch (error) {
       console.error(`Failed to load ${tab} feed:`, error)
@@ -120,38 +143,63 @@ export default function Feed() {
   }
 
   const handleTabSwitch = (tab: 'stream' | 'trending') => {
-    if (tab === activeTab) return;
-    setActiveTab(tab);
-    setIsLoading(true);
-    setPosts([]);
-    setOffset(0);
-    setHasMore(true);
-    fetchPosts(0, true, tab);
+    if (tab === activeTab) return
+    setActiveTab(tab)
+    setIsLoading(true)
+    setPosts([])
+    setOffset(0)
+    setHasMore(true)
+    fetchPosts(0, true, tab)
   }
 
+  // ── Like — optimistic, reconciled from server ──────────────────────────
   const handleLike = async (postId: string) => {
+    if (!isAuthenticated) { router.push('/auth'); return }
     if (likeBusy) return
     setLikeBusy(postId)
+    const wasLiked = likedPosts[postId] ?? false
+    setLikedPosts((prev) => ({ ...prev, [postId]: !wasLiked }))
+    setPosts((prev) => prev.map((p) =>
+      p.post_id === postId
+        ? { ...p, total_likes_count: wasLiked ? p.total_likes_count - 1 : p.total_likes_count + 1 }
+        : p
+    ))
     try {
       const res = await gisvizApi.toggleLike(postId)
-      setPosts((prev) =>
-        prev.map((p) => p.post_id === postId ? { ...p, total_likes_count: res.total_likes_count } : p)
-      )
-      setLikedPosts((prev) =>
-        res.liked ? [...new Set([...prev, postId])] : prev.filter((id) => id !== postId)
-      )
+      setLikedPosts((prev) => ({ ...prev, [postId]: res.liked }))
+      setPosts((prev) => prev.map((p) =>
+        p.post_id === postId ? { ...p, total_likes_count: res.total_likes_count } : p
+      ))
     } catch (error) {
-      console.error("Like interaction failure:", error)
+      // Revert on failure
+      setLikedPosts((prev) => ({ ...prev, [postId]: wasLiked }))
+      setPosts((prev) => prev.map((p) =>
+        p.post_id === postId
+          ? { ...p, total_likes_count: wasLiked ? p.total_likes_count + 1 : p.total_likes_count - 1 }
+          : p
+      ))
+      console.error('Like interaction failure:', error)
     } finally {
       setLikeBusy(null)
     }
   }
 
-  const handleSave = (postId: string) => {
-    const isCurrentlySaved = savedPosts.includes(postId)
-    let updatedSaves = isCurrentlySaved ? savedPosts.filter((id) => id !== postId) : [...savedPosts, postId]
-    setSavedPosts(updatedSaves)
-    localStorage.setItem('gisviz_saved', JSON.stringify(updatedSaves))
+  // ── Bookmark — real API, optimistic, reconciled; no localStorage ────────
+  const handleBookmark = async (postId: string) => {
+    if (!isAuthenticated) { router.push('/auth'); return }
+    if (bookmarkBusy) return
+    setBookmarkBusy(postId)
+    const wasBookmarked = bookmarkedPosts[postId] ?? false
+    setBookmarkedPosts((prev) => ({ ...prev, [postId]: !wasBookmarked }))
+    try {
+      const res = await gisvizApi.toggleBookmark(postId)
+      setBookmarkedPosts((prev) => ({ ...prev, [postId]: res.bookmarked }))
+    } catch (error) {
+      setBookmarkedPosts((prev) => ({ ...prev, [postId]: wasBookmarked }))
+      console.error('Bookmark interaction failure:', error)
+    } finally {
+      setBookmarkBusy(null)
+    }
   }
 
   const toggleDropdown = (e: React.MouseEvent, id: string) => {
@@ -175,7 +223,7 @@ export default function Feed() {
           <button
             onClick={() => handleTabSwitch('stream')}
             className={`relative z-10 flex-1 py-1.5 text-[12px] font-bold rounded-full transition-colors duration-300 ${
-              activeTab === 'stream' ? 'text-gisviz-accent' : 'text-gisviz-ink-soft hover:text-gisviz-ink'
+              activeTab === 'stream' ? 'text-gisviz-ink' : 'text-gisviz-ink-soft'
             }`}
           >
             Stream
@@ -183,22 +231,21 @@ export default function Feed() {
           <button
             onClick={() => handleTabSwitch('trending')}
             className={`relative z-10 flex-1 py-1.5 text-[12px] font-bold rounded-full transition-colors duration-300 ${
-              activeTab === 'trending' ? 'text-gisviz-accent' : 'text-gisviz-ink-soft hover:text-gisviz-ink'
+              activeTab === 'trending' ? 'text-gisviz-ink' : 'text-gisviz-ink-soft'
             }`}
           >
             Trending
           </button>
         </div>
 
-        {/* Publish Button */}
-        <Link href="/post/upload" className="flex items-center justify-center gap-2 bg-gisviz-accent/10 text-gisviz-accent border border-gisviz-accent/20 hover:bg-gisviz-accent hover:text-white px-4 sm:px-5 py-2 rounded-full text-[12px] font-bold transition-all shadow-sm shrink-0">
-          <Plus size={16} /> 
-          <span className="hidden sm:inline">Publish a Visual</span>
-          <span className="sm:hidden">Publish</span>
+        <Link
+          href="/post/upload"
+          className="flex items-center gap-2 bg-gisviz-accent text-white px-4 py-2 rounded-full text-[12px] font-bold hover:bg-opacity-90 transition-all shadow-sm"
+        >
+          <Plus size={16} /> Publish
         </Link>
       </div>
 
-      {/* DYNAMIC CONTENT AREA */}
       {isLoading ? (
         <div className="flex justify-center items-center h-64">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gisviz-accent"></div>
@@ -210,9 +257,10 @@ export default function Feed() {
       ) : (
         <>
           {posts.map((post) => {
-            const isPostLiked = likedPosts.includes(post.post_id)
-            const isPostSaved = savedPosts.includes(post.post_id)
-            const allTags = [...post.categories.map(c => c.label), ...post.keywords.map(k => k.word)];
+            const isPostLiked      = likedPosts[post.post_id]      ?? false
+            const isPostBookmarked = bookmarkedPosts[post.post_id] ?? false
+            const isOwnPost        = isAuthenticated && user?.user_id === post.publisher_user_id
+            const allTags = [...post.categories.map(c => c.label), ...post.keywords.map(k => k.word)]
 
             return (
               <div key={post.post_id} className="snap-start snap-always md:snap-align-none w-full pb-8">
@@ -290,33 +338,27 @@ export default function Feed() {
                     <div className="flex items-center gap-3 overflow-hidden">
                       <Link href={`/profile/${post.publisher_handle}`} className="shrink-0">
                         {post.publisher_avatar_path ? (
-                          <img 
-                            src={`${API_BASE_URL}${post.publisher_avatar_path}`} 
-                            className="w-11 h-11 rounded-full object-cover border border-gisviz-border" 
-                            alt={post.publisher_handle} 
+                          <img
+                            src={`${API_BASE_URL}${post.publisher_avatar_path}`}
+                            alt={post.publisher_handle}
+                            className="w-10 h-10 rounded-full object-cover border border-gisviz-border flex-shrink-0" 
                           />
                         ) : (
-                          <div className="w-11 h-11 rounded-full bg-gradient-to-tr from-gisviz-accent to-gisviz-safe  0 flex items-center justify-center text-white text-[16px] font-bold">
-                            {post.publisher_handle.charAt(0).toUpperCase()}
-                          </div>
+                          <div className="w-10 h-10 rounded-full border border-gisviz-border bg-gradient-to-tr from-gisviz-accent to-gisviz-safe 0 flex items-center justify-center text-white text-[16px] font-bold uppercase font-mono shadow-inner flex-shrink-0">
+                        {post.publisher_handle.charAt(0)}
+                      </div>
                         )}
                       </Link>
-                      
-                      <div className="flex flex-col justify-center gap-1.5 min-w-0">
-                        <div className="text-[16px] text-gisviz-ink flex items-center">
-                          <Link href={`/profile/${post.publisher_handle}`} className="font-semibold hover:underline truncate max-w-[200px]">
-                            @{post.publisher_handle}
-                          </Link>
-                          <span className="text-gisviz-ink-soft mx-1.5">•</span>
-                          <span className="text-gisviz-ink-soft whitespace-nowrap">
-                            {formatTimeAgo(post.created_timestamp)}
-                          </span>
-                        </div>
+                      <div className="min-w-0">
+                        <Link href={`/profile/${post.publisher_handle}`} className="text-[12px] font-bold text-gisviz-ink hover:text-gisviz-accent truncate block">
+                          @{post.publisher_handle}
+                        </Link>
+                        <span className="text-[12px] font-mono text-gisviz-ink-soft">{formatTimeAgo(post.created_timestamp)}</span>
                       </div>
                     </div>
 
                     {(post.source_name || post.note) && (
-                      <div className="flex flex-col items-end gap-1 text-[12px] text-gisviz-ink-soft shrink-0 max-w-[150px] text-right pt-1">
+                      <div className="flex flex-col items-end text-[12px] font-mono text-gisviz-ink-soft text-right max-w-[50%] gap-0.5">
                         {post.source_name && (
                           <span className="truncate w-full">
                             Source:{' '}
@@ -348,25 +390,35 @@ export default function Feed() {
                           isPostLiked ? 'text-gisviz-accent' : 'hover:text-gisviz-accent text-gisviz-ink-soft'
                         }`}
                       >
-                        <ThumbsUp size={20} className={isPostLiked ? 'fill-current' : ''} />
-                        <span>{post.total_likes_count > 0 ? (post.total_likes_count >= 1000 ? (post.total_likes_count/1000).toFixed(1) + 'K' : post.total_likes_count) : ''} Likes</span>
+                        {likeBusy === post.post_id
+                          ? <Loader2 size={20} className="animate-spin" />
+                          : <ThumbsUp size={20} className={isPostLiked ? 'fill-current' : ''} />
+                        }
+                        <span>{post.total_likes_count > 0 ? (post.total_likes_count >= 1000 ? (post.total_likes_count/1000).toFixed(1) + 'K' : post.total_likes_count) : ''} </span>
                       </button>
                       
                       <Link href={`/post/${post.post_id}`} className="flex items-center gap-2 hover:text-gisviz-accent text-gisviz-ink-soft transition-colors">
                         <MessageSquare size={20} />
-                        <span>{post.total_comments_count} Comments</span>
+                        <span>{post.total_comments_count > 0 ? (post.total_comments_count >= 1000 ? (post.total_comments_count/1000).toFixed(1) + 'K' : post.total_comments_count) : ''} {post.total_comments_count>1 ? 'Comments' : 'Comment'}</span>
                       </Link>
                     </div>
 
-                    <button 
-                      onClick={() => handleSave(post.post_id)}
-                      className={`flex items-center gap-2 font-medium text-[16px] transition-colors ${
-                        isPostSaved ? 'text-gisviz-accent' : 'text-gisviz-ink-soft hover:text-gisviz-ink'
-                      }`}
-                    >
-                      <Bookmark size={20} className={isPostSaved ? 'fill-current' : ''} />
-                      <span className="hidden sm:inline">Bookmark</span>
-                    </button>
+                    {/* Bookmark — hidden on own posts, real API, seeded from DB */}
+                    {!isOwnPost && (
+                      <button
+                        onClick={() => handleBookmark(post.post_id)}
+                        disabled={bookmarkBusy === post.post_id}
+                        className={`flex items-center gap-2 font-medium text-[16px] transition-colors disabled:opacity-50 ${
+                          isPostBookmarked ? 'text-gisviz-accent' : 'text-gisviz-ink-soft hover:text-gisviz-ink'
+                        }`}
+                      >
+                        {bookmarkBusy === post.post_id
+                          ? <Loader2 size={20} className="animate-spin" />
+                          : <Bookmark size={20} className={isPostBookmarked ? 'fill-current' : ''} />
+                        }
+                        <span className="hidden sm:inline">{isPostBookmarked ? 'Bookmarked' : 'Bookmark'}</span>
+                      </button>
+                    )}
                   </div>
                 </article>
               </div>
@@ -392,13 +444,13 @@ export default function Feed() {
       )}
 
       {shareModalPost && (
-        <ShareModal 
-          isOpen={!!shareModalPost} 
-          onClose={() => setShareModalPost(null)}
-          url={shareModalPost.share_url || `${typeof window !== 'undefined' ? window.location.origin : ''}/post/${shareModalPost.post_id}`}
-          title={shareModalPost.title}
-        />
-      )}
+  <ShareModal 
+    isOpen={!!shareModalPost} 
+    onClose={() => setShareModalPost(null)}
+    url={`${typeof window !== 'undefined' ? window.location.origin : ''}/post/${shareModalPost.post_id}`}
+    title={shareModalPost.title}
+  />
+)}
 
       {reportModalId && (
         <ReportModal 

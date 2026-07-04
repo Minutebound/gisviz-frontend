@@ -2,68 +2,66 @@
 
 import React, { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { Edit2, Image as ImageIcon, Loader2, Map as MapIcon, X, Tag, Info, Link as LinkIcon, Send, Bookmark, ArrowLeft } from 'lucide-react'
+import { Edit2, Image as ImageIcon, Loader2, Map as MapIcon, X, Tag, Info, Link as LinkIcon, Send, Bookmark } from 'lucide-react'
 import { useAuth } from '../../../../context/AuthContext'
 import { gisvizApi } from '../../../../services/api'
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL
 
 export default function EditPostPage() {
   const params = useParams()
   const router = useRouter()
   const postId = params.id as string
   const { user, isAuthenticated, isLoading: authLoading } = useAuth() as any
-  
-  const [isLoading, setIsLoading] = useState(true)
-  const [isSaving, setIsSaving] = useState(false)
-  const [errorMsg, setErrorMsg] = useState('')
+
+  const [isLoading, setIsLoading]   = useState(true)
+  const [isSaving, setIsSaving]     = useState(false)
+  const [errorMsg, setErrorMsg]     = useState('')
   const [successMsg, setSuccessMsg] = useState('')
-  
-  // Modal State for Image Enlargement
+
   const [isModalOpen, setIsModalOpen] = useState(false)
 
-  // Form State
-  const [title, setTitle] = useState('')
+  const [title, setTitle]           = useState('')
   const [description, setDescription] = useState('')
-  const [note, setNote] = useState('')
+  const [note, setNote]             = useState('')
   const [sourceName, setSourceName] = useState('')
-  const [sourceUrl, setSourceUrl] = useState('')
-  
-  const [keywordString, setKeywordString] = useState('')
+  const [sourceUrl, setSourceUrl]   = useState('')
+
+  const [keywords, setKeywords]         = useState<string[]>([])
+  const [keywordInput, setKeywordInput] = useState('')
+
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>([])
-  
-  const [customCategoryLabel, setCustomCategoryLabel] = useState('')
-  const [isSubmittingCustom, setIsSubmittingCustom] = useState(false)
-  
-  // Data State
+
+  const [customCategoryLabel, setCustomCategoryLabel]   = useState('')
+  const [isSubmittingCustom, setIsSubmittingCustom]     = useState(false)
+
   const [availableCategories, setAvailableCategories] = useState<any[]>([])
 
-  // File State
-  const [file, setFile] = useState<File | null>(null)
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [file, setFile]                       = useState<File | null>(null)
+  const [previewUrl, setPreviewUrl]           = useState<string | null>(null)
   const [existingImagePath, setExistingImagePath] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Initialization
+  // ── Init ────────────────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      router.push('/auth')
-      return
-    }
+    if (!authLoading && !isAuthenticated) { router.push('/auth'); return }
 
     const initData = async () => {
       try {
         const [cats, postData] = await Promise.all([
           gisvizApi.listCategories(),
-          gisvizApi.fetchPost(postId)
+          gisvizApi.fetchPost(postId),
         ])
-        
+
         setAvailableCategories(cats)
 
-        // Security check: only the publisher (or an admin) can edit
-        if (postData.publisher_user_id !== user?.user_id && user?.role_name !== 'admin' && user?.role_name !== 'editor') {
-            router.push(`/post/${postId}`)
-            return
+        if (
+          postData.publisher_user_id !== user?.user_id &&
+          user?.role_name !== 'admin' &&
+          user?.role_name !== 'editor'
+        ) {
+          router.push(`/post/${postId}`)
+          return
         }
 
         setTitle(postData.title)
@@ -71,16 +69,15 @@ export default function EditPostPage() {
         setNote(postData.note || '')
         setSourceName(postData.source_name || '')
         setSourceUrl(postData.source_url || '')
-        setKeywordString(postData.keywords.map((k: any) => k.word).join(', '))
+        setKeywords(postData.keywords.map((k: any) => k.word))
         setSelectedCategoryIds(postData.categories.map((c: any) => c.category_id))
-        
+
         setExistingImagePath(postData.visual_image_path)
         if (postData.visual_image_path) {
           setPreviewUrl(`${API_BASE_URL}${postData.visual_image_path}`)
         }
-
-      } catch (err) {
-        setErrorMsg("Failed to load posts data.")
+      } catch {
+        setErrorMsg('Failed to load post data.')
       } finally {
         setIsLoading(false)
       }
@@ -89,15 +86,13 @@ export default function EditPostPage() {
     if (postId && user) initData()
   }, [postId, isAuthenticated, authLoading, user, router])
 
+  // ── Handlers ────────────────────────────────────────────────────────────────
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      const selectedFile = e.target.files[0]
-      if (!selectedFile.type.startsWith('image/')) {
-        setErrorMsg('Only image files are allowed.')
-        return
-      }
-      setFile(selectedFile)
-      setPreviewUrl(URL.createObjectURL(selectedFile))
+      const f = e.target.files[0]
+      if (!f.type.startsWith('image/')) { setErrorMsg('Only image files are allowed.'); return }
+      setFile(f)
+      setPreviewUrl(URL.createObjectURL(f))
       setErrorMsg('')
     }
   }
@@ -105,47 +100,73 @@ export default function EditPostPage() {
   const addCategory = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const id = parseInt(e.target.value)
     if (id && !selectedCategoryIds.includes(id)) {
+      if (selectedCategoryIds.length >= 2) { e.target.value = ''; return }
       setSelectedCategoryIds(prev => [...prev, id])
     }
-    e.target.value = "" // reset select
+    e.target.value = ''
   }
 
-  const removeCategory = (id: number) => {
-    setSelectedCategoryIds(prev => prev.filter(catId => catId !== id))
-  }
+  const removeCategory = (id: number) =>
+    setSelectedCategoryIds(prev => prev.filter(c => c !== id))
 
   const handleSuggestCategory = async () => {
-    if (!customCategoryLabel.trim()) return;
+    if (!customCategoryLabel.trim()) return
     setIsSubmittingCustom(true)
     try {
       await gisvizApi.suggestCategory(customCategoryLabel)
       setSuccessMsg(`"${customCategoryLabel}" proposed for review successfully.`)
       setCustomCategoryLabel('')
-    } catch (error) {
-      console.error(error)
-      setErrorMsg("Failed to suggest category. It may already exist.")
+    } catch {
+      setErrorMsg('Failed to suggest category. It may already exist.')
     } finally {
       setIsSubmittingCustom(false)
     }
   }
 
+  const handleKeywordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value
+    if (val.includes(',')) {
+      const newKws = val.split(',').map(k => k.trim()).filter(k => k.length > 0)
+      let updated = [...keywords]
+      for (const kw of newKws) {
+        if (updated.length < 3 && !updated.includes(kw)) updated.push(kw)
+      }
+      setKeywords(updated)
+      setKeywordInput('')
+    } else {
+      setKeywordInput(val)
+    }
+  }
+
+  const handleKeywordKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      const kw = keywordInput.trim()
+      if (kw && keywords.length < 3 && !keywords.includes(kw)) setKeywords([...keywords, kw])
+      setKeywordInput('')
+    }
+  }
+
+  const removeKeyword = (kw: string) =>
+    setKeywords(prev => prev.filter(k => k !== kw))
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!title.trim()) { setErrorMsg('A title is required.'); return }
+    if (!title.trim())                  { setErrorMsg('A title is required.'); return }
+    if (!sourceName.trim())             { setErrorMsg('Data Source Name is required.'); return }
+    if (selectedCategoryIds.length < 1) { setErrorMsg('Please select at least one category.'); return }
+    if (keywords.length < 1)            { setErrorMsg('Please add at least one keyword.'); return }
+    if (keywords.length > 3)            { setErrorMsg('You can only add up to 3 keywords.'); return }
 
     setIsSaving(true)
     setErrorMsg('')
 
     try {
-      let finalImagePath = existingImagePath;
-
-      // Only upload a new image if the user actually selected one
+      let finalImagePath = existingImagePath
       if (file) {
         const uploadRes = await gisvizApi.uploadVisual(file)
         finalImagePath = uploadRes.visual_path
       }
-
-      const keywords = keywordString.split(',').map(k => k.trim()).filter(k => k.length > 0)
 
       await gisvizApi.updatePost(postId, {
         title,
@@ -155,10 +176,9 @@ export default function EditPostPage() {
         source_url: sourceUrl || null,
         visual_image_path: finalImagePath,
         category_ids: selectedCategoryIds,
-        keywords
+        keywords,
       })
 
-      // Redirect back to the post view upon successful save
       router.push(`/post/${postId}`)
     } catch (err: any) {
       const detail = err.response?.data?.detail
@@ -168,15 +188,20 @@ export default function EditPostPage() {
     }
   }
 
-  if (isLoading) return <div className="flex justify-center items-center h-[calc(100vh-4rem)]"><Loader2 size={32} className="animate-spin text-gisviz-accent" /></div>
+  if (isLoading) return (
+    <div className="flex justify-center items-center h-[calc(100vh-4rem)]">
+      <Loader2 size={32} className="animate-spin text-gisviz-accent" />
+    </div>
+  )
 
+  // ── Render ───────────────────────────────────────────────────────────────────
   return (
     <div className="max-w-5xl mx-auto px-4 py-8 pb-24 relative">
 
       <div className="mb-8">
         <h1 className="text-[24px] font-display font-bold text-gisviz-ink flex items-center gap-3">
           <Edit2 className="text-gisviz-accent" size={32} />
-          Edit Post
+          Edit gisviz
         </h1>
         <p className="text-gisviz-ink-soft font-mono mt-2 text-[12px]">Update your visual map, dataset metadata, or sources.</p>
       </div>
@@ -184,22 +209,24 @@ export default function EditPostPage() {
       {errorMsg && (
         <div className="p-4 mb-6 rounded-md text-[12px] font-mono border bg-gisviz-alert/10 text-gisviz-alert border-gisviz-border flex items-center justify-between">
           <span>{errorMsg}</span>
-          <button onClick={() => setErrorMsg('')}><X size={16}/></button>
+          <button onClick={() => setErrorMsg('')}><X size={16} /></button>
         </div>
       )}
-      
+
       {successMsg && (
-        <div className="p-4 mb-6 rounded-md text-[12px] font-mono border bg-gisviz-safe/5  text-gisviz-accent border-gisviz-border flex items-center justify-between">
+        <div className="p-4 mb-6 rounded-md text-[12px] font-mono border bg-gisviz-safe/5 text-gisviz-accent border-gisviz-border flex items-center justify-between">
           <span>{successMsg}</span>
-          <button onClick={() => setSuccessMsg('')}><X size={16}/></button>
+          <button onClick={() => setSuccessMsg('')}><X size={16} /></button>
         </div>
       )}
 
       <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        
-        {/* LEFT COLUMN - IMAGE UPLOAD & GUIDELINES */}
+
+        {/* ── LEFT COLUMN — image + guidelines only (same as upload page) ── */}
         <div className="lg:col-span-5 space-y-4">
-          <div 
+
+          {/* Image drop zone */}
+          <div
             className={`w-full aspect-[4/3] rounded-xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all overflow-hidden relative group ${
               previewUrl ? 'border-gisviz-accent bg-gisviz-canvas' : 'border-gisviz-border bg-gisviz-card hover:border-gisviz-accent'
             }`}
@@ -207,10 +234,8 @@ export default function EditPostPage() {
             {previewUrl ? (
               <>
                 <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
-                
-                {/* Image Interaction Layer */}
                 <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white gap-3 z-10">
-                  <button 
+                  <button
                     type="button"
                     onClick={() => setIsModalOpen(true)}
                     className="p-2.5 bg-white/20 rounded-full hover:bg-white/30 transition-colors"
@@ -218,10 +243,9 @@ export default function EditPostPage() {
                   >
                     <ImageIcon size={24} />
                   </button>
-                  
-                  <button 
-                    type="button" 
-                    onClick={() => fileInputRef.current?.click()} 
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
                     className="p-2.5 bg-white/20 rounded-full hover:bg-white/30 transition-colors"
                     title="Change Visual"
                   >
@@ -230,7 +254,10 @@ export default function EditPostPage() {
                 </div>
               </>
             ) : (
-              <div onClick={() => fileInputRef.current?.click()} className="text-center p-6 text-gisviz-ink-soft group-hover:text-gisviz-accent transition-colors z-10 w-full h-full flex flex-col items-center justify-center">
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className="text-center p-6 text-gisviz-ink-soft group-hover:text-gisviz-accent transition-colors z-10 w-full h-full flex flex-col items-center justify-center"
+              >
                 <ImageIcon size={48} className="mx-auto mb-4 opacity-50" />
                 <p className="font-bold text-[12px] mb-1">Click to browse or drag & drop</p>
                 <p className="font-mono text-[12px] uppercase opacity-75">JPG, PNG, WebP • Max 10MB</p>
@@ -239,6 +266,7 @@ export default function EditPostPage() {
             <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
           </div>
 
+          {/* Guidelines */}
           <div className="bg-gisviz-rail border border-gisviz-border rounded-xl p-4 text-[12px] font-mono text-gisviz-ink-soft">
             <h4 className="font-bold text-gisviz-ink-soft mb-2 uppercase tracking-wider flex items-center gap-2 text-[12px]">
               <MapIcon size={14} /> Post Guidelines
@@ -249,64 +277,23 @@ export default function EditPostPage() {
               <li>Do not upload sensitive or proprietary coordinates.</li>
             </ul>
           </div>
-          
-          {/* Note & Source Group - Moved to Left Column */}
-          <div className="bg-gisviz-card border border-gisviz-border rounded-xl p-6 shadow-sm space-y-6">
-            <div className="space-y-4">
-              <div>
-                <label className="text-[12px] font-mono text-gisviz-ink-soft mb-2 uppercase tracking-wider flex items-center gap-1.5">
-                  <Info size={14}/> Important Note / Limitation
-                </label>
-                <input
-                  type="text"
-                  value={note}
-                  onChange={e => setNote(e.target.value)}
-                  placeholder="e.g. Data may contain copyright boundaries. Used with permission."
-                  className="w-full bg-gisviz-canvas border border-gisviz-border rounded-md px-3 py-2 text-gisviz-ink text-[12px] focus:ring-1 focus:ring-gisviz-accent outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="text-[12px] font-mono text-gisviz-ink-soft mb-2 uppercase tracking-wider">Data Source Name</label>
-                <input
-                  type="text"
-                  value={sourceName}
-                  onChange={e => setSourceName(e.target.value)}
-                  placeholder="e.g. OpenStreetMap / USGS"
-                  className="w-full bg-gisviz-canvas border border-gisviz-border rounded-md px-3 py-2 text-gisviz-ink text-[12px] focus:ring-1 focus:ring-gisviz-accent outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="text-[12px] font-mono text-gisviz-ink-soft mb-2 uppercase tracking-wider flex items-center gap-1.5">
-                  <LinkIcon size={12}/> Data Source Link
-                </label>
-                <input
-                  type="url"
-                  value={sourceUrl}
-                  onChange={e => setSourceUrl(e.target.value)}
-                  placeholder="https://..."
-                  className="w-full bg-gisviz-canvas border border-gisviz-border rounded-md px-3 py-2 text-gisviz-ink text-[12px] focus:ring-1 focus:ring-gisviz-accent outline-none"
-                />
-              </div>
-            </div>
-          </div>
-          
         </div>
 
-        {/* RIGHT COLUMN - METADATA */}
+        {/* ── RIGHT COLUMN — metadata (identical structure to upload page) ── */}
         <div className="lg:col-span-7 bg-gisviz-card border border-gisviz-border rounded-xl p-6 sm:p-8 shadow-sm h-fit">
           <div className="space-y-6">
-            
+
             {/* Title */}
             <div>
-              <label className="block text-[12px] font-mono text-gisviz-ink-soft mb-2 uppercase tracking-wider">Post Title <span className="text-gisviz-alert/80">*</span></label>
+              <label className="block text-[12px] font-mono text-gisviz-ink-soft mb-2 uppercase tracking-wider">
+                Post Title <span className="text-gisviz-alert">*</span>
+              </label>
               <input
                 type="text"
                 value={title}
                 onChange={e => setTitle(e.target.value)}
                 placeholder="e.g. Boulder County LiDAR Elevation Model"
-                className="w-full bg-gisviz-canvas border border-gisviz-border text-camelcase rounded-md px-4 py-3 text-gisviz-ink font-display font-medium text-[16px] focus:ring-2 focus:ring-gisviz-accent outline-none"
+                className="w-full bg-gisviz-canvas text-camelcase border border-gisviz-border rounded-md px-4 py-3 text-gisviz-ink font-display font-medium text-[16px] focus:ring-2 focus:ring-gisviz-accent outline-none"
                 required
               />
             </div>
@@ -318,37 +305,85 @@ export default function EditPostPage() {
                 value={description}
                 onChange={e => setDescription(e.target.value)}
                 placeholder="Describe the data sources, methodology, or interesting findings..."
-                className="w-full bg-gisviz-canvas border border-gisviz-border rounded-md px-4 py-3 text-gisviz-ink font-sans text-[12px] focus:ring-2 focus:ring-gisviz-accent outline-none min-h-[120px] resize-y"
+                className="w-full bg-gisviz-canvas border text-camelcase border-gisviz-border rounded-md px-4 py-3 text-gisviz-ink font-sans text-[12px] focus:ring-2 focus:ring-gisviz-accent outline-none min-h-[120px] resize-y"
               />
             </div>
 
-            {/* Categories & Pending Selection */}
+            {/* ── Note & Source — same grid/border-y layout as upload page ── */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-y border-gisviz-border py-4">
+
+              {/* Note — full width */}
+              <div className="md:col-span-2">
+                <label className="text-[12px] font-mono text-gisviz-ink-soft mb-2 uppercase tracking-wider flex items-center gap-1.5">
+                  <Info size={14} /> Important Note / Limitation
+                </label>
+                <input
+                  type="text"
+                  value={note}
+                  onChange={e => setNote(e.target.value)}
+                  placeholder="e.g. Data may contain copyright boundaries. Used with permission."
+                  className="w-full bg-gisviz-canvas border text-camelcase border-gisviz-border rounded-md px-3 py-2 text-gisviz-ink text-[12px] focus:ring-1 focus:ring-gisviz-accent outline-none"
+                />
+              </div>
+
+              {/* Source Name */}
+              <div>
+                <label className="text-[12px] font-mono text-gisviz-ink-soft mb-2 uppercase tracking-wider block">
+                  Data Source Name <span className="text-gisviz-alert">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={sourceName}
+                  onChange={e => setSourceName(e.target.value)}
+                  placeholder="e.g. OpenStreetMap / USGS"
+                  className="w-full bg-gisviz-canvas border text-camelcase border-gisviz-border rounded-md px-3 py-2 text-gisviz-ink text-[12px] focus:ring-1 focus:ring-gisviz-accent outline-none"
+                />
+              </div>
+
+              {/* Source URL */}
+              <div>
+                <label className="text-[12px] font-mono text-gisviz-ink-soft mb-2 uppercase tracking-wider flex items-center gap-1.5">
+                  <LinkIcon size={12} /> Data Source Link
+                </label>
+                <input
+                  type="url"
+                  value={sourceUrl}
+                  onChange={e => setSourceUrl(e.target.value)}
+                  placeholder="https://..."
+                  className="w-full bg-gisviz-canvas border border-gisviz-border rounded-md px-3 py-2 text-gisviz-ink text-[12px] focus:ring-1 focus:ring-gisviz-accent outline-none"
+                />
+              </div>
+            </div>
+
+            {/* Categories */}
             <div>
-              <label className="block text-[12px] font-mono text-gisviz-ink-soft mb-2 tracking-wider">Categorization</label>
-              
+              <label className="block text-[12px] uppercase font-mono text-gisviz-ink-soft mb-2 tracking-wider">
+                Categorization (Max 2) <span className="text-gisviz-alert">*</span>
+              </label>
+
               <div className="flex flex-col gap-3">
-                {/* Active Selection Display */}
                 <div className="flex flex-wrap gap-2">
                   {selectedCategoryIds.map(id => {
                     const cat = availableCategories.find(c => c.category_id === id)
                     return cat ? (
                       <span key={id} className="flex items-center gap-1.5 px-3 py-1 bg-gisviz-accent text-white rounded-md font-mono text-[12px] shadow-sm text-camelcase tracking-wider">
                         {cat.label}
-                        <button type="button" onClick={() => removeCategory(id)} className="hover:text-gisviz-alert/60"><X size={12}/></button>
+                        <button type="button" onClick={() => removeCategory(id)} className="hover:text-gisviz-alert/60"><X size={12} /></button>
                       </span>
                     ) : null
                   })}
-                  {selectedCategoryIds.length === 0 && <span className="text-[12px] font-mono text-gisviz-ink-soft">No categories selected.</span>}
+                  {selectedCategoryIds.length === 0 && (
+                    <span className="text-[12px] font-mono text-gisviz-ink-soft">No categories selected.</span>
+                  )}
                 </div>
-                
-                {/* Inputs Row */}
+
                 <div className="flex flex-col sm:flex-row gap-4 items-start">
-                  {/* Select Dropdown */}
                   <div className="flex-1 w-full">
-                    <select 
+                    <select
                       onChange={addCategory}
                       value=""
-                      className="w-full bg-gisviz-canvas text-camelcase border border-gisviz-border rounded-md px-3 py-2.5 text-gisviz-ink text-[12px] focus:ring-2 focus:ring-gisviz-accent outline-none font-mono"
+                      disabled={selectedCategoryIds.length >= 2}
+                      className="w-full bg-gisviz-canvas text-camelcase border border-gisviz-border rounded-md px-3 py-2.5 text-gisviz-ink text-[12px] focus:ring-2 focus:ring-gisviz-accent outline-none font-mono disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <option value="" disabled>+ Add an existing Category...</option>
                       {availableCategories.map(cat => (
@@ -358,8 +393,7 @@ export default function EditPostPage() {
                       ))}
                     </select>
                   </div>
-                  
-                  {/* Suggest Custom Category */}
+
                   <div className="flex w-full sm:w-auto flex-1 gap-2">
                     <input
                       type="text"
@@ -379,31 +413,54 @@ export default function EditPostPage() {
                     </button>
                   </div>
                 </div>
-
               </div>
             </div>
 
             {/* Keywords */}
             <div>
               <label className="block text-[12px] font-mono text-gisviz-ink-soft mb-2 uppercase tracking-wider flex items-center gap-1.5">
-                <Tag size={14} /> Custom Metadata Tags (Comma Separated)
+                <Tag size={14} /> Keywords (Max 3 Comma-Separated) <span className="text-gisviz-alert">*</span>
               </label>
-              <input
-                type="text"
-                value={keywordString}
-                onChange={e => setKeywordString(e.target.value)}
-                placeholder="e.g. lidar, topography, urban-planning"
-                className="w-full bg-gisviz-canvas border border-gisviz-border text-camelcase rounded-md px-4 py-2.5 text-gisviz-ink font-mono text-[12px] focus:ring-2 focus:ring-gisviz-accent outline-none"
-              />
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-wrap gap-2">
+                  {keywords.map(kw => (
+                    <span key={kw} className="flex items-center gap-1.5 px-3 py-1 bg-gisviz-accent text-white rounded-md font-mono text-[12px] shadow-sm text-camelcase tracking-wider">
+                      {kw}
+                      <button type="button" onClick={() => removeKeyword(kw)} className="hover:text-gisviz-alert/60"><X size={12} /></button>
+                    </span>
+                  ))}
+                  {keywords.length === 0 && (
+                    <span className="text-[12px] font-mono text-gisviz-ink-soft">No keywords added.</span>
+                  )}
+                </div>
+
+                <input
+                  type="text"
+                  value={keywordInput}
+                  onChange={handleKeywordChange}
+                  onKeyDown={handleKeywordKeyDown}
+                  disabled={keywords.length >= 3}
+                  placeholder={keywords.length >= 3 ? 'Limit reached' : 'Type a keyword and press comma or enter'}
+                  className="w-full bg-gisviz-canvas border border-gisviz-border text-camelcase rounded-md px-4 py-2.5 text-gisviz-ink font-mono text-[12px] focus:ring-2 focus:ring-gisviz-accent outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+              </div>
             </div>
 
             {/* Submit */}
             <div className="pt-6 border-t border-gisviz-border flex justify-end gap-4">
-              <button type="button" onClick={() => router.back()} disabled={isSaving} className="px-6 py-2.5 rounded-md font-mono text-[12px] border border-gisviz-border text-gisviz-ink-soft hover:bg-gisviz-rail transition-colors">
+              <button
+                type="button"
+                onClick={() => router.back()}
+                disabled={isSaving}
+                className="px-6 py-2.5 rounded-md font-mono text-[12px] border border-gisviz-border text-gisviz-ink-soft hover:bg-gisviz-rail transition-colors"
+              >
                 Cancel
               </button>
-              {/* Renamed Submit Button */}
-              <button type="submit" disabled={isSaving} className="flex items-center gap-2 bg-gisviz-accent text-white py-2.5 px-8 rounded-md hover:bg-opacity-90 transition-all font-mono text-[12px] font-bold shadow-md disabled:opacity-70 uppercase tracking-wide">
+              <button
+                type="submit"
+                disabled={isSaving}
+                className="flex items-center gap-2 bg-gisviz-accent text-white py-2.5 px-8 rounded-md hover:bg-opacity-90 transition-all font-mono text-[12px] font-bold shadow-md disabled:opacity-70 uppercase tracking-wide"
+              >
                 {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Bookmark size={18} />}
                 {isSaving ? 'Saving Changes...' : 'Save Changes'}
               </button>
@@ -412,20 +469,23 @@ export default function EditPostPage() {
           </div>
         </div>
       </form>
-      
+
       {/* Image Enlargement Modal */}
       {isModalOpen && previewUrl && (
-        <div className="fixed inset-0 z-50 backdrop-blur-xl bg-black/60 flex items-center justify-center p-4 md:p-8" onClick={() => setIsModalOpen(false)}>
-          <div className="relative bg-gisviz-card border border-gisviz-border rounded-2xl shadow-2xl p-2 max-w-4xl max-h-[90vh] overflow-hidden" onClick={e => e.stopPropagation()}>
-            {/* Close Button */}
-            <button 
-              onClick={() => setIsModalOpen(false)} 
+        <div
+          className="fixed inset-0 z-50 backdrop-blur-xl bg-black/60 flex items-center justify-center p-4 md:p-8"
+          onClick={() => setIsModalOpen(false)}
+        >
+          <div
+            className="relative bg-gisviz-card border border-gisviz-border rounded-2xl shadow-2xl p-2 max-w-4xl max-h-[90vh] overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setIsModalOpen(false)}
               className="absolute top-4 right-4 z-20 p-2 bg-white/30 backdrop-blur-md rounded-full text-white hover:bg-white/40 transition-colors shadow-lg"
             >
               <X size={24} className="text-gisviz-ink" />
             </button>
-            
-            {/* The Image */}
             <img src={previewUrl} alt="Enlarged Post Visual" className="w-full h-full object-contain rounded-xl" />
           </div>
         </div>

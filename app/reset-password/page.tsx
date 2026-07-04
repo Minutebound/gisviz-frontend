@@ -74,7 +74,7 @@ export default function ResetPasswordPage() {
             disabled={isLoading || !token || !!successMsg} 
             className="w-full flex items-center justify-center gap-2 bg-gisviz-ink text-white py-2.5 rounded-md hover:bg-opacity-90 transition-all font-mono text-[12px] font-bold mt-6 disabled:opacity-50"
           >
-            {isLoading ? <Loader2 size={16} className="animate-spin" /> : <><Save size={16} /> Execute Overwrite</>}
+            {isLoading ? <Loader2 size={16} className="animate-spin" /> : <><Save size={16} /> Reset Password</>}
           </button>
           
           <div className="text-center mt-6">

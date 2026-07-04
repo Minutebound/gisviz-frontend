@@ -288,9 +288,9 @@ The main feed component. Key behaviours:
 - **Share button:** copies share URL to clipboard.
 - Action bar is a separate `<div>` **outside** the card `<Link>` to avoid nested interactive element problems.
 
-### `app/add-post/page.tsx`
+### `app/post/upload/page.tsx`
 
-Upload page (previously `/post/upload`, renamed to `/add-post`):
+Upload page (previously `/post/upload`, renamed to `/post/upload`):
 
 - Client-side image validation runs on file select (`validateImageQuality()` from `lib/imageValidation.ts`)
 - Submit button stays disabled until validation passes

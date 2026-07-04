@@ -15,9 +15,9 @@ export default function Sidebar() {
   // Destructure from auth context so we don't have to do a redundant API call
   const { user, isAuthenticated } = useAuth() as any;
 
-  const RAW_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
+  const RAW_API_URL = process.env.NEXT_PUBLIC_API_URL ;
   // Strip '/api/v1' explicitly to target the base mount where '/post/uploads' lives
-  const API_BASE_URL = RAW_API_URL.replace('/api/v1', '');
+  const API_BASE_URL = `${RAW_API_URL}`.replace('/api/v1', '');
 
   useEffect(() => {
     // 1. Fetch Categories and sort by real usage_count
@@ -167,13 +167,9 @@ export default function Sidebar() {
                             e.currentTarget.nextElementSibling?.classList.add('flex');
                           }}
                         />
-                        {/* Fallback Icon div specifically for onError above */}
-                        <div className="hidden w-10 h-10 rounded-full border border-gisviz-border bg-gradient-to-tr from-gisviz-accent to-gisviz-safe/5  0items-center justify-center text-white text-[12px] font-bold uppercase font-mono shadow-inner flex-shrink-0">
-                            {pub.user_handle.charAt(0)}
-                        </div>
                       </>
                     ) : (
-                      <div className="w-10 h-10 rounded-full border border-gisviz-border bg-gradient-to-tr from-gisviz-accent to-gisviz-safe/5  0flex items-center justify-center text-white text-[12px] font-bold uppercase font-mono shadow-inner flex-shrink-0">
+                      <div className="w-10 h-10 rounded-full border border-gisviz-border bg-gradient-to-tr from-gisviz-accent to-gisviz-safe 0 flex items-center justify-center text-white text-[16px] font-bold uppercase font-mono shadow-inner flex-shrink-0">
                         {pub.user_handle.charAt(0)}
                       </div>
                     )}

@@ -14,28 +14,26 @@ export default function UploadPage() {
   const [errorMsg, setErrorMsg] = useState('')
   const [successMsg, setSuccessMsg] = useState('')
   
-  // Form State
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [note, setNote] = useState('')
   const [sourceName, setSourceName] = useState('')
   const [sourceUrl, setSourceUrl] = useState('')
   
-  const [keywordString, setKeywordString] = useState('')
+  const [keywords, setKeywords] = useState<string[]>([])
+  const [keywordInput, setKeywordInput] = useState('')
+  
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>([])
   
   const [customCategoryLabel, setCustomCategoryLabel] = useState('')
   const [isSubmittingCustom, setIsSubmittingCustom] = useState(false)
   
-  // Data State
   const [availableCategories, setAvailableCategories] = useState<any[]>([])
 
-  // File State
   const [file, setFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Redirect if not logged in
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       router.push('/auth?redirect=/post/upload')
@@ -71,9 +69,13 @@ export default function UploadPage() {
   const addCategory = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const id = parseInt(e.target.value)
     if (id && !selectedCategoryIds.includes(id)) {
+      if (selectedCategoryIds.length >= 2) {
+        e.target.value = ""
+        return
+      }
       setSelectedCategoryIds(prev => [...prev, id])
     }
-    e.target.value = "" // reset select
+    e.target.value = ""
   }
 
   const removeCategory = (id: number) => {
@@ -95,18 +97,54 @@ export default function UploadPage() {
     }
   }
 
+  const handleKeywordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value
+    if (val.includes(',')) {
+      const newKws = val.split(',').map(k => k.trim()).filter(k => k.length > 0)
+      let updatedKeywords = [...keywords]
+      for (const kw of newKws) {
+        if (updatedKeywords.length < 3 && !updatedKeywords.includes(kw)) {
+          updatedKeywords.push(kw)
+        }
+      }
+      setKeywords(updatedKeywords)
+      setKeywordInput('')
+    } else {
+      setKeywordInput(val)
+    }
+  }
+
+  const handleKeywordKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      const newKw = keywordInput.trim()
+      if (newKw && keywords.length < 3 && !keywords.includes(newKw)) {
+        setKeywords([...keywords, newKw])
+      }
+      setKeywordInput('')
+    }
+  }
+
+  const removeKeyword = (kwToRemove: string) => {
+    setKeywords(prev => prev.filter(kw => kw !== kwToRemove))
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!file) { setErrorMsg('Please upload a visual file before publishing.'); return }
-    if (!title.trim()) { setErrorMsg('A title is required.'); return }
+    if (!file)          { setErrorMsg('Please upload a visual file before publishing.'); return }
+    if (!title.trim())  { setErrorMsg('A title is required.'); return }
+    // ── New required field validations ───────────────────────────────────────
+    if (!sourceName.trim())          { setErrorMsg('Data Source Name is required.'); return }
+    if (selectedCategoryIds.length < 1) { setErrorMsg('Please select at least one category.'); return }
+    if (keywords.length < 1)            { setErrorMsg('Please add at least one keyword.'); return }
+    // ────────────────────────────────────────────────────────────────────────
+    if (keywords.length > 3)        { setErrorMsg('You can only add up to 3 keywords.'); return }
 
     setIsLoading(true)
     setErrorMsg('')
 
     try {
       const uploadRes = await gisvizApi.uploadVisual(file)
-      
-      const keywords = keywordString.split(',').map(k => k.trim()).filter(k => k.length > 0)
 
       const postRes = await gisvizApi.createPost({
         title,
@@ -134,9 +172,10 @@ export default function UploadPage() {
     <div className="max-w-5xl mx-auto px-4 py-8 pb-24">
       
       <div className="mb-8">
+        {/* ── Renamed from "Publish Spatial Data" to "Post a GISViz" ── */}
         <h1 className="text-[24px] font-display font-bold text-gisviz-ink flex items-center gap-3">
           <UploadCloud className="text-gisviz-accent" size={32} />
-          Publish Spatial Data
+          Post a gisviz
         </h1>
         <p className="text-gisviz-ink-soft font-mono mt-2">Upload a new visual map, dataset rendering, or dashboard to the global feed.</p>
       </div>
@@ -201,7 +240,7 @@ export default function UploadPage() {
             
             {/* Title */}
             <div>
-              <label className="block text-xs font-mono text-gisviz-ink-soft mb-2 uppercase tracking-wider">Post Title <span className="text-gisviz-alert/80">*</span></label>
+              <label className="block text-xs font-mono text-gisviz-ink-soft mb-2 uppercase tracking-wider">Post Title <span className="text-gisviz-alert">*</span></label>
               <input
                 type="text"
                 value={title}
@@ -238,8 +277,11 @@ export default function UploadPage() {
                 />
               </div>
 
+              {/* ── Source Name — now required ── */}
               <div>
-                <label className="text-xs font-mono text-gisviz-ink-soft mb-2 uppercase tracking-wider">Data Source Name</label>
+                <label className="text-xs font-mono text-gisviz-ink-soft mb-2 uppercase tracking-wider block">
+                  Data Source Name <span className="text-gisviz-alert">*</span>
+                </label>
                 <input
                   type="text"
                   value={sourceName}
@@ -263,12 +305,13 @@ export default function UploadPage() {
               </div>
             </div>
 
-            {/* Categories & Pending Selection */}
+            {/* Categories — now requires at least 1 */}
             <div>
-              <label className="block text-xs font-mono text-gisviz-ink-soft mb-2 uppercase tracking-wider">Categorization</label>
+              <label className="block text-xs font-mono text-gisviz-ink-soft mb-2 uppercase tracking-wider">
+                Categorization (Max 2) <span className="text-gisviz-alert">*</span>
+              </label>
               
               <div className="flex flex-col gap-3">
-                {/* Active Selection Display */}
                 <div className="flex flex-wrap gap-2">
                   {selectedCategoryIds.map(id => {
                     const cat = availableCategories.find(c => c.category_id === id)
@@ -282,14 +325,13 @@ export default function UploadPage() {
                   {selectedCategoryIds.length === 0 && <span className="text-xs font-mono text-gisviz-ink-soft">No categories selected.</span>}
                 </div>
                 
-                {/* Inputs Row */}
                 <div className="flex flex-col sm:flex-row gap-4 items-start">
-                  {/* Select Dropdown */}
                   <div className="flex-1 w-full">
                     <select 
                       onChange={addCategory}
-                      defaultValue=""
-                      className="w-full bg-gisviz-canvas border text-camelcase border-gisviz-border rounded-md px-3 py-2.5 text-gisviz-ink text-[12px] focus:ring-2 focus:ring-gisviz-accent outline-none font-mono"
+                      value=""
+                      disabled={selectedCategoryIds.length >= 2}
+                      className="w-full bg-gisviz-canvas border text-camelcase border-gisviz-border rounded-md px-3 py-2.5 text-gisviz-ink text-[12px] focus:ring-2 focus:ring-gisviz-accent outline-none font-mono disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <option value="" disabled>+ Add an existing Category...</option>
                       {availableCategories.map(cat => (
@@ -299,14 +341,13 @@ export default function UploadPage() {
                       ))}
                     </select>
                   </div>
-                  
-                  {/* Suggest Custom Category */}
+                   </div>
                   <div className="flex w-full sm:w-auto flex-1 gap-2">
                     <input
                       type="text"
                       value={customCategoryLabel}
                       onChange={e => setCustomCategoryLabel(e.target.value)}
-                      placeholder="Propose custom..."
+                      placeholder="Propose new category for review"
                       className="w-full bg-gisviz-canvas border border-gisviz-border text-camelcase rounded-md px-3 py-2 text-gisviz-ink font-mono text-[12px] focus:ring-1 focus:ring-gisviz-accent outline-none"
                     />
                     <button
@@ -318,24 +359,38 @@ export default function UploadPage() {
                     >
                       {isSubmittingCustom ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
                     </button>
-                  </div>
+                 
                 </div>
 
               </div>
             </div>
 
-            {/* Keywords */}
+            {/* Keywords — now requires at least 1 */}
             <div>
               <label className="block text-xs font-mono text-gisviz-ink-soft mb-2 uppercase tracking-wider flex items-center gap-1.5">
-                <Tag size={14} /> Custom Metadata Tags (Comma Separated)
+                <Tag size={14} /> Keywords (Max 3) <span className="text-gisviz-alert">*</span>
               </label>
-              <input
-                type="text"
-                value={keywordString}
-                onChange={e => setKeywordString(e.target.value)}
-                placeholder="e.g. lidar, topography, urban-planning"
-                className="w-full bg-gisviz-canvas border border-gisviz-border text-camelcase rounded-md px-4 py-2.5 text-gisviz-ink font-mono text-[12px] focus:ring-2 focus:ring-gisviz-accent outline-none"
-              />
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-wrap gap-2">
+                  {keywords.map(kw => (
+                    <span key={kw} className="flex items-center gap-1.5 px-3 py-1 bg-gisviz-accent text-white rounded-md font-mono text-xs shadow-sm text-camelcase tracking-wider">
+                      {kw}
+                      <button type="button" onClick={() => removeKeyword(kw)} className="hover:text-gisviz-alert/60"><X size={12}/></button>
+                    </span>
+                  ))}
+                  {keywords.length === 0 && <span className="text-xs font-mono text-gisviz-ink-soft">No keywords added.</span>}
+                </div>
+                
+                <input
+                  type="text"
+                  value={keywordInput}
+                  onChange={handleKeywordChange}
+                  onKeyDown={handleKeywordKeyDown}
+                  disabled={keywords.length >= 3}
+                  placeholder={keywords.length >= 3 ? "Limit reached" : "Type a keyword and press comma or enter"}
+                  className="w-full bg-gisviz-canvas border border-gisviz-border text-camelcase rounded-md px-4 py-2.5 text-gisviz-ink font-mono text-[12px] focus:ring-2 focus:ring-gisviz-accent outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+              </div>
             </div>
 
             {/* Submit */}

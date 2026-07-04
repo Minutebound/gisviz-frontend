@@ -5,7 +5,8 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
   Heart, Bookmark, Share2, MessageSquare, ArrowLeft,
-  Loader2, User, Send, CornerDownRight, Image as ImageIcon, X
+  Loader2, User, Send, CornerDownRight, Image as ImageIcon, X,
+  ThumbsUp, FileText, ExternalLink
 } from 'lucide-react'
 import { useAuth } from '../../../context/AuthContext'
 import { gisvizApi } from '../../../services/api'
@@ -31,28 +32,31 @@ export default function PostDetail() {
   const params = useParams()
   const router = useRouter()
   const postId = params.id as string
-  const { user, isAuthenticated } = useAuth() as any
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth() as any
 
-  const [post, setPost]       = useState<any>(null)
+  const [post, setPost]         = useState<any>(null)
   const [comments, setComments] = useState<CommentData[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
-  // Interaction states — no localStorage at all
-  const [isLiked, setIsLiked]             = useState(false)
-  const [likeCount, setLikeCount]         = useState(0)
-  const [isBookmarked, setIsBookmarked]   = useState(false)
-  const [likeBusy, setLikeBusy]           = useState(false)
-  const [bookmarkBusy, setBookmarkBusy]   = useState(false)
+  const [isLiked, setIsLiked]           = useState(false)
+  const [likeCount, setLikeCount]       = useState(0)
+  const [isBookmarked, setIsBookmarked] = useState(false)
+  const [likeBusy, setLikeBusy]         = useState(false)
+  const [bookmarkBusy, setBookmarkBusy] = useState(false)
 
-  const [isImageFullscreen, setIsImageFullscreen] = useState(false)
-  const [newComment, setNewComment]       = useState('')
+  const [isImageFullscreen, setIsImageFullscreen]     = useState(false)
+  const [newComment, setNewComment]                   = useState('')
   const [isSubmittingComment, setIsSubmittingComment] = useState(false)
-  const [commentError, setCommentError]   = useState('')
-  const [replyingTo, setReplyingTo]       = useState<{ id: string; handle: string } | null>(null)
-  const [isShareModalOpen, setIsShareModalOpen] = useState(false)
+  const [commentError, setCommentError]               = useState('')
+  const [replyingTo, setReplyingTo]                   = useState<{ id: string; handle: string } | null>(null)
+  const [isShareModalOpen, setIsShareModalOpen]       = useState(false)
 
-  // Fetch post + comments — no localStorage reads
   useEffect(() => {
+    if (!postId || authLoading) return
+    setIsLoading(true)
+    setIsLiked(false)
+    setIsBookmarked(false)
+
     const load = async () => {
       try {
         const [foundPost, commentsData] = await Promise.all([
@@ -62,14 +66,17 @@ export default function PostDetail() {
         setPost(foundPost)
         setLikeCount(foundPost.total_likes_count)
         setComments(commentsData)
+        if (foundPost.is_liked      != null) setIsLiked(foundPost.is_liked)
+        if (foundPost.is_bookmarked != null) setIsBookmarked(foundPost.is_bookmarked)
       } catch (err) {
         console.error('Failed to fetch post', err)
       } finally {
         setIsLoading(false)
       }
     }
-    if (postId) load()
-  }, [postId])
+    load()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [postId, isAuthenticated, authLoading])
 
   const handleLike = async () => {
     if (!isAuthenticated) { router.push('/auth'); return }
@@ -90,7 +97,6 @@ export default function PostDetail() {
     }
   }
 
-  // Bookmark — real API call, no localStorage
   const handleBookmark = async () => {
     if (!isAuthenticated) { router.push('/auth'); return }
     if (bookmarkBusy) return
@@ -126,18 +132,20 @@ export default function PostDetail() {
     }
   }
 
+  // ── Comment renderer — capped at ONE layer of replies ────────────────────
+  // isReply=true means we are already inside a reply → never recurse further.
   const renderComment = (comment: CommentData, isReply = false): React.ReactNode => {
     const avatarUrl = comment.publisher_avatar_path
       ? `${API_BASE_URL}${comment.publisher_avatar_path.startsWith('/') ? '' : '/'}${comment.publisher_avatar_path}`
       : null
     return (
-      <div key={comment.comment_id} className={`flex gap-3 ${isReply ? 'mt-3 border-l-2 border-gisviz-border/50 pl-3' : 'pt-4 first:pt-0'}`}>
+      <div key={comment.comment_id} className={`flex gap-3 ${isReply ? 'pl-3' : 'pt-4 first:pt-0'}`}>
         <div className="shrink-0 pt-1">
           {avatarUrl ? (
-            <img src={avatarUrl} alt={comment.publisher_handle} className="w-7 h-7 rounded-full object-cover border border-gisviz-border" />
+            <img src={avatarUrl} alt={comment.publisher_handle} className="w-8 h-8 rounded-full object-cover border border-gisviz-border" />
           ) : (
-            <div className="w-7 h-7 rounded-full bg-gisviz-canvas border border-gisviz-border flex items-center justify-center">
-              <User size={13} className="text-gisviz-ink-soft" />
+            <div className="w-8 h-8 rounded-full border border-gisviz-border bg-gradient-to-tr from-gisviz-accent to-gisviz-safe flex items-center justify-center text-white text-[12px] font-bold uppercase font-mono shadow-inner flex-shrink-0">
+              {comment.publisher_handle.charAt(0)}
             </div>
           )}
         </div>
@@ -146,20 +154,25 @@ export default function PostDetail() {
             <Link href={`/profile/${comment.publisher_handle}`} className="text-[12px] font-bold font-mono text-gisviz-ink hover:text-gisviz-accent transition-colors">
               @{comment.publisher_handle}
             </Link>
-            <span className="text-[10px] font-mono text-gisviz-ink-soft">
+            <span className="text-[12px] font-mono text-gisviz-ink-soft">
               {new Date(comment.created_timestamp).toLocaleDateString()}
             </span>
           </div>
           <p className="text-[12px] text-gisviz-ink leading-relaxed font-mono">{comment.content}</p>
-          {isAuthenticated && (
+
+          {/* Reply button — only shown on top-level comments, not on replies */}
+          {!isReply && isAuthenticated && (
             <button
               onClick={() => setReplyingTo({ id: comment.comment_id, handle: comment.publisher_handle })}
-              className="mt-1 text-[10px] font-mono text-gisviz-ink-soft hover:text-gisviz-accent flex items-center gap-1 transition-colors"
+              className="mt-1 text-[12px] font-mono text-gisviz-ink-soft hover:text-gisviz-accent flex items-center gap-1 transition-colors"
             >
-              <CornerDownRight size={11} /> Reply
+              <CornerDownRight size={12} /> Reply
             </button>
           )}
-          {comment.replies?.length > 0 && (
+
+          {/* Replies — only rendered when this is a top-level comment (isReply=false).
+              This hard-caps nesting at exactly one layer deep. */}
+          {!isReply && comment.replies?.length > 0 && (
             <div className="mt-2 space-y-2">
               {comment.replies.map(reply => renderComment(reply, true))}
             </div>
@@ -195,6 +208,7 @@ export default function PostDetail() {
     ? `${API_BASE_URL}${post.publisher_avatar_path.startsWith('/') ? '' : '/'}${post.publisher_avatar_path}`
     : null
   const displayHandle = post.publisher_handle || 'Unknown'
+  const isOwnPost = isAuthenticated && user && String(post.publisher_user_id) === String(user.user_id)
 
   return (
     <div className="max-w-6xl mx-auto py-8 px-4">
@@ -203,6 +217,8 @@ export default function PostDetail() {
 
         {/* Left: Visual */}
         <div className="lg:col-span-8 flex flex-col gap-6">
+
+          {/* Visual image */}
           {visualUrl && (
             <div
               className="w-full rounded-sm overflow-hidden border border-gisviz-border cursor-zoom-in shadow-sm"
@@ -212,8 +228,40 @@ export default function PostDetail() {
             </div>
           )}
 
-          {/* 3-button action row: Like · Bookmark · Share */}
-          <div className="grid grid-cols-3 gap-4">
+          {/* ── Source & Note — below the visual, above the action row ── */}
+          {(post.source_name || post.note) && (
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-1 px-1 text-[12px] font-mono text-gisviz-ink-soft border-l-2 border-gisviz-border pl-3">
+              {post.source_name && (
+                <span className="flex items-center gap-1.5">
+                  <span className="uppercase tracking-wider text-[11px]">Source</span>
+                  <span className="text-gisviz-border">·</span>
+                  {post.source_url ? (
+                    <a
+                      href={post.source_url.startsWith('http') ? post.source_url : `https://${post.source_url}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-gisviz-accent hover:underline flex items-center gap-1"
+                    >
+                      {post.source_name}
+                      <ExternalLink size={10} />
+                    </a>
+                  ) : (
+                    <span className="text-gisviz-ink font-medium">{post.source_name}</span>
+                  )}
+                </span>
+              )}
+              {post.note && (
+                <span className="flex items-center gap-1.5">
+                  <span className="uppercase tracking-wider text-[11px]">Note</span>
+                  <span className="text-gisviz-border">·</span>
+                  <span className="text-gisviz-ink">{post.note}</span>
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Action row: Like · Bookmark · Share */}
+          <div className={`grid gap-4 ${isOwnPost ? 'grid-cols-2' : 'grid-cols-3'}`}>
 
             {/* Like */}
             <button
@@ -225,25 +273,27 @@ export default function PostDetail() {
             >
               {likeBusy
                 ? <Loader2 size={18} className="animate-spin" />
-                : <Heart size={18} className={isLiked ? 'fill-current' : ''} />
+                : <ThumbsUp size={18} className={isLiked ? 'fill-current' : ''} />
               }
-              <span>{likeCount > 0 ? likeCount : ''} {isLiked ? 'Liked' : 'Like'}</span>
+              <span>{likeCount > 0 ? likeCount : ''}</span>
             </button>
 
-            {/* Bookmark — API-backed */}
-            <button
-              onClick={handleBookmark}
-              disabled={bookmarkBusy}
-              className={`bg-gisviz-card border border-gisviz-border py-3 rounded-sm shadow-sm flex items-center justify-center gap-2 font-mono text-[12px] uppercase tracking-wider transition-colors disabled:opacity-50 ${
-                isBookmarked ? 'text-gisviz-accent bg-gisviz-accent/5 border-gisviz-accent/40' : 'text-gisviz-ink hover:text-gisviz-accent'
-              }`}
-            >
-              {bookmarkBusy
-                ? <Loader2 size={18} className="animate-spin" />
-                : <Bookmark size={18} className={isBookmarked ? 'fill-current' : ''} />
-              }
-              <span>{isBookmarked ? 'Bookmarked' : 'Bookmark'}</span>
-            </button>
+            {/* Bookmark — hidden on own posts */}
+            {!isOwnPost && (
+              <button
+                onClick={handleBookmark}
+                disabled={bookmarkBusy}
+                className={`bg-gisviz-card border border-gisviz-border py-3 rounded-sm shadow-sm flex items-center justify-center gap-2 font-mono text-[12px] uppercase tracking-wider transition-colors disabled:opacity-50 ${
+                  isBookmarked ? 'text-gisviz-accent bg-gisviz-accent/5 border-gisviz-accent/40' : 'text-gisviz-ink hover:text-gisviz-accent'
+                }`}
+              >
+                {bookmarkBusy
+                  ? <Loader2 size={18} className="animate-spin" />
+                  : <Bookmark size={18} className={isBookmarked ? 'fill-current' : ''} />
+                }
+                <span>{isBookmarked ? 'Bookmarked' : 'Bookmark'}</span>
+              </button>
+            )}
 
             {/* Share */}
             <button
@@ -288,8 +338,8 @@ export default function PostDetail() {
                 {avatarUrl ? (
                   <img src={avatarUrl} alt={displayHandle} className="w-9 h-9 rounded-full object-cover border border-gisviz-border" />
                 ) : (
-                  <div className="w-9 h-9 rounded-full bg-gisviz-canvas border border-gisviz-border flex items-center justify-center">
-                    <User size={16} className="text-gisviz-ink-soft" />
+                  <div className="w-10 h-10 rounded-full border border-gisviz-border bg-gradient-to-tr from-gisviz-accent to-gisviz-safe flex items-center justify-center text-white text-[16px] font-bold uppercase font-mono shadow-inner flex-shrink-0">
+                    {post.publisher_handle.charAt(0)}
                   </div>
                 )}
               </Link>
@@ -300,7 +350,7 @@ export default function PostDetail() {
             {post.keywords?.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
                 {post.keywords.map((kw: any) => (
-                  <span key={kw.keyword_id} className="px-2 py-0.5 bg-gisviz-canvas border border-gisviz-border rounded text-[10px] font-mono text-gisviz-ink-soft">
+                  <span key={kw.keyword_id} className="px-2 py-0.5 bg-gisviz-canvas border border-gisviz-border rounded text-[12px] font-mono text-gisviz-ink-soft">
                     {kw.word}
                   </span>
                 ))}
@@ -325,54 +375,65 @@ export default function PostDetail() {
 
             {/* Comment input */}
             {isAuthenticated ? (
-              <form onSubmit={handlePostComment} className="mt-4 shrink-0">
+              <div className="shrink-0 mt-4 pt-4 border-t border-gisviz-border">
                 {replyingTo && (
-                  <div className="flex items-center justify-between text-[11px] font-mono text-gisviz-ink-soft mb-2 bg-gisviz-canvas rounded px-3 py-1.5">
-                    <span>Replying to <span className="font-bold text-gisviz-accent">@{replyingTo.handle}</span></span>
-                    <button type="button" onClick={() => setReplyingTo(null)}><X size={12} /></button>
+                  <div className="mb-2 flex items-center justify-between text-[12px] font-mono text-gisviz-ink-soft bg-gisviz-canvas px-3 py-1.5 rounded-md">
+                    <span>Replying to @{replyingTo.handle}</span>
+                    <button onClick={() => setReplyingTo(null)}><X size={12} /></button>
                   </div>
                 )}
-                <div className="flex gap-2">
+                {commentError && (
+                  <p className="text-[11px] text-gisviz-alert font-mono mb-2">{commentError}</p>
+                )}
+                <form onSubmit={handlePostComment} className="flex gap-2">
                   <input
-                    type="text"
                     value={newComment}
                     onChange={e => setNewComment(e.target.value)}
-                    placeholder="Add a comment…"
-                    className="flex-1 bg-gisviz-canvas border border-gisviz-border rounded-md px-3 py-2 text-[12px] font-mono text-gisviz-ink focus:ring-2 focus:ring-gisviz-accent outline-none"
+                    placeholder="Write a comment…"
+                    className="flex-1 bg-gisviz-canvas border border-gisviz-border rounded-md px-3 py-2 text-[12px] font-mono text-gisviz-ink focus:ring-1 focus:ring-gisviz-accent outline-none"
                   />
                   <button
                     type="submit"
                     disabled={isSubmittingComment || !newComment.trim()}
-                    className="px-3 py-2 bg-gisviz-accent text-white rounded-md hover:bg-gisviz-accent/90 disabled:opacity-50 transition-colors"
+                    className="bg-gisviz-accent text-white px-3 py-2 rounded-md disabled:opacity-50 flex items-center"
                   >
                     {isSubmittingComment ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
                   </button>
-                </div>
-                {commentError && (
-                  <p className="mt-2 text-[11px] font-mono text-gisviz-alert">{commentError}</p>
-                )}
-              </form>
+                </form>
+              </div>
             ) : (
-              <p className="mt-4 text-[11px] font-mono text-gisviz-ink-soft text-center shrink-0">
-                <Link href="/auth" className="text-gisviz-accent hover:underline">Log in</Link> to comment
-              </p>
+              <div className="shrink-0 mt-4 pt-4 border-t border-gisviz-border">
+                <Link href="/auth" className="text-[12px] font-mono text-gisviz-accent hover:underline">
+                  Sign in to comment
+                </Link>
+              </div>
             )}
           </div>
         </div>
       </div>
 
-      {/* Fullscreen image */}
+      {/* Fullscreen overlay */}
       {isImageFullscreen && visualUrl && (
-        <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4" onClick={() => setIsImageFullscreen(false)}>
-          <button className="absolute top-4 right-4 text-white/70 hover:text-white"><X size={24} /></button>
-          <img src={visualUrl} alt={post.title} className="max-w-full max-h-full object-contain rounded-sm shadow-2xl" />
+        <div
+          className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4"
+          onClick={() => setIsImageFullscreen(false)}
+        >
+          <button className="absolute top-4 right-4 text-white hover:text-gisviz-accent transition-colors">
+            <X size={28} />
+          </button>
+          <img
+            src={visualUrl}
+            alt={post.title}
+            className="max-w-full max-h-full object-contain rounded-sm"
+            onClick={e => e.stopPropagation()}
+          />
         </div>
       )}
 
       <ShareModal
         isOpen={isShareModalOpen}
         onClose={() => setIsShareModalOpen(false)}
-        url={`${typeof window !== 'undefined' ? window.location.origin : ''}/post/${post.post_id}`}
+        url={`${typeof window !== 'undefined' ? window.location.origin : ''}/post/${postId}`}
         title={post.title}
       />
     </div>

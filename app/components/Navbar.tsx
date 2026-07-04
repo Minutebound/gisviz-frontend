@@ -2,12 +2,12 @@
 
 import React, { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { Home, User, LogOut, Sun, Moon, Menu, X, LogIn, Settings } from 'lucide-react'
+import { Home, User, LogOut, Sun, Moon, Menu, X, LogIn, Settings, Notebook, Phone, ChartArea } from 'lucide-react'
 import Sidebar from './Sidebar'
 import Logo from './Logo'
 import { useAuth } from '../../context/AuthContext'
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL 
 
 export default function Navbar() {
   const { user, isAuthenticated, logoutSession, isLoading } = useAuth()
@@ -96,11 +96,11 @@ export default function Navbar() {
             </button>
 
             {!mounted || isLoading ? (
-              <div className="w-8 h-8 rounded-full bg-gisviz-border animate-pulse" />
+              <div className="w-10 h-10 rounded-full bg-gisviz-border animate-pulse" />
             ) : isAuthenticated ? (
               <div className="relative" ref={dropdownRef}>
                 <div
-                  className="w-8 h-8 rounded-full border border-gisviz-border cursor-pointer shadow-sm overflow-hidden flex items-center justify-center bg-gisviz-canvas hover:ring-2 hover:ring-gisviz-accent hover:ring-offset-2 hover:ring-offset-gisviz-canvas transition-all relative"
+                  className="w-10 h-10 rounded-full border border-gisviz-border cursor-pointer shadow-sm overflow-hidden flex items-center justify-center bg-gisviz-canvas hover:ring-2 hover:ring-gisviz-accent hover:ring-offset-2 hover:ring-offset-gisviz-canvas transition-all relative"
                   onClick={() => setIsProfileOpen(!isProfileOpen)}
                   aria-label="Toggle Profile Menu"
                 >
@@ -121,7 +121,14 @@ export default function Navbar() {
                 {isProfileOpen && (
                   <div className="absolute top-10 right-0 w-48 bg-gisviz-card border border-gisviz-border rounded-xl shadow-lg flex flex-col z-50 plate-enter">
                     <div className=" text-[16px] px-4 py-2 border-b border-gisviz-border">
-                     <p className="font-bold text-gisviz-accent/80">@{displayHandle}</p>
+                     <p className="font-bold text-gisviz-accent">@{displayHandle}</p>
+                     <Link 
+                      href={`/profile/${displayHandle}`} 
+                      onClick={() => setIsProfileOpen(false)}
+                      className="flex items-center gap-3 px-1 py-1 hover:text-gisviz-accent text-[12px] text-gisviz-ink transition-colors"
+                    >
+                    <span>View Profile</span>
+                    </Link>
                     </div>
                     
                     <Link 
@@ -131,16 +138,6 @@ export default function Navbar() {
                     >
                       <Home size={16} /> Home
                     </Link>
-                    
-                    <Link 
-                      href={`/profile/${displayHandle}`} 
-                      onClick={() => setIsProfileOpen(false)}
-                      className="flex items-center gap-3 px-4 py-2 hover:bg-gisviz-canvas hover:text-gisviz-accent text-[16px] text-gisviz-ink transition-colors"
-                    >
-                      <User size={16} /> Profile
-                    </Link>
-
-                    <div className="border-t border-gisviz-border my-2"></div>
                     
                     <Link 
                       href="/settings" 
@@ -156,6 +153,15 @@ export default function Navbar() {
                     >
                       <LogOut size={16} /> Sign out
                     </button>
+
+                    <Link 
+                      href="/" 
+                      onClick={() => setIsProfileOpen(false)}
+                      className="flex items-center gap-3 px-4 py-2 hover:bg-gisviz-canvas rounded-b-xl hover:text-gisviz-accent text-[16px] text-gisviz-ink transition-colors"
+                    >
+                      <ChartArea size={16} /> Help & Support
+                    </Link>
+
                   </div>
                 )}
               </div>

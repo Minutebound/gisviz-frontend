@@ -6,7 +6,7 @@ import { Search, X, Loader2, User, FileText, Tag, FolderOpen } from 'lucide-reac
 import { gisvizApi } from '@/services/api'
 
 // Strip /api/v1 so avatar paths resolve to the backend root
-const RAW_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
+const RAW_API_URL = process.env.NEXT_PUBLIC_API_URL 
 const API_BASE_URL = RAW_API_URL.replace('/api/v1', '').replace(/\/$/, '')
 
 const getAvatarUrl = (path: string | null | undefined): string | null => {
@@ -34,10 +34,10 @@ function SectionHeader({ icon, label, count }: { icon: React.ReactNode; label: s
   return (
     <div className="flex items-center gap-2 px-4 py-2 border-b border-gisviz-border/40">
       <span className="text-gisviz-accent">{icon}</span>
-      <span className="text-[10px] font-mono font-bold text-gisviz-ink-soft uppercase tracking-widest">
+      <span className="text-[12px] font-mono font-bold text-gisviz-ink-soft uppercase tracking-widest">
         {label}
       </span>
-      <span className="ml-auto text-[10px] font-mono text-gisviz-ink-soft/60">{count}</span>
+      <span className="ml-auto text-[12px] font-mono text-gisviz-ink-soft/60">{count}</span>
     </div>
   )
 }
@@ -183,7 +183,7 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
               {/* USERS */}
               {results.users.length > 0 && (
                 <div>
-                  <SectionHeader icon={<User size={12} />} label="Analysts" count={results.users.length} />
+                  <SectionHeader icon={<User size={12} />} label="User Handles" count={results.users.length} />
                   <ul className="p-2 space-y-0.5">
                     {results.users.map(u => {
                       const avatarUrl = getAvatarUrl(u.avatar_path)
@@ -292,7 +292,7 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
             <div className="py-10 text-center">
               <Search size={28} className="mx-auto text-gisviz-ink-soft/30 mb-3" />
               <p className="text-[12px] font-mono text-gisviz-ink-soft/60">
-                Search across posts, analysts, categories, and tags
+                Search across posts, User Handles, categories, and tags
               </p>
             </div>
           )}
@@ -300,7 +300,7 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
 
         {/* Footer hint */}
         <div className="px-4 py-2 border-t border-gisviz-border/40 bg-gisviz-canvas/50 flex items-center gap-4">
-          <span className="text-[10px] font-mono text-gisviz-ink-soft/50">
+          <span className="text-[12px] font-mono text-gisviz-ink-soft/50">
             <kbd className="px-1.5 py-0.5 rounded bg-gisviz-border/40 text-[9px]">ESC</kbd> to close
           </span>
         </div>
