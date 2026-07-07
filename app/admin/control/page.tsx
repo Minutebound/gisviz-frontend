@@ -1,36 +1,42 @@
 'use client'
-
+ 
 import React, { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
-  ShieldCheck, Tag, Users, Hash, FileText, Flag,
+  ShieldCheck, Tag, Users, FileText, Flag,
   MessageSquare, UserX, KeyRound, Plus, Trash2,
   Edit2, X, Check, Loader2, Search, ChevronDown,
   ToggleLeft, ToggleRight, ExternalLink, RefreshCw,
   AlertTriangle, ArrowUpRight, Save, Shield,
+  Activity, BarChart2,
 } from 'lucide-react'
 import { useAuth } from '../../../context/AuthContext'
 import { gisvizApi } from '../../../services/api'
 import AccessRestricted from '../../components/AccessRestricted'
-
-type Tab = 'categories' | 'users' | 'keywords' | 'posts' | 'reports' | 'comments' | 'unverified' | 'roles'
-
+import AccessControlPanel from './AccessControlPanel'
+ 
+type Tab = 'categories' | 'users' | 'posts' | 'reports' | 'comments' | 'unverified' | 'roles'
+ 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'categories', label: 'Categories', icon: <Tag size={14} /> },
   { id: 'users',      label: 'Users',      icon: <Users size={14} /> },
-  { id: 'keywords',   label: 'Keywords',   icon: <Hash size={14} /> },
   { id: 'posts',      label: 'Posts',      icon: <FileText size={14} /> },
   { id: 'reports',    label: 'Reports',    icon: <Flag size={14} /> },
   { id: 'comments',   label: 'Comments',   icon: <MessageSquare size={14} /> },
   { id: 'unverified', label: 'Unverified', icon: <UserX size={14} /> },
-  { id: 'roles',      label: 'Roles',      icon: <KeyRound size={14} /> },
+  { id: 'roles',      label: 'Access & Roles', icon: <KeyRound size={14} /> },
 ]
-
+ 
+const VALID_TABS: Tab[] = ['categories','users','posts','reports','comments','unverified','roles']
+ 
 const ALL_ROLES = ['viewer', 'publisher', 'editor', 'support', 'admin']
-
-// ─── Shared micro-components ──────────────────────────────────────────────────
-
+ 
+/* ─── Shared micro-components (Badge, ConfirmBtn, Panel, EmptyState, Spinner)
+   KEEP your existing definitions from the current file — they are unchanged.
+   They're shown here only so the file remains complete if you paste top-down.
+   If you are pasting ONLY the page-root function, skip re-declaring these. ─── */
+ 
 const Badge = ({ children, color = 'default' }: { children: React.ReactNode; color?: string }) => {
   const cls: Record<string, string> = {
     admin:     'bg-red-100 text-red-700 border-red-200',
@@ -49,9 +55,7 @@ const Badge = ({ children, color = 'default' }: { children: React.ReactNode; col
     </span>
   )
 }
-
-// Two-step confirm delete button — each instance has its own local state
-// so one confirmation never accidentally triggers another row's delete.
+ 
 function ConfirmBtn({ onConfirm, busy }: { onConfirm: () => void; busy?: boolean }) {
   const [confirming, setConfirming] = useState(false)
   if (!confirming) return (
@@ -73,7 +77,7 @@ function ConfirmBtn({ onConfirm, busy }: { onConfirm: () => void; busy?: boolean
     </div>
   )
 }
-
+ 
 function Panel({ title, icon, count, actions, children }: {
   title: string; icon: React.ReactNode; count?: number | string;
   actions?: React.ReactNode; children: React.ReactNode
@@ -91,43 +95,50 @@ function Panel({ title, icon, count, actions, children }: {
     </div>
   )
 }
-
+ 
 const EmptyState = ({ text }: { text: string }) => (
   <div className="py-12 text-center text-[12px] font-mono text-gisviz-ink-soft">{text}</div>
 )
 const Spinner = () => (
   <div className="flex justify-center py-12"><Loader2 size={24} className="animate-spin text-gisviz-accent" /></div>
 )
-
+ 
 // ─── Page root ────────────────────────────────────────────────────────────────
-
+ 
 export default function AdminControlPage() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth() as any
   const router = useRouter()
-
+  const searchParams = useSearchParams()
+ 
   const [activeTab, setActiveTab] = useState<Tab>('categories')
   const [ddOpen, setDdOpen]       = useState(false)
   const [globalErr, setGlobalErr] = useState('')
-
+ 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) router.push('/auth')
   }, [authLoading, isAuthenticated, router])
-
+ 
+  // Deep-link support: /admin/control?tab=users opens that tab
+  useEffect(() => {
+    const t = searchParams.get('tab') as Tab | null
+    if (t && VALID_TABS.includes(t)) setActiveTab(t)
+  }, [searchParams])
+ 
   if (authLoading) return (
     <div className="flex justify-center items-center h-[calc(100vh-4rem)]">
       <Loader2 size={32} className="animate-spin text-gisviz-accent" />
     </div>
   )
-
+ 
   if (!user || user.role_name !== 'admin') {
     return <AccessRestricted requiredRoles={['admin']} currentRole={user?.role_name} backHref="/" backLabel="Return to Feed" />
   }
-
+ 
   const meta = TABS.find(t => t.id === activeTab)!
-
+ 
   return (
     <div className="max-w-6xl mx-auto py-8 px-4 pb-20">
-
+ 
       <div className="flex items-start justify-between gap-4 mb-8 flex-wrap">
         <div>
           <h1 className="text-[24px] font-display font-bold text-gisviz-ink flex items-center gap-3">
@@ -137,11 +148,22 @@ export default function AdminControlPage() {
             Platform management — <Badge color="admin">admin</Badge> only
           </p>
         </div>
-        <div className="flex items-center gap-3">
+ 
+        {/* ── Header nav: Admin Home + Analytics + Activity + tab dropdown ── */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <Link href="/admin"
+            className="px-4 py-2 bg-gisviz-canvas border border-gisviz-border rounded-md font-mono text-[12px] text-gisviz-ink hover:border-gisviz-accent transition-colors flex items-center gap-1.5">
+            <ArrowUpRight size={14} /> Admin Home
+          </Link>
           <Link href="/admin/analytics"
             className="px-4 py-2 bg-gisviz-canvas border border-gisviz-border rounded-md font-mono text-[12px] text-gisviz-ink hover:border-gisviz-accent transition-colors flex items-center gap-1.5">
-            <ArrowUpRight size={14} /> Analytics
+            <BarChart2 size={14} /> Analytics
           </Link>
+          <Link href="/admin/activity"
+            className="px-4 py-2 bg-gisviz-canvas border border-gisviz-border rounded-md font-mono text-[12px] text-gisviz-ink hover:border-gisviz-accent transition-colors flex items-center gap-1.5">
+            <Activity size={14} /> Activity
+          </Link>
+ 
           <div className="relative">
             <button onClick={() => setDdOpen(p => !p)}
               className="flex items-center gap-2 bg-gisviz-card border border-gisviz-border px-4 py-2 rounded-md font-mono text-[12px] text-gisviz-ink shadow-sm hover:border-gisviz-accent transition-colors min-w-[160px] justify-between">
@@ -163,22 +185,21 @@ export default function AdminControlPage() {
           </div>
         </div>
       </div>
-
+ 
       {globalErr && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md text-[12px] font-mono text-gisviz-alert flex items-center justify-between">
           {globalErr}
           <button onClick={() => setGlobalErr('')}><X size={14} /></button>
         </div>
       )}
-
+ 
       {activeTab === 'categories' && <CategoriesPanel onError={setGlobalErr} />}
       {activeTab === 'users'      && <UsersPanel      onError={setGlobalErr} adminUser={user} />}
-      {activeTab === 'keywords'   && <KeywordsPanel   onError={setGlobalErr} />}
       {activeTab === 'posts'      && <PostsPanel      onError={setGlobalErr} />}
       {activeTab === 'reports'    && <ReportsPanel    onError={setGlobalErr} />}
       {activeTab === 'comments'   && <CommentsPanel   onError={setGlobalErr} />}
       {activeTab === 'unverified' && <UnverifiedPanel onError={setGlobalErr} />}
-      {activeTab === 'roles'      && <RolesPanel      onError={setGlobalErr} />}
+      {activeTab === 'roles'      && <AccessControlPanel onError={setGlobalErr} />}
     </div>
   )
 }
@@ -460,76 +481,7 @@ function UsersPanel({ onError, adminUser }: { onError: (e: string) => void; admi
   )
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// KEYWORDS
-// ─────────────────────────────────────────────────────────────────────────────
-function KeywordsPanel({ onError }: { onError: (e: string) => void }) {
-  const [data, setData]     = useState<any>(null)
-  const [loading, setLoading] = useState(true)
-  const [busy, setBusy]     = useState<number | null>(null)
-  const [filter, setFilter] = useState('')
-
-  const load = useCallback(async () => {
-    setLoading(true)
-    try { setData(await gisvizApi.fetchAllKeywords()) }
-    catch { onError('Failed to load keywords') }
-    finally { setLoading(false) }
-  }, [onError])
-
-  useEffect(() => { load() }, [load])
-
-  const filtered = (data?.keywords || []).filter((k: any) =>
-    !filter || k.word.includes(filter.toLowerCase())
-  )
-
-  return (
-    <Panel title="Keywords" icon={<Hash size={14} />} count={data?.total ?? '…'}
-      actions={
-        <div className="flex gap-2 items-center">
-          <button onClick={load} title="Refresh"
-            className="p-1.5 rounded hover:bg-gisviz-canvas text-gisviz-ink-soft hover:text-gisviz-ink transition-colors">
-            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-          </button>
-          <div className="relative">
-            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gisviz-ink-soft" />
-            <input value={filter} onChange={e => setFilter(e.target.value)} placeholder="Filter…"
-              className="pl-8 pr-3 py-1.5 bg-gisviz-canvas border border-gisviz-border rounded text-[12px] font-mono text-gisviz-ink focus:ring-1 focus:ring-gisviz-accent outline-none w-40" />
-          </div>
-        </div>
-      }
-    >
-      {loading ? <Spinner /> : (
-        <div className="p-6">
-          {filtered.length === 0
-            ? <EmptyState text="No keywords match." />
-            : (
-              <div className="flex flex-wrap gap-2">
-                {filtered.map((kw: any) => (
-                  <div key={kw.keyword_id} className="flex items-center gap-1.5 px-3 py-1.5 bg-gisviz-canvas border border-gisviz-border rounded-full font-mono text-[12px] text-gisviz-ink">
-                    <Hash size={10} className="text-gisviz-ink-soft shrink-0" />
-                    <span>{kw.word}</span>
-                    <span className="text-gisviz-ink-soft text-[10px]">({kw.usage_count})</span>
-                    <ConfirmBtn
-                      onConfirm={() => {
-                        setBusy(kw.keyword_id)
-                        gisvizApi.deleteKeyword(kw.keyword_id)
-                          .then(load)
-                          .catch((e: any) => onError(e.response?.data?.detail || 'Delete failed'))
-                          .finally(() => setBusy(null))
-                      }}
-                      busy={busy === kw.keyword_id}
-                    />
-                  </div>
-                ))}
-              </div>
-            )
-          }
-        </div>
-      )}
-    </Panel>
-  )
-}
-
+ 
 // ─────────────────────────────────────────────────────────────────────────────
 // POSTS
 // ─────────────────────────────────────────────────────────────────────────────
@@ -597,8 +549,8 @@ function PostsPanel({ onError }: { onError: (e: string) => void }) {
                     <td className="px-4 py-3 text-right text-gisviz-ink-soft hidden sm:table-cell">{p.total_likes_count}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
-                        {/* ↓ FIX: correct edit URL /post/edit/[id] not /post/[id]/edit */}
-                        <Link href={`/post/edit/${p.post_id}`}
+                        {/* ↓ FIX: correct edit URL /post/[id]/edit not /post/[id]/edit */}
+                        <Link href={`/post/${p.post_id}/edit`}
                           className="p-1.5 rounded text-gisviz-ink-soft hover:text-gisviz-accent hover:bg-gisviz-canvas transition-colors" title="Edit">
                           <Edit2 size={14} />
                         </Link>
@@ -635,39 +587,51 @@ function PostsPanel({ onError }: { onError: (e: string) => void }) {
 // REPORTS
 // ─────────────────────────────────────────────────────────────────────────────
 function ReportsPanel({ onError }: { onError: (e: string) => void }) {
-  const [reports, setReports] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const [busy, setBusy]       = useState<string | null>(null)
-  const [filter, setFilter]   = useState<'all' | 'open' | 'resolved' | 'dismissed'>('all')
-
+  const [reports, setReports]   = useState<any[]>([])
+  const [loading, setLoading]   = useState(true)
+  const [busy, setBusy]         = useState<string | null>(null)
+  const [filter, setFilter]     = useState<'all' | 'open' | 'resolved' | 'dismissed'>('all')
+ 
   const load = useCallback(async () => {
     setLoading(true)
     try { setReports(await gisvizApi.fetchReports()) }
     catch { onError('Failed to load reports') }
     finally { setLoading(false) }
   }, [onError])
-
+ 
   useEffect(() => { load() }, [load])
-
-  const act = (id: string, status: string) => {
-    setBusy(id)
-    gisvizApi.updateReportStatus(id, status as any)
-      .then(load)
-      .catch((e: any) => onError(e.response?.data?.detail || 'Failed'))
-      .finally(() => setBusy(null))
+ 
+  // Generic action runner: sets busy key, runs fn, reloads, clears busy
+  const act = async (key: string, fn: () => Promise<any>, reload = true) => {
+    setBusy(key)
+    try {
+      await fn()
+      if (reload) await load()
+    } catch (e: any) {
+      onError(e?.response?.data?.detail || 'Action failed')
+    } finally {
+      setBusy(null)
+    }
   }
-
+ 
   const visible = reports.filter(r => filter === 'all' || r.status === filter)
-
+ 
   return (
-    <Panel title="Reports" icon={<Flag size={14} />} count={reports.length}
+    <Panel
+      title="Reports"
+      icon={<Flag size={14} />}
+      count={reports.length}
       actions={
-        <div className="flex gap-1 items-center flex-wrap">
+        <div className="flex items-center gap-1 flex-wrap">
           {(['all', 'open', 'resolved', 'dismissed'] as const).map(f => (
             <button key={f} onClick={() => setFilter(f)}
-              className={`px-2.5 py-1 rounded text-[11px] font-mono transition-colors ${
-                filter === f ? 'bg-gisviz-accent text-white' : 'bg-gisviz-canvas border border-gisviz-border text-gisviz-ink-soft hover:text-gisviz-ink'
-              }`}>{f}</button>
+              className={`px-2.5 py-1 rounded text-[11px] font-mono transition-colors capitalize ${
+                filter === f
+                  ? 'bg-gisviz-accent text-white'
+                  : 'bg-gisviz-canvas border border-gisviz-border text-gisviz-ink-soft hover:text-gisviz-ink'
+              }`}>
+              {f}
+            </button>
           ))}
           <button onClick={load} title="Refresh"
             className="p-1.5 ml-1 rounded hover:bg-gisviz-canvas text-gisviz-ink-soft hover:text-gisviz-ink transition-colors">
@@ -676,50 +640,173 @@ function ReportsPanel({ onError }: { onError: (e: string) => void }) {
         </div>
       }
     >
-      {loading ? <Spinner /> : visible.length === 0
-        ? <EmptyState text="No reports match this filter." />
-        : (
-          <table className="w-full text-[12px] font-mono">
-            <thead><tr className="border-b border-gisviz-border">
-              <th className="text-left px-6 py-3 text-gisviz-ink-soft uppercase tracking-wider">Post</th>
-              <th className="text-left px-4 py-3 text-gisviz-ink-soft uppercase tracking-wider hidden md:table-cell">Reason</th>
-              <th className="text-left px-4 py-3 text-gisviz-ink-soft uppercase tracking-wider hidden sm:table-cell">Status</th>
-              <th className="px-4 py-3 w-44"></th>
-            </tr></thead>
-            <tbody className="divide-y divide-gisviz-border/50">
-              {visible.map((r: any) => (
-                <tr key={r.report_id} className="hover:bg-gisviz-canvas/30 transition-colors">
-                  <td className="px-6 py-3">
-                    <Link href={`/post/${r.post_id}`} target="_blank" className="text-gisviz-accent hover:underline flex items-center gap-1">
-                      View Post <ExternalLink size={10} />
-                    </Link>
-                    <div className="text-[10px] text-gisviz-ink-soft mt-0.5">{new Date(r.created_timestamp).toLocaleDateString()}</div>
-                  </td>
-                  <td className="px-4 py-3 text-gisviz-ink-soft hidden md:table-cell max-w-xs">
-                    <span className="line-clamp-2">{r.reason}</span>
-                  </td>
-                  <td className="px-4 py-3 hidden sm:table-cell"><Badge color={r.status}>{r.status}</Badge></td>
-                  <td className="px-4 py-3">
-                    {r.status === 'open' && (
-                      <div className="flex items-center gap-1 justify-end">
-                        <button onClick={() => act(r.report_id, 'resolved')} disabled={!!busy}
-                          className="flex items-center gap-1 px-2 py-1 bg-green-50 text-green-700 border border-green-200 rounded text-[11px] font-mono hover:bg-green-100 transition-colors disabled:opacity-50">
-                          {busy === r.report_id ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />} Resolve
-                        </button>
-                        <button onClick={() => act(r.report_id, 'dismissed')} disabled={!!busy}
-                          className="flex items-center gap-1 px-2 py-1 bg-gisviz-canvas border border-gisviz-border rounded text-[11px] font-mono text-gisviz-ink-soft hover:text-gisviz-ink transition-colors disabled:opacity-50">
-                          <X size={11} /> Dismiss
-                        </button>
-                      </div>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )
-      }
+      {loading ? (
+        <Spinner />
+      ) : visible.length === 0 ? (
+        <EmptyState text={filter === 'all' ? 'No reports yet.' : `No ${filter} reports.`} />
+      ) : (
+        <div className="divide-y divide-gisviz-border/50">
+          {visible.map(r => (
+            <ReportRow
+              key={r.report_id}
+              report={r}
+              busy={busy}
+              onResolve={() => act(`res-${r.report_id}`, () =>
+                gisvizApi.updateReportStatus(r.report_id, 'resolved'))}
+              onDismiss={() => act(`dis-${r.report_id}`, () =>
+                gisvizApi.updateReportStatus(r.report_id, 'dismissed'))}
+              onDeactivateUser={() => act(`deact-${r.reporter_user_id}`, () =>
+                gisvizApi.setUserStatus(r.reporter_user_id, false))}
+              onDeletePost={() => act(`delpost-${r.post_id}`, () =>
+                gisvizApi.adminDeletePost(r.post_id))}
+            />
+          ))}
+        </div>
+      )}
     </Panel>
+  )
+}
+ 
+// ── ReportRow — one report with its action toolbar ───────────────────────────
+function ReportRow({
+  report: r,
+  busy,
+  onResolve, onDismiss, onDeactivateUser, onDeletePost,
+}: {
+  report: any; busy: string | null;
+  onResolve: () => void; onDismiss: () => void;
+  onDeactivateUser: () => void; onDeletePost: () => void;
+}) {
+  const [confirmDeact, setConfirmDeact] = useState(false)
+  const [confirmDel,   setConfirmDel]   = useState(false)
+ 
+  const isBusy = (key: string) => busy === key
+ 
+  return (
+    <div className="px-5 py-4 hover:bg-gisviz-canvas/30 transition-colors">
+ 
+      {/* ── Report metadata ── */}
+      <div className="flex items-start gap-3 mb-3">
+        <Flag size={14} className={`mt-0.5 shrink-0 ${
+          r.status === 'open' ? 'text-yellow-500' :
+          r.status === 'resolved' ? 'text-green-600' : 'text-gisviz-ink-soft'
+        }`} />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap mb-1">
+            <Badge color={r.status}>{r.status}</Badge>
+            <span className="text-[11px] font-mono text-gisviz-ink-soft">
+              {new Date(r.created_timestamp).toLocaleDateString()}
+            </span>
+            {r.post_id && (
+              <Link href={`/post/${r.post_id}`} target="_blank"
+                className="text-[11px] font-mono text-gisviz-accent hover:underline flex items-center gap-0.5">
+                View post <ExternalLink size={10} />
+              </Link>
+            )}
+          </div>
+          <p className="text-[12px] font-mono text-gisviz-ink">
+            <span className="text-gisviz-ink-soft">Reason: </span>{r.reason}
+          </p>
+          {r.reporter_user_id && (
+            <p className="text-[11px] font-mono text-gisviz-ink-soft mt-0.5">
+              Reporter ID: <code className="text-gisviz-ink">{String(r.reporter_user_id).slice(0, 8)}…</code>
+            </p>
+          )}
+        </div>
+      </div>
+ 
+      {/* ── Action toolbar ── */}
+      <div className="flex items-center gap-2 flex-wrap pl-[22px]">
+ 
+        {/* Resolve */}
+        {r.status !== 'resolved' && (
+          <button
+            onClick={onResolve}
+            disabled={!!busy}
+            className="flex items-center gap-1.5 px-3 py-1 rounded text-[11px] font-mono bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 transition-colors disabled:opacity-40"
+          >
+            {isBusy(`res-${r.report_id}`)
+              ? <Loader2 size={11} className="animate-spin" />
+              : <Check size={11} />}
+            Resolve
+          </button>
+        )}
+ 
+        {/* Dismiss */}
+        {r.status !== 'dismissed' && (
+          <button
+            onClick={onDismiss}
+            disabled={!!busy}
+            className="flex items-center gap-1.5 px-3 py-1 rounded text-[11px] font-mono bg-gisviz-canvas text-gisviz-ink-soft border border-gisviz-border hover:text-gisviz-ink transition-colors disabled:opacity-40"
+          >
+            {isBusy(`dis-${r.report_id}`)
+              ? <Loader2 size={11} className="animate-spin" />
+              : <X size={11} />}
+            Dismiss
+          </button>
+        )}
+ 
+        {/* Deactivate the reporter */}
+        {r.reporter_user_id && (
+          confirmDeact ? (
+            <div className="flex items-center gap-1">
+              <span className="text-[11px] font-mono text-gisviz-ink-soft">Deactivate reporter?</span>
+              <button
+                onClick={() => { setConfirmDeact(false); onDeactivateUser() }}
+                disabled={!!busy}
+                className="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-mono bg-yellow-50 text-yellow-700 border border-yellow-200 hover:bg-yellow-100 transition-colors disabled:opacity-40">
+                {isBusy(`deact-${r.reporter_user_id}`)
+                  ? <Loader2 size={11} className="animate-spin" />
+                  : <Check size={11} />}
+                Yes
+              </button>
+              <button onClick={() => setConfirmDeact(false)}
+                className="px-2 py-0.5 rounded text-[11px] font-mono bg-gisviz-canvas border border-gisviz-border text-gisviz-ink-soft hover:text-gisviz-ink transition-colors">
+                No
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setConfirmDeact(true)}
+              disabled={!!busy}
+              className="flex items-center gap-1.5 px-3 py-1 rounded text-[11px] font-mono bg-yellow-50 text-yellow-700 border border-yellow-200 hover:bg-yellow-100 transition-colors disabled:opacity-40"
+            >
+              <ToggleLeft size={12} /> Deactivate User
+            </button>
+          )
+        )}
+ 
+        {/* Delete the reported post */}
+        {r.post_id && (
+          confirmDel ? (
+            <div className="flex items-center gap-1">
+              <span className="text-[11px] font-mono text-gisviz-ink-soft">Delete post?</span>
+              <button
+                onClick={() => { setConfirmDel(false); onDeletePost() }}
+                disabled={!!busy}
+                className="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-mono bg-red-50 text-gisviz-alert border border-red-200 hover:bg-red-100 transition-colors disabled:opacity-40">
+                {isBusy(`delpost-${r.post_id}`)
+                  ? <Loader2 size={11} className="animate-spin" />
+                  : <Check size={11} />}
+                Yes, delete
+              </button>
+              <button onClick={() => setConfirmDel(false)}
+                className="px-2 py-0.5 rounded text-[11px] font-mono bg-gisviz-canvas border border-gisviz-border text-gisviz-ink-soft hover:text-gisviz-ink transition-colors">
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setConfirmDel(true)}
+              disabled={!!busy}
+              className="flex items-center gap-1.5 px-3 py-1 rounded text-[11px] font-mono bg-red-50 text-gisviz-alert border border-red-200 hover:bg-red-100 transition-colors disabled:opacity-40"
+            >
+              <Trash2 size={11} /> Delete Post
+            </button>
+          )
+        )}
+      </div>
+    </div>
   )
 }
 

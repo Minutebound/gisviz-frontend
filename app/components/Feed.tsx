@@ -350,7 +350,7 @@ export default function Feed() {
                         )}
                       </Link>
                       <div className="min-w-0">
-                        <Link href={`/profile/${post.publisher_handle}`} className="text-[12px] font-bold text-gisviz-ink hover:text-gisviz-accent truncate block">
+                        <Link href={`/profile/${post.publisher_handle}`} className="text-[16px] font-bold text-gisviz-ink hover:text-gisviz-accent truncate block">
                           @{post.publisher_handle}
                         </Link>
                         <span className="text-[12px] font-mono text-gisviz-ink-soft">{formatTimeAgo(post.created_timestamp)}</span>

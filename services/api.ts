@@ -435,4 +435,40 @@ export const gisvizApi = {
   adminBulkDeleteUnverified: async (olderThanDays = 30) =>
     (await axiosInstance.delete('/admin/users/unverified/bulk', { params: { older_than_days: olderThanDays } })).data,
 
+
+  // ── Admin — Historical trends (analytics_db / snapshots) ──────────────
+  adminFetchTrendsDaily: async (days = 90) =>
+    (await axiosInstance.get('/admin/analytics/trends/daily', { params: { days } })).data,
+ 
+  adminFetchCategoryTrends: async (days = 30) =>
+    (await axiosInstance.get('/admin/analytics/trends/categories', { params: { days } })).data,
+ 
+  adminFetchEtlStatus: async (limit = 10) =>
+    (await axiosInstance.get('/admin/analytics/etl-status', { params: { limit } })).data,
+ 
+ 
+  // ── Admin — Audit trail (admin_db, live/permanent) ────────────────────
+  adminFetchAuditActions: async (opts: {
+    skip?: number; limit?: number; action_type?: string;
+    admin_user_id?: string; target_id?: string;
+  } = {}) =>
+    (await axiosInstance.get('/admin/audit/actions', { params: opts })).data,
+ 
+ 
+  adminFetchAuditSummary: async (days = 30) =>
+    (await axiosInstance.get('/admin/audit/actions/summary', { params: { days } })).data,
+ 
+  adminFetchRoleChanges: async (skip = 0, limit = 50) =>
+    (await axiosInstance.get('/admin/audit/role-changes', { params: { skip, limit } })).data,
+ 
+  adminFetchReportResolutions: async (skip = 0, limit = 50) =>
+    (await axiosInstance.get('/admin/audit/report-resolutions', { params: { skip, limit } })).data,
+
+   // ── Admin — Access control (page registry + derived matrix) ───────────
+  adminFetchAccessPages: async () =>
+    (await axiosInstance.get('/admin/access/pages')).data,
+ 
+  adminFetchAccessMatrix: async () =>
+    (await axiosInstance.get('/admin/access/matrix')).data,
+ 
 }

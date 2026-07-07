@@ -18,7 +18,7 @@ export default function Logo({
       className={`group flex items-center transition-opacity hover:opacity-80 ${className}`}
     >
       
-      <div className={`text-gisviz-accent italic font-bold tracking-wider font-[cursive] ${textClassName}`}>
+      <div style={{ fontFamily: '"Barlow Condensed", ui-monospace, monospace' }} className={`text-gisviz-accent text-[24px] font-[cursive] ${textClassName}`}>
         <span>gisviz</span>
         <span
           className="italic rounded-md bg-gisviz-infos ml-1 px-[4px] py-[3px] text-[8px] bg-gisviz-ink-soft/20 font-medium leading-none tracking-[0.1em] text-gisviz-ink"

@@ -215,31 +215,77 @@ function AuthContent() {
 
         {/* ── REGISTER ── */}
         {view === 'register' && (
-          <form onSubmit={handleRegister} className="space-y-4">
-            {[
-              { name: 'email_address', label: 'Email Address', icon: Mail, type: 'email' },
-              { name: 'password', label: 'Security Key', icon: Lock, type: 'password' },
-            ].map(({ name, label, icon: Icon, type }) => (
-              <div key={name}>
-                <label className="block text-[12px] font-mono text-gisviz-ink-soft mb-1 uppercase tracking-wider">{label}</label>
-                <div className="relative">
-                  <Icon className="absolute left-3 top-2.5 text-gisviz-ink-soft" size={16} />
-                  <input required type={type} name={name} onChange={handleChange}
-                    className="w-full bg-gisviz-canvas border border-gisviz-border rounded-md pl-10 pr-4 py-2 text-gisviz-ink focus:ring-2 focus:ring-gisviz-accent outline-none font-mono text-[12px]" />
-                </div>
-              </div>
-            ))}
-            <button type="submit" disabled={isLoading}
-              className="w-full flex items-center justify-center gap-2 bg-gisviz-accent text-white py-2.5 rounded-md hover:bg-opacity-90 transition-all font-mono text-[12px] font-bold mt-6">
-              {isLoading ? <Loader2 size={16} className="animate-spin" /> : <UserPlus size={16} />}
-              {isLoading ? 'Registering...' : 'Create Account'}
-            </button>
-            <button type="button" onClick={() => { clearMessages(); setView('login') }}
-              className="w-full text-center text-[11px] font-mono text-gisviz-ink-soft hover:text-gisviz-accent mt-2">
-              Already have an account? Login
-            </button>
-          </form>
-        )}
+  <form onSubmit={handleRegister} className="space-y-4">
+ 
+    {/* ── User Handle (NEW — registration only) ── */}
+    <div>
+      <label className="block text-[12px] font-mono text-gisviz-ink-soft mb-1 uppercase tracking-wider">
+        User Handle
+      </label>
+      <div className="relative">
+        <AtSign className="absolute left-3 top-2.5 text-gisviz-ink-soft" size={16} />
+        <input
+          required
+          type="text"
+          name="user_handle"
+          value={formData.user_handle}
+          onChange={handleChange}
+          placeholder="e.g. mapmaker_jane"
+          minLength={3}
+          maxLength={30}
+          pattern="[a-zA-Z0-9_]+"
+          title="3–30 characters. Letters, numbers, and underscores only."
+          autoComplete="username"
+          className="w-full bg-gisviz-canvas border border-gisviz-border rounded-md pl-10 pr-4 py-2 text-gisviz-ink focus:ring-2 focus:ring-gisviz-accent outline-none font-mono text-[12px]"
+        />
+      </div>
+      <p className="text-[10px] font-mono text-gisviz-ink-soft mt-1">
+        3–30 characters · letters, numbers, underscores
+      </p>
+    </div>
+ 
+    {/* ── Email + Password (unchanged) ── */}
+    {[
+      { name: 'email_address', label: 'Email Address', icon: Mail, type: 'email' },
+      { name: 'password',      label: 'Security Key',  icon: Lock, type: 'password' },
+    ].map(({ name, label, icon: Icon, type }) => (
+      <div key={name}>
+        <label className="block text-[12px] font-mono text-gisviz-ink-soft mb-1 uppercase tracking-wider">
+          {label}
+        </label>
+        <div className="relative">
+          <Icon className="absolute left-3 top-2.5 text-gisviz-ink-soft" size={16} />
+          <input
+            required
+            type={type}
+            name={name}
+            value={(formData as any)[name]}
+            onChange={handleChange}
+            className="w-full bg-gisviz-canvas border border-gisviz-border rounded-md pl-10 pr-4 py-2 text-gisviz-ink focus:ring-2 focus:ring-gisviz-accent outline-none font-mono text-[12px]"
+          />
+        </div>
+      </div>
+    ))}
+ 
+    <button
+      type="submit"
+      disabled={isLoading}
+      className="w-full flex items-center justify-center gap-2 bg-gisviz-accent text-white py-2.5 rounded-md hover:bg-opacity-90 transition-all font-mono text-[12px] font-bold mt-6"
+    >
+      {isLoading ? <Loader2 size={16} className="animate-spin" /> : <UserPlus size={16} />}
+      {isLoading ? 'Registering...' : 'Create Account'}
+    </button>
+ 
+    <button
+      type="button"
+      onClick={() => { clearMessages(); setView('login') }}
+      className="w-full text-center text-[11px] font-mono text-gisviz-ink-soft hover:text-gisviz-accent mt-2"
+    >
+      Already have an account?
+    </button>
+  </form>
+)}
+ 
 
         {/* ── VERIFY ── */}
         {view === 'verify' && (

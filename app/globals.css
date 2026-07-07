@@ -36,6 +36,7 @@
   --font-sans:    var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-sora),  ui-sans-serif, system-ui, sans-serif;
   --font-mono:    var(--font-plex-mono), ui-monospace, SFMono-Regular, monospace;
+  --font-condensed: var(--font-barlow-condensed), ui-monospace, monospace;
 }
 
 /* ─────────────────────────────────────────────────────────────

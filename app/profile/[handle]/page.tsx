@@ -5,7 +5,8 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
   Map as MapIcon, ExternalLink, ArrowUpDown,
-  Loader2, UserCheck, UserPlus, UserMinus, MapPin, Edit2, Image as ImageIcon
+  Loader2, UserCheck, UserPlus, UserMinus, MapPin, Edit2, Image as ImageIcon,
+  Plus
 } from 'lucide-react'
 import { useAuth } from '../../../context/AuthContext'
 import { gisvizApi } from '../../../services/api'
@@ -347,17 +348,29 @@ export default function ProfileHandlePage() {
           )}
         </div>
       </div>
-
-      {/* ── Grid header ──────────────────────────────────────────────────────── */}
-      <div className="flex justify-between items-center mb-4 mt-8">
-        <button
-          onClick={() => setSortOption(prev => prev === 'latest' ? 'alphabetical' : 'latest')}
-          className="text-[16px] font-mono text-gisviz-ink-soft hover:text-gisviz-ink flex items-center gap-1.5 border border-gisviz-border px-3 py-1.5 rounded-md bg-gisviz-card transition-colors select-none"
-        >
-          <ArrowUpDown size={14} />
-          {sortOption === 'latest' ? 'Sort: Latest' : 'Sort: A-Z'}
-        </button>
-      </div>
+ 
+{/* ── Grid header ──────────────────────────────────────────────────────── */}
+<div className="flex justify-between items-center mb-4 mt-8">
+ 
+  {/* Sort — unchanged */}
+  <button
+    onClick={() => setSortOption(prev => prev === 'latest' ? 'alphabetical' : 'latest')}
+    className="text-[16px] font-mono text-gisviz-ink-soft hover:text-gisviz-ink flex items-center gap-1.5 border border-gisviz-border px-3 py-1.5 rounded-md bg-gisviz-card transition-colors select-none"
+  >
+    <ArrowUpDown size={14} />
+    {sortOption === 'latest' ? 'Sort: Latest' : 'Sort: A-Z'}
+  </button>
+ 
+  {/* Publish — own profile only, matches feed page styling */}
+  {isOwnProfile && (
+    <Link
+      href="/post/upload"
+      className="flex items-center gap-2 bg-gisviz-accent text-white px-4 py-2 rounded-full text-[12px] font-bold hover:bg-opacity-90 transition-all shadow-sm"
+    >
+      <Plus size={16} /> Publish
+    </Link>
+  )}
+</div>
 
       {/* ── PUBLICATIONS TAB ─────────────────────────────────────────────────── */}
       {activeTab === 'publications' && (
