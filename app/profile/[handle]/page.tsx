@@ -218,7 +218,7 @@ export default function ProfileHandlePage() {
                 ) : (
                   <div className="flex flex-col items-center gap-1 text-white">
                     <ImageIcon size={22} />
-                    <span className="font-mono text-[11px] uppercase tracking-wider">
+                    <span className="font-mono text-[12px] uppercase tracking-wider">
                       {profile.banner_path ? 'Change Banner' : 'Upload Banner'}
                     </span>
                   </div>

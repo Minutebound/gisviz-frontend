@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { Home, User, LogOut, Sun, Moon, Menu, X, LogIn, Settings, Notebook, Phone, ChartArea, BarChart, ShieldCheck } from 'lucide-react'
+import { Home, User, LogOut, Sun, Moon, Menu, X, LogIn, Settings, Notebook, Phone, ChartArea, BarChart, ShieldCheck, LifeBuoy } from 'lucide-react'
 import Sidebar from './Sidebar'
 import Logo from './Logo'
 import { useAuth } from '../../context/AuthContext'
@@ -17,7 +17,8 @@ export default function Navbar() {
   const [isDarkMode, setIsDarkMode] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [imageError, setImageError] = useState(false)
-  
+  const [isSupportOpen,    setIsSupportOpen]    = useState(false)   // ← NEW
+
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -63,6 +64,7 @@ export default function Navbar() {
   const displayHandle = user?.user_handle ?? 'guest'
   const avatarUrl = user?.avatar_path ? `${API_BASE_URL}${user.avatar_path}` : null
 
+  
   return (
     <>
       <header className="sticky top-0 z-50 bg-gisviz-canvas/80 backdrop-blur-md border-b border-gisviz-border">
@@ -141,15 +143,9 @@ export default function Navbar() {
                     
                     {user?.role_name === 'admin' && (
                     <>
+                      
                       <Link
-                        href="/admin/analytics"
-                        onClick={() => setIsProfileOpen(false)}
-                        className="flex items-center gap-3 px-4 py-2 hover:bg-gisviz-canvas hover:text-gisviz-accent text-[16px] text-gisviz-ink transition-colors"
-                      >
-                        <BarChart size={16} /> Analytics
-                      </Link>
-                      <Link
-                        href="/admin/control"
+                        href="/admin"
                         onClick={() => setIsProfileOpen(false)}
                         className="flex items-center gap-3 px-4 py-2 hover:bg-gisviz-canvas hover:text-gisviz-accent text-[16px] text-gisviz-ink transition-colors"
                       >
@@ -166,20 +162,26 @@ export default function Navbar() {
                       <Settings size={16} /> Settings
                     </Link>
 
+                    {/* Sign out */}
                     <button
                       onClick={() => { logoutSession(); setIsProfileOpen(false) }}
                       className="flex items-center w-full gap-3 px-4 py-2 hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-gisviz-alert/90 text-[16px] text-gisviz-ink text-left transition-colors"
                     >
                       <LogOut size={16} /> Sign out
                     </button>
-
-                    <Link 
-                      href="/" 
-                      onClick={() => setIsProfileOpen(false)}
-                      className="flex items-center gap-3 px-4 py-2 hover:bg-gisviz-canvas rounded-b-xl hover:text-gisviz-accent text-[16px] text-gisviz-ink transition-colors"
+ 
+                    {/* ── Help & Support — opens SupportPopup ── */}
+                    <button
+                      onClick={() => {
+                        setIsProfileOpen(false)   // close dropdown first
+                        setIsSupportOpen(true)    // then open modal
+                      }}
+                      className="flex items-center w-full gap-3 px-4 py-2 hover:bg-gisviz-canvas rounded-b-xl hover:text-gisviz-accent text-[16px] text-gisviz-ink transition-colors text-left"
                     >
-                      <ChartArea size={16} /> Help & Support
-                    </Link>
+                      <LifeBuoy size={16} /> Help & Support
+                    </button>
+
+                    
 
                   </div>
                 )}

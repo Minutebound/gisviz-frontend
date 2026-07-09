@@ -140,7 +140,7 @@ export default function AdminActivityPage() {
         {FILTERS.map(f => (
           <button key={f.value}
             onClick={() => { setFilter(f.value); setSkip(0); load(0, f.value) }}
-            className={`px-2.5 py-1 rounded font-mono text-[11px] transition-colors ${
+            className={`px-2.5 py-1 rounded font-mono text-[12px] transition-colors ${
               filter === f.value
                 ? 'bg-gisviz-accent/10 text-gisviz-accent font-bold'
                 : 'text-gisviz-ink-soft hover:text-gisviz-ink border border-gisviz-border'}`}>
@@ -158,7 +158,7 @@ export default function AdminActivityPage() {
         ) : actions.length === 0 ? (
           <div className="py-16 text-center text-[12px] font-mono text-gisviz-ink-soft">
             <p>No admin actions recorded yet.</p>
-            <p className="text-[11px] mt-1 opacity-70">Actions appear here once admins perform mutations in the control panel.</p>
+            <p className="text-[12px] mt-1 opacity-70">Actions appear here once admins perform mutations in the control panel.</p>
           </div>
         ) : (
           <ul className="divide-y divide-gisviz-border">
@@ -168,22 +168,22 @@ export default function AdminActivityPage() {
                 <li key={a.action_id} className="flex items-start gap-3 px-5 py-3 hover:bg-gisviz-canvas/40 transition-colors">
                   <Icon size={15} className={`mt-0.5 shrink-0 ${color}`} />
                   <div className="flex-1 min-w-0">
-                    <p className="text-[13px] text-gisviz-ink leading-snug">
+                    <p className="text-[12px] text-gisviz-ink leading-snug">
                       <span className="font-bold">{a.admin_handle ?? 'admin'}</span>{' '}
-                      <span className="font-mono text-[11px] text-gisviz-ink-soft bg-gisviz-canvas px-1 rounded">{a.action_type}</span>
+                      <span className="font-mono text-[12px] text-gisviz-ink-soft bg-gisviz-canvas px-1 rounded">{a.action_type}</span>
                       {a.target_id && (
-                        <span className="text-gisviz-ink-soft text-[11px] font-mono ml-1">
+                        <span className="text-gisviz-ink-soft text-[12px] font-mono ml-1">
                           · {a.target_type} <code>{a.target_id.slice(0, 8)}</code>
                         </span>
                       )}
                     </p>
                     {a.payload && Object.keys(a.payload).length > 0 && (
-                      <p className="text-[11px] font-mono text-gisviz-ink-soft mt-0.5 truncate">
+                      <p className="text-[12px] font-mono text-gisviz-ink-soft mt-0.5 truncate">
                         {Object.entries(a.payload).slice(0, 3).map(([k, v]) => `${k}: ${String(v).slice(0, 50)}`).join(' · ')}
                       </p>
                     )}
                   </div>
-                  <span className="text-[11px] font-mono text-gisviz-ink-soft shrink-0 whitespace-nowrap">{timeAgo(a.occurred)}</span>
+                  <span className="text-[12px] font-mono text-gisviz-ink-soft shrink-0 whitespace-nowrap">{timeAgo(a.occurred)}</span>
                 </li>
               )
             })}
@@ -192,14 +192,14 @@ export default function AdminActivityPage() {
 
         {/* pagination */}
         <div className="flex items-center justify-between px-5 py-3 border-t border-gisviz-border bg-gisviz-canvas/30">
-          <span className="text-[11px] font-mono text-gisviz-ink-soft">{total} total action{total !== 1 ? 's' : ''}</span>
+          <span className="text-[12px] font-mono text-gisviz-ink-soft">{total} total action{total !== 1 ? 's' : ''}</span>
           <div className="flex items-center gap-2">
             <button onClick={() => { const n = Math.max(0, skip - LIMIT); setSkip(n); load(n) }}
               disabled={skip === 0}
-              className="px-3 py-1 rounded border border-gisviz-border text-[11px] font-mono text-gisviz-ink-soft hover:text-gisviz-ink disabled:opacity-40 transition-colors">← Prev</button>
+              className="px-3 py-1 rounded border border-gisviz-border text-[12px] font-mono text-gisviz-ink-soft hover:text-gisviz-ink disabled:opacity-40 transition-colors">← Prev</button>
             <button onClick={() => { const n = skip + LIMIT; setSkip(n); load(n) }}
               disabled={actions.length < LIMIT}
-              className="px-3 py-1 rounded border border-gisviz-border text-[11px] font-mono text-gisviz-ink-soft hover:text-gisviz-ink disabled:opacity-40 transition-colors">Next →</button>
+              className="px-3 py-1 rounded border border-gisviz-border text-[12px] font-mono text-gisviz-ink-soft hover:text-gisviz-ink disabled:opacity-40 transition-colors">Next →</button>
           </div>
         </div>
       </div>

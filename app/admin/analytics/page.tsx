@@ -11,7 +11,6 @@ import {
 import { useAuth } from '../../../context/AuthContext'
 import { gisvizApi } from '../../../services/api'
 import AccessRestricted from '../../components/AccessRestricted'
-import TrendCharts from './TrendCharts'
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -22,20 +21,20 @@ const fmt = (n: number) =>
 
 function Trend({ current, previous }: { current: number; previous: number }) {
   if (previous === 0 && current === 0)
-    return <span className="text-gisviz-ink-soft font-mono text-[11px]">—</span>
+    return <span className="text-gisviz-ink-soft font-mono text-[12px]">—</span>
   const pct = previous === 0 ? 100 : Math.round(((current - previous) / previous) * 100)
   if (pct > 0) return (
-    <span className="flex items-center gap-0.5 text-green-600 font-mono text-[11px]">
+    <span className="flex items-center gap-0.5 text-green-600 font-mono text-[12px]">
       <TrendingUp size={11} />+{pct}% vs last week
     </span>
   )
   if (pct < 0) return (
-    <span className="flex items-center gap-0.5 text-gisviz-alert font-mono text-[11px]">
+    <span className="flex items-center gap-0.5 text-gisviz-alert font-mono text-[12px]">
       <TrendingDown size={11} />{pct}% vs last week
     </span>
   )
   return (
-    <span className="flex items-center gap-0.5 text-gisviz-ink-soft font-mono text-[11px]">
+    <span className="flex items-center gap-0.5 text-gisviz-ink-soft font-mono text-[12px]">
       <Minus size={11} />No change
     </span>
   )
@@ -53,7 +52,7 @@ function StatCard({ icon, label, value, sub, trend }: {
       </div>
       <p className="text-[28px] font-display font-bold text-gisviz-ink leading-none">{fmt(value)}</p>
       <p className="text-[12px] font-mono text-gisviz-ink-soft uppercase tracking-wider">{label}</p>
-      {sub && <p className="text-[11px] font-mono text-gisviz-ink-soft">{sub}</p>}
+      {sub && <p className="text-[12px] font-mono text-gisviz-ink-soft">{sub}</p>}
     </div>
   )
 }
@@ -185,10 +184,10 @@ export default function AdminAnalyticsPage() {
       {!hasLoaded && !loading && (
         <div className="flex flex-col items-center justify-center py-24 gap-3 text-gisviz-ink-soft">
           <Database size={36} className="opacity-30" />
-          <p className="font-mono text-[13px]">
+          <p className="font-mono text-[12px]">
             Click <strong className="text-gisviz-ink">Load Data</strong> to fetch from the snapshot warehouse.
           </p>
-          <p className="font-mono text-[11px] opacity-60">
+          <p className="font-mono text-[12px] opacity-60">
             Numbers reflect the last Dagster snapshot — not live counts.
           </p>
         </div>
@@ -221,9 +220,6 @@ export default function AdminAnalyticsPage() {
               sub={t.open_reports > 0 ? 'Needs attention' : 'All clear'} />
           </div>
 
-          {/* Trend charts — triggerLoad controls when it fetches */}
-          <TrendCharts triggerLoad={triggerLoad} />
-
           {/* Tables */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
 
@@ -234,7 +230,7 @@ export default function AdminAnalyticsPage() {
                 <div className="flex gap-1">
                   {(['likes', 'bookmarks', 'comments'] as TopBy[]).map(b => (
                     <button key={b} onClick={() => switchTopPosts(b)}
-                      className={`px-2 py-0.5 rounded text-[11px] font-mono transition-colors ${
+                      className={`px-2 py-0.5 rounded text-[12px] font-mono transition-colors ${
                         topPostsBy === b
                           ? 'bg-gisviz-accent text-white'
                           : 'bg-gisviz-canvas border border-gisviz-border text-gisviz-ink-soft hover:text-gisviz-ink'
@@ -250,19 +246,19 @@ export default function AdminAnalyticsPage() {
                 <div className="divide-y divide-gisviz-border/50">
                   {topPosts.map((p, i) => (
                     <div key={p.post_id} className="flex items-start gap-3 px-5 py-3 hover:bg-gisviz-canvas/30 transition-colors">
-                      <span className="text-[11px] font-mono text-gisviz-ink-soft w-4 shrink-0 mt-0.5">{i + 1}</span>
+                      <span className="text-[12px] font-mono text-gisviz-ink-soft w-4 shrink-0 mt-0.5">{i + 1}</span>
                       <div className="flex-1 min-w-0">
                         <Link href={`/post/${p.post_id}`} target="_blank"
                           className="text-[12px] font-mono text-gisviz-ink hover:text-gisviz-accent truncate block">
                           {p.title}
                         </Link>
-                        <span className="text-[11px] font-mono text-gisviz-ink-soft">@{p.publisher_handle}</span>
+                        <span className="text-[12px] font-mono text-gisviz-ink-soft">@{p.publisher_handle}</span>
                       </div>
                       <div className="text-right shrink-0">
-                        <p className="text-[13px] font-mono font-bold text-gisviz-ink">
+                        <p className="text-[12px] font-mono font-bold text-gisviz-ink">
                           {fmt(topPostsBy === 'likes' ? p.total_likes_count : p.total_comments_count)}
                         </p>
-                        <p className="text-[10px] font-mono text-gisviz-ink-soft">{topPostsBy}</p>
+                        <p className="text-[12px] font-mono text-gisviz-ink-soft">{topPostsBy}</p>
                       </div>
                     </div>
                   ))}
@@ -277,7 +273,7 @@ export default function AdminAnalyticsPage() {
                 <div className="flex gap-1">
                   {(['followers', 'posts'] as UserBy[]).map(b => (
                     <button key={b} onClick={() => switchTopUsers(b)}
-                      className={`px-2 py-0.5 rounded text-[11px] font-mono transition-colors ${
+                      className={`px-2 py-0.5 rounded text-[12px] font-mono transition-colors ${
                         topUsersBy === b
                           ? 'bg-gisviz-accent text-white'
                           : 'bg-gisviz-canvas border border-gisviz-border text-gisviz-ink-soft hover:text-gisviz-ink'
@@ -293,19 +289,19 @@ export default function AdminAnalyticsPage() {
                 <div className="divide-y divide-gisviz-border/50">
                   {topUsers.map((u, i) => (
                     <div key={u.user_id} className="flex items-center gap-3 px-5 py-3 hover:bg-gisviz-canvas/30 transition-colors">
-                      <span className="text-[11px] font-mono text-gisviz-ink-soft w-4 shrink-0">{i + 1}</span>
+                      <span className="text-[12px] font-mono text-gisviz-ink-soft w-4 shrink-0">{i + 1}</span>
                       <div className="flex-1 min-w-0">
                         <Link href={`/profile/${u.user_handle}`}
                           className="text-[12px] font-mono text-gisviz-ink hover:text-gisviz-accent">
                           @{u.user_handle}
                         </Link>
-                        <p className="text-[11px] font-mono text-gisviz-ink-soft">{u.role_name}</p>
+                        <p className="text-[12px] font-mono text-gisviz-ink-soft">{u.role_name}</p>
                       </div>
                       <div className="text-right shrink-0">
-                        <p className="text-[13px] font-mono font-bold text-gisviz-ink">
+                        <p className="text-[12px] font-mono font-bold text-gisviz-ink">
                           {fmt(topUsersBy === 'followers' ? u.follower_count : u.post_count)}
                         </p>
-                        <p className="text-[10px] font-mono text-gisviz-ink-soft">{topUsersBy}</p>
+                        <p className="text-[12px] font-mono text-gisviz-ink-soft">{topUsersBy}</p>
                       </div>
                     </div>
                   ))}
@@ -327,13 +323,13 @@ export default function AdminAnalyticsPage() {
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 divide-x divide-y divide-gisviz-border/50">
                 {commenters.map((c, i) => (
                   <div key={c.user_id} className="flex flex-col items-center py-4 px-3 hover:bg-gisviz-canvas/30 transition-colors text-center">
-                    <span className="text-[10px] font-mono text-gisviz-ink-soft mb-1">#{i + 1}</span>
+                    <span className="text-[12px] font-mono text-gisviz-ink-soft mb-1">#{i + 1}</span>
                     <Link href={`/profile/${c.user_handle}`}
                       className="text-[12px] font-mono text-gisviz-ink hover:text-gisviz-accent truncate w-full text-center">
                       @{c.user_handle}
                     </Link>
-                    <p className="text-[18px] font-bold font-display text-gisviz-ink mt-1">{fmt(c.comment_count)}</p>
-                    <p className="text-[10px] font-mono text-gisviz-ink-soft">comments</p>
+                    <p className="text-[16px] font-bold font-display text-gisviz-ink mt-1">{fmt(c.comment_count)}</p>
+                    <p className="text-[12px] font-mono text-gisviz-ink-soft">comments</p>
                   </div>
                 ))}
               </div>

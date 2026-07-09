@@ -207,7 +207,7 @@ export default function PostDetail() {
   const avatarUrl = post.publisher_avatar_path
     ? `${API_BASE_URL}${post.publisher_avatar_path.startsWith('/') ? '' : '/'}${post.publisher_avatar_path}`
     : null
-  const displayHandle = post.publisher_handle || 'Unknown'
+  const displayHandle = post.publisher_handle
   const isOwnPost = isAuthenticated && user && String(post.publisher_user_id) === String(user.user_id)
 
   return (
@@ -233,7 +233,7 @@ export default function PostDetail() {
             <div className="flex flex-wrap items-center gap-x-6 gap-y-1 px-1 text-[12px] font-mono text-gisviz-ink-soft border-l-2 border-gisviz-border pl-3">
               {post.source_name && (
                 <span className="flex items-center gap-1.5">
-                  <span className="uppercase tracking-wider text-[11px]">Source</span>
+                  <span className="uppercase tracking-wider text-[12px]">Source</span>
                   <span className="text-gisviz-border">·</span>
                   {post.source_url ? (
                     <a
@@ -252,7 +252,7 @@ export default function PostDetail() {
               )}
               {post.note && (
                 <span className="flex items-center gap-1.5">
-                  <span className="uppercase tracking-wider text-[11px]">Note</span>
+                  <span className="uppercase tracking-wider text-[12px]">Note</span>
                   <span className="text-gisviz-border">·</span>
                   <span className="text-gisviz-ink">{post.note}</span>
                 </span>
@@ -383,7 +383,7 @@ export default function PostDetail() {
                   </div>
                 )}
                 {commentError && (
-                  <p className="text-[11px] text-gisviz-alert font-mono mb-2">{commentError}</p>
+                  <p className="text-[12px] text-gisviz-alert font-mono mb-2">{commentError}</p>
                 )}
                 <form onSubmit={handlePostComment} className="flex gap-2">
                   <input

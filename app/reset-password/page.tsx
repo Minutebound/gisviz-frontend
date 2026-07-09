@@ -29,7 +29,7 @@ export default function ResetPasswordPage() {
     setErrorMsg('')
     try {
       await gisvizApi.resetPassword(token, newPassword)
-      setSuccessMsg("Security key successfully updated. You may now log in.")
+      setSuccessMsg("Password successfully updated. You may now log in.")
       setTimeout(() => router.push('/auth'), 3000) // Redirect to login after 3 seconds
     } catch (err: any) {
       setErrorMsg(err.response?.data?.detail || "Failed to reset password. The token may be expired.")
@@ -46,8 +46,7 @@ export default function ResetPasswordPage() {
           <div className="inline-flex items-center justify-center w-12 h-12 bg-gisviz-alert/90 text-white rounded-full mb-4">
             <Lock size={24} />
           </div>
-          <h1 className="text-[24px] font-display font-bold text-gisviz-ink">Reconfigure Security Key</h1>
-          <p className="text-[12px] font-mono text-gisviz-ink-soft mt-2 uppercase tracking-wider">Authorized Protocol</p>
+          <h2 className="text-[24px] font-display font-bold text-gisviz-ink">Reconfigure Password</h2>
         </div>
 
         {errorMsg && <div className="p-3 mb-6 bg-red-50 border border-gisviz-alert/60 text-gisviz-alert/90 text-[12px] font-mono rounded-md">{errorMsg}</div>}
@@ -55,7 +54,7 @@ export default function ResetPasswordPage() {
 
         <form onSubmit={handleReset} className="space-y-4">
           <div>
-            <label className="block text-[12px] font-mono text-gisviz-ink-soft mb-1 uppercase tracking-wider">New Security Key</label>
+            <label className="block text-[12px] font-mono text-gisviz-ink-soft mb-1 uppercase tracking-wider">New Password</label>
             <div className="relative">
               <Lock className="absolute left-3 top-2.5 text-gisviz-ink-soft" size={16} />
               <input 

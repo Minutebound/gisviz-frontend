@@ -9,13 +9,13 @@ import {
   Edit2, X, Check, Loader2, Search, ChevronDown,
   ToggleLeft, ToggleRight, ExternalLink, RefreshCw,
   AlertTriangle, ArrowUpRight, Save, Shield,
-  Activity, BarChart2,
+  Activity, BarChart2, LifeBuoy
 } from 'lucide-react'
 import { useAuth } from '../../../context/AuthContext'
 import { gisvizApi } from '../../../services/api'
 import AccessRestricted from '../../components/AccessRestricted'
 import AccessControlPanel from './AccessControlPanel'
- 
+
 type Tab = 'categories' | 'users' | 'posts' | 'reports' | 'comments' | 'unverified' | 'roles'
  
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
@@ -50,7 +50,7 @@ const Badge = ({ children, color = 'default' }: { children: React.ReactNode; col
     default:   'bg-gisviz-canvas text-gisviz-ink border-gisviz-border',
   }
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-mono font-bold border ${cls[color as string] || cls.default}`}>
+    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[12px] font-mono font-bold border ${cls[color as string] || cls.default}`}>
       {children}
     </span>
   )
@@ -255,12 +255,12 @@ function CategoriesPanel({ onError }: { onError: (e: string) => void }) {
         {showAdd && (
           <div className="px-6 py-4 border-b border-gisviz-border bg-gisviz-canvas/30 flex flex-wrap gap-3 items-end">
             <div className="flex-1 min-w-[130px]">
-              <label className="block text-[11px] font-mono text-gisviz-ink-soft mb-1 uppercase">Label</label>
+              <label className="block text-[12px] font-mono text-gisviz-ink-soft mb-1 uppercase">Label</label>
               <input value={newLabel} onChange={e => setNewLabel(e.target.value)} placeholder="Remote Sensing"
                 className="w-full bg-gisviz-canvas border border-gisviz-border rounded px-3 py-1.5 text-[12px] font-mono text-gisviz-ink focus:ring-1 focus:ring-gisviz-accent outline-none" />
             </div>
             <div className="flex-1 min-w-[130px]">
-              <label className="block text-[11px] font-mono text-gisviz-ink-soft mb-1 uppercase">Slug</label>
+              <label className="block text-[12px] font-mono text-gisviz-ink-soft mb-1 uppercase">Slug</label>
               <input value={newSlug} onChange={e => setNewSlug(e.target.value)} placeholder="remote-sensing"
                 className="w-full bg-gisviz-canvas border border-gisviz-border rounded px-3 py-1.5 text-[12px] font-mono text-gisviz-ink focus:ring-1 focus:ring-gisviz-accent outline-none" />
             </div>
@@ -339,11 +339,11 @@ function CategoriesPanel({ onError }: { onError: (e: string) => void }) {
                   <td className="px-4 py-3">
                     <div className="flex gap-2 justify-end">
                       <button onClick={() => act(p.pending_id, () => gisvizApi.approvePendingCategory(p.pending_id))} disabled={!!busy}
-                        className="flex items-center gap-1 px-2 py-1 bg-green-50 text-green-700 border border-green-200 rounded text-[11px] font-mono hover:bg-green-100 transition-colors disabled:opacity-50">
+                        className="flex items-center gap-1 px-2 py-1 bg-green-50 text-green-700 border border-green-200 rounded text-[12px] font-mono hover:bg-green-100 transition-colors disabled:opacity-50">
                         {busy === p.pending_id ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />} Approve
                       </button>
                       <button onClick={() => act(`rej-${p.pending_id}`, () => gisvizApi.rejectPendingCategory(p.pending_id))} disabled={!!busy}
-                        className="flex items-center gap-1 px-2 py-1 bg-red-50 text-gisviz-alert border border-red-200 rounded text-[11px] font-mono hover:bg-red-100 transition-colors disabled:opacity-50">
+                        className="flex items-center gap-1 px-2 py-1 bg-red-50 text-gisviz-alert border border-red-200 rounded text-[12px] font-mono hover:bg-red-100 transition-colors disabled:opacity-50">
                         <X size={11} /> Reject
                       </button>
                     </div>
@@ -425,9 +425,9 @@ function UsersPanel({ onError, adminUser }: { onError: (e: string) => void; admi
                       <Link href={`/profile/${u.user_handle}`} target="_blank" className="text-gisviz-accent hover:underline flex items-center gap-1">
                         @{u.user_handle} <ExternalLink size={10} />
                       </Link>
-                      <div className="text-[10px] text-gisviz-ink-soft mt-0.5">{u.post_count} posts · {u.follower_count} followers</div>
+                      <div className="text-[12px] text-gisviz-ink-soft mt-0.5">{u.post_count} posts · {u.follower_count} followers</div>
                     </td>
-                    <td className="px-4 py-3 text-gisviz-ink-soft hidden lg:table-cell text-[11px]">{u.email_address}</td>
+                    <td className="px-4 py-3 text-gisviz-ink-soft hidden lg:table-cell text-[12px]">{u.email_address}</td>
                     <td className="px-4 py-3">
                       {u.user_id === adminUser?.user_id
                         ? <Badge color="admin">admin (you)</Badge>
@@ -465,14 +465,14 @@ function UsersPanel({ onError, adminUser }: { onError: (e: string) => void; admi
             </table>
           </div>
           <div className="flex items-center justify-between px-6 py-3 border-t border-gisviz-border bg-gisviz-canvas/30">
-            <span className="text-[11px] font-mono text-gisviz-ink-soft">
+            <span className="text-[12px] font-mono text-gisviz-ink-soft">
               {skip + 1}–{Math.min(skip + LIMIT, total)} of {total}
             </span>
             <div className="flex gap-2">
               <button onClick={() => { const s = Math.max(0, skip - LIMIT); setSkip(s); load(s, search) }} disabled={skip === 0}
-                className="px-3 py-1 rounded border border-gisviz-border text-[11px] font-mono text-gisviz-ink-soft hover:text-gisviz-ink disabled:opacity-40 transition-colors">← Prev</button>
+                className="px-3 py-1 rounded border border-gisviz-border text-[12px] font-mono text-gisviz-ink-soft hover:text-gisviz-ink disabled:opacity-40 transition-colors">← Prev</button>
               <button onClick={() => { const s = skip + LIMIT; setSkip(s); load(s, search) }} disabled={skip + LIMIT >= total}
-                className="px-3 py-1 rounded border border-gisviz-border text-[11px] font-mono text-gisviz-ink-soft hover:text-gisviz-ink disabled:opacity-40 transition-colors">Next →</button>
+                className="px-3 py-1 rounded border border-gisviz-border text-[12px] font-mono text-gisviz-ink-soft hover:text-gisviz-ink disabled:opacity-40 transition-colors">Next →</button>
             </div>
           </div>
         </>
@@ -487,6 +487,7 @@ function UsersPanel({ onError, adminUser }: { onError: (e: string) => void; admi
 // ─────────────────────────────────────────────────────────────────────────────
 function PostsPanel({ onError }: { onError: (e: string) => void }) {
   const [posts, setPosts]   = useState<any[]>([])
+  const [total, setTotal]   = useState<number>(0)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy]     = useState<string | null>(null)
   const [search, setSearch] = useState('')
@@ -495,7 +496,18 @@ function PostsPanel({ onError }: { onError: (e: string) => void }) {
 
   const load = useCallback(async (s = 0, q = '') => {
     setLoading(true)
-    try { setPosts(await gisvizApi.fetchAllPosts(s, LIMIT, q || undefined)) }
+    try { 
+      const res = await gisvizApi.fetchAllPosts(s, LIMIT, q || undefined)
+      
+      // Safely handle both standard arrays and paginated { posts, total } objects
+      if (Array.isArray(res)) {
+        setPosts(res)
+        setTotal(res.length)
+      } else {
+        setPosts(res.posts || [])
+        setTotal(res.total || 0)
+      }
+    }
     catch { onError('Failed to load posts') }
     finally { setLoading(false) }
   }, [onError])
@@ -503,7 +515,7 @@ function PostsPanel({ onError }: { onError: (e: string) => void }) {
   useEffect(() => { load() }, [load])
 
   return (
-    <Panel title="Posts" icon={<FileText size={14} />}
+    <Panel title="Posts" icon={<FileText size={14} />} count={total}
       actions={
         <div className="flex gap-2 items-center">
           <button onClick={() => load(skip, search)} title="Refresh"
@@ -539,7 +551,7 @@ function PostsPanel({ onError }: { onError: (e: string) => void }) {
                       <Link href={`/post/${p.post_id}`} target="_blank" className="text-gisviz-accent hover:underline flex items-center gap-1 line-clamp-1">
                         {p.title} <ExternalLink size={10} />
                       </Link>
-                      <div className="text-[10px] text-gisviz-ink-soft mt-0.5">{new Date(p.created_timestamp).toLocaleDateString()}</div>
+                      <div className="text-[12px] text-gisviz-ink-soft mt-0.5">{new Date(p.created_timestamp).toLocaleDateString()}</div>
                     </td>
                     <td className="px-4 py-3 hidden md:table-cell">
                       <Link href={`/profile/${p.publisher_handle}`} className="text-gisviz-ink hover:text-gisviz-accent transition-colors">
@@ -549,7 +561,6 @@ function PostsPanel({ onError }: { onError: (e: string) => void }) {
                     <td className="px-4 py-3 text-right text-gisviz-ink-soft hidden sm:table-cell">{p.total_likes_count}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
-                        {/* ↓ FIX: correct edit URL /post/[id]/edit not /post/[id]/edit */}
                         <Link href={`/post/${p.post_id}/edit`}
                           className="p-1.5 rounded text-gisviz-ink-soft hover:text-gisviz-accent hover:bg-gisviz-canvas transition-colors" title="Edit">
                           <Edit2 size={14} />
@@ -571,11 +582,16 @@ function PostsPanel({ onError }: { onError: (e: string) => void }) {
               }
             </tbody>
           </table>
-          <div className="flex justify-end gap-2 px-6 py-3 border-t border-gisviz-border bg-gisviz-canvas/30">
-            <button onClick={() => { const s = Math.max(0, skip - LIMIT); setSkip(s); load(s, search) }} disabled={skip === 0}
-              className="px-3 py-1 rounded border border-gisviz-border text-[11px] font-mono text-gisviz-ink-soft hover:text-gisviz-ink disabled:opacity-40 transition-colors">← Prev</button>
-            <button onClick={() => { const s = skip + LIMIT; setSkip(s); load(s, search) }} disabled={posts.length < LIMIT}
-              className="px-3 py-1 rounded border border-gisviz-border text-[11px] font-mono text-gisviz-ink-soft hover:text-gisviz-ink disabled:opacity-40 transition-colors">Next →</button>
+          <div className="flex items-center justify-between px-6 py-3 border-t border-gisviz-border bg-gisviz-canvas/30">
+            <span className="text-[12px] font-mono text-gisviz-ink-soft">
+              {skip + 1}–{Math.min(skip + LIMIT, total || skip + posts.length)} of {total || '?'}
+            </span>
+            <div className="flex gap-2">
+              <button onClick={() => { const s = Math.max(0, skip - LIMIT); setSkip(s); load(s, search) }} disabled={skip === 0}
+                className="px-3 py-1 rounded border border-gisviz-border text-[12px] font-mono text-gisviz-ink-soft hover:text-gisviz-ink disabled:opacity-40 transition-colors">← Prev</button>
+              <button onClick={() => { const s = skip + LIMIT; setSkip(s); load(s, search) }} disabled={posts.length < LIMIT}
+                className="px-3 py-1 rounded border border-gisviz-border text-[12px] font-mono text-gisviz-ink-soft hover:text-gisviz-ink disabled:opacity-40 transition-colors">Next →</button>
+            </div>
           </div>
         </>
       )}
@@ -594,7 +610,11 @@ function ReportsPanel({ onError }: { onError: (e: string) => void }) {
  
   const load = useCallback(async () => {
     setLoading(true)
-    try { setReports(await gisvizApi.fetchReports()) }
+    try { 
+      const res = await gisvizApi.fetchReports()
+      // Safely handle both array and object responses
+      setReports(Array.isArray(res) ? res : (res?.reports || []))
+    }
     catch { onError('Failed to load reports') }
     finally { setLoading(false) }
   }, [onError])
@@ -614,18 +634,20 @@ function ReportsPanel({ onError }: { onError: (e: string) => void }) {
     }
   }
  
-  const visible = reports.filter(r => filter === 'all' || r.status === filter)
+  // Ensure safeReports is ALWAYS an array before attempting to .filter()
+  const safeReports = Array.isArray(reports) ? reports : []
+  const visible = safeReports.filter(r => filter === 'all' || r.status === filter)
  
   return (
     <Panel
       title="Reports"
       icon={<Flag size={14} />}
-      count={reports.length}
+      count={safeReports.length}
       actions={
         <div className="flex items-center gap-1 flex-wrap">
           {(['all', 'open', 'resolved', 'dismissed'] as const).map(f => (
             <button key={f} onClick={() => setFilter(f)}
-              className={`px-2.5 py-1 rounded text-[11px] font-mono transition-colors capitalize ${
+              className={`px-2.5 py-1 rounded text-[12px] font-mono transition-colors capitalize ${
                 filter === f
                   ? 'bg-gisviz-accent text-white'
                   : 'bg-gisviz-canvas border border-gisviz-border text-gisviz-ink-soft hover:text-gisviz-ink'
@@ -694,12 +716,12 @@ function ReportRow({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-1">
             <Badge color={r.status}>{r.status}</Badge>
-            <span className="text-[11px] font-mono text-gisviz-ink-soft">
+            <span className="text-[12px] font-mono text-gisviz-ink-soft">
               {new Date(r.created_timestamp).toLocaleDateString()}
             </span>
             {r.post_id && (
               <Link href={`/post/${r.post_id}`} target="_blank"
-                className="text-[11px] font-mono text-gisviz-accent hover:underline flex items-center gap-0.5">
+                className="text-[12px] font-mono text-gisviz-accent hover:underline flex items-center gap-0.5">
                 View post <ExternalLink size={10} />
               </Link>
             )}
@@ -708,7 +730,7 @@ function ReportRow({
             <span className="text-gisviz-ink-soft">Reason: </span>{r.reason}
           </p>
           {r.reporter_user_id && (
-            <p className="text-[11px] font-mono text-gisviz-ink-soft mt-0.5">
+            <p className="text-[12px] font-mono text-gisviz-ink-soft mt-0.5">
               Reporter ID: <code className="text-gisviz-ink">{String(r.reporter_user_id).slice(0, 8)}…</code>
             </p>
           )}
@@ -716,14 +738,14 @@ function ReportRow({
       </div>
  
       {/* ── Action toolbar ── */}
-      <div className="flex items-center gap-2 flex-wrap pl-[22px]">
+      <div className="flex items-center gap-2 flex-wrap pl-[24px]">
  
         {/* Resolve */}
         {r.status !== 'resolved' && (
           <button
             onClick={onResolve}
             disabled={!!busy}
-            className="flex items-center gap-1.5 px-3 py-1 rounded text-[11px] font-mono bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 transition-colors disabled:opacity-40"
+            className="flex items-center gap-1.5 px-3 py-1 rounded text-[12px] font-mono bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 transition-colors disabled:opacity-40"
           >
             {isBusy(`res-${r.report_id}`)
               ? <Loader2 size={11} className="animate-spin" />
@@ -737,7 +759,7 @@ function ReportRow({
           <button
             onClick={onDismiss}
             disabled={!!busy}
-            className="flex items-center gap-1.5 px-3 py-1 rounded text-[11px] font-mono bg-gisviz-canvas text-gisviz-ink-soft border border-gisviz-border hover:text-gisviz-ink transition-colors disabled:opacity-40"
+            className="flex items-center gap-1.5 px-3 py-1 rounded text-[12px] font-mono bg-gisviz-canvas text-gisviz-ink-soft border border-gisviz-border hover:text-gisviz-ink transition-colors disabled:opacity-40"
           >
             {isBusy(`dis-${r.report_id}`)
               ? <Loader2 size={11} className="animate-spin" />
@@ -750,18 +772,18 @@ function ReportRow({
         {r.reporter_user_id && (
           confirmDeact ? (
             <div className="flex items-center gap-1">
-              <span className="text-[11px] font-mono text-gisviz-ink-soft">Deactivate reporter?</span>
+              <span className="text-[12px] font-mono text-gisviz-ink-soft">Deactivate reporter?</span>
               <button
                 onClick={() => { setConfirmDeact(false); onDeactivateUser() }}
                 disabled={!!busy}
-                className="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-mono bg-yellow-50 text-yellow-700 border border-yellow-200 hover:bg-yellow-100 transition-colors disabled:opacity-40">
+                className="flex items-center gap-1 px-2 py-0.5 rounded text-[12px] font-mono bg-yellow-50 text-yellow-700 border border-yellow-200 hover:bg-yellow-100 transition-colors disabled:opacity-40">
                 {isBusy(`deact-${r.reporter_user_id}`)
                   ? <Loader2 size={11} className="animate-spin" />
                   : <Check size={11} />}
                 Yes
               </button>
               <button onClick={() => setConfirmDeact(false)}
-                className="px-2 py-0.5 rounded text-[11px] font-mono bg-gisviz-canvas border border-gisviz-border text-gisviz-ink-soft hover:text-gisviz-ink transition-colors">
+                className="px-2 py-0.5 rounded text-[12px] font-mono bg-gisviz-canvas border border-gisviz-border text-gisviz-ink-soft hover:text-gisviz-ink transition-colors">
                 No
               </button>
             </div>
@@ -769,7 +791,7 @@ function ReportRow({
             <button
               onClick={() => setConfirmDeact(true)}
               disabled={!!busy}
-              className="flex items-center gap-1.5 px-3 py-1 rounded text-[11px] font-mono bg-yellow-50 text-yellow-700 border border-yellow-200 hover:bg-yellow-100 transition-colors disabled:opacity-40"
+              className="flex items-center gap-1.5 px-3 py-1 rounded text-[12px] font-mono bg-yellow-50 text-yellow-700 border border-yellow-200 hover:bg-yellow-100 transition-colors disabled:opacity-40"
             >
               <ToggleLeft size={12} /> Deactivate User
             </button>
@@ -780,18 +802,18 @@ function ReportRow({
         {r.post_id && (
           confirmDel ? (
             <div className="flex items-center gap-1">
-              <span className="text-[11px] font-mono text-gisviz-ink-soft">Delete post?</span>
+              <span className="text-[12px] font-mono text-gisviz-ink-soft">Delete post?</span>
               <button
                 onClick={() => { setConfirmDel(false); onDeletePost() }}
                 disabled={!!busy}
-                className="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-mono bg-red-50 text-gisviz-alert border border-red-200 hover:bg-red-100 transition-colors disabled:opacity-40">
+                className="flex items-center gap-1 px-2 py-0.5 rounded text-[12px] font-mono bg-red-50 text-gisviz-alert border border-red-200 hover:bg-red-100 transition-colors disabled:opacity-40">
                 {isBusy(`delpost-${r.post_id}`)
                   ? <Loader2 size={11} className="animate-spin" />
                   : <Check size={11} />}
                 Yes, delete
               </button>
               <button onClick={() => setConfirmDel(false)}
-                className="px-2 py-0.5 rounded text-[11px] font-mono bg-gisviz-canvas border border-gisviz-border text-gisviz-ink-soft hover:text-gisviz-ink transition-colors">
+                className="px-2 py-0.5 rounded text-[12px] font-mono bg-gisviz-canvas border border-gisviz-border text-gisviz-ink-soft hover:text-gisviz-ink transition-colors">
                 Cancel
               </button>
             </div>
@@ -799,7 +821,7 @@ function ReportRow({
             <button
               onClick={() => setConfirmDel(true)}
               disabled={!!busy}
-              className="flex items-center gap-1.5 px-3 py-1 rounded text-[11px] font-mono bg-red-50 text-gisviz-alert border border-red-200 hover:bg-red-100 transition-colors disabled:opacity-40"
+              className="flex items-center gap-1.5 px-3 py-1 rounded text-[12px] font-mono bg-red-50 text-gisviz-alert border border-red-200 hover:bg-red-100 transition-colors disabled:opacity-40"
             >
               <Trash2 size={11} /> Delete Post
             </button>
@@ -865,7 +887,7 @@ function CommentsPanel({ onError }: { onError: (e: string) => void }) {
                 <tr key={c.comment_id} className="hover:bg-gisviz-canvas/30 transition-colors">
                   <td className="px-6 py-3">
                     <Link href={`/profile/${c.user_handle}`} className="text-gisviz-accent hover:underline">@{c.user_handle}</Link>
-                    <div className="text-[10px] text-gisviz-ink-soft mt-0.5">{new Date(c.created_timestamp).toLocaleDateString()}</div>
+                    <div className="text-[12px] text-gisviz-ink-soft mt-0.5">{new Date(c.created_timestamp).toLocaleDateString()}</div>
                   </td>
                   <td className="px-4 py-3 text-gisviz-ink-soft max-w-xs"><span className="line-clamp-2">{c.content}</span></td>
                   <td className="px-4 py-3 hidden sm:table-cell">
@@ -891,9 +913,9 @@ function CommentsPanel({ onError }: { onError: (e: string) => void }) {
           </table>
           <div className="flex justify-end gap-2 px-6 py-3 border-t border-gisviz-border bg-gisviz-canvas/30">
             <button onClick={() => { const s = Math.max(0, skip - LIMIT); setSkip(s); load(s, search) }} disabled={skip === 0}
-              className="px-3 py-1 rounded border border-gisviz-border text-[11px] font-mono text-gisviz-ink-soft hover:text-gisviz-ink disabled:opacity-40 transition-colors">← Prev</button>
+              className="px-3 py-1 rounded border border-gisviz-border text-[12px] font-mono text-gisviz-ink-soft hover:text-gisviz-ink disabled:opacity-40 transition-colors">← Prev</button>
             <button onClick={() => { const s = skip + LIMIT; setSkip(s); load(s, search) }} disabled={comments.length < LIMIT}
-              className="px-3 py-1 rounded border border-gisviz-border text-[11px] font-mono text-gisviz-ink-soft hover:text-gisviz-ink disabled:opacity-40 transition-colors">Next →</button>
+              className="px-3 py-1 rounded border border-gisviz-border text-[12px] font-mono text-gisviz-ink-soft hover:text-gisviz-ink disabled:opacity-40 transition-colors">Next →</button>
           </div>
         </>
       )}
@@ -956,7 +978,7 @@ function UnverifiedPanel({ onError }: { onError: (e: string) => void }) {
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
           </button>
           <div className="flex items-center gap-2">
-            <label className="text-[11px] font-mono text-gisviz-ink-soft whitespace-nowrap">Older than</label>
+            <label className="text-[12px] font-mono text-gisviz-ink-soft whitespace-nowrap">Older than</label>
             <select
               value={days}
               onChange={e => {
@@ -970,7 +992,7 @@ function UnverifiedPanel({ onError }: { onError: (e: string) => void }) {
           </div>
           {users.length > 0 && (
             <button onClick={handleBulkDelete} disabled={bulkBusy}
-              className="flex items-center gap-1 px-3 py-1.5 bg-gisviz-alert text-white rounded text-[11px] font-mono font-bold hover:bg-red-700 transition-colors disabled:opacity-50">
+              className="flex items-center gap-1 px-3 py-1.5 bg-gisviz-alert text-white rounded text-[12px] font-mono font-bold hover:bg-red-700 transition-colors disabled:opacity-50">
               {bulkBusy ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />} Bulk Delete (30+ days)
             </button>
           )}
@@ -991,12 +1013,12 @@ function UnverifiedPanel({ onError }: { onError: (e: string) => void }) {
               {users.map((u: any) => (
                 <tr key={u.user_id} className="hover:bg-gisviz-canvas/30 transition-colors">
                   <td className="px-6 py-3 font-medium text-gisviz-ink">@{u.user_handle}</td>
-                  <td className="px-4 py-3 text-gisviz-ink-soft hidden sm:table-cell text-[11px]">{u.email_address}</td>
+                  <td className="px-4 py-3 text-gisviz-ink-soft hidden sm:table-cell text-[12px]">{u.email_address}</td>
                   <td className="px-4 py-3 text-gisviz-ink-soft hidden md:table-cell">{new Date(u.created_timestamp).toLocaleDateString()}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1 justify-end">
                       <button onClick={() => handleVerify(u.user_id)} disabled={!!busy}
-                        className="flex items-center gap-1 px-2 py-1 bg-green-50 text-green-700 border border-green-200 rounded text-[11px] font-mono hover:bg-green-100 transition-colors disabled:opacity-50">
+                        className="flex items-center gap-1 px-2 py-1 bg-green-50 text-green-700 border border-green-200 rounded text-[12px] font-mono hover:bg-green-100 transition-colors disabled:opacity-50">
                         {busy === u.user_id ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />} Verify
                       </button>
                       <ConfirmBtn onConfirm={() => handleDelete(u.user_id)} busy={busy === u.user_id} />
@@ -1008,6 +1030,108 @@ function UnverifiedPanel({ onError }: { onError: (e: string) => void }) {
           </table>
         )
       }
+    </Panel>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SUPPORT TICKETS
+// ─────────────────────────────────────────────────────────────────────────────
+function SupportPopup({ onError }: { onError: (e: string) => void }) {
+  const [tickets, setTickets]   = useState<any[]>([])
+  const [loading, setLoading]   = useState(true)
+  const [busy, setBusy]         = useState<string | null>(null)
+  const [filter, setFilter]     = useState<'all' | 'open' | 'resolved' | 'dismissed'>('all')
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const res = await gisvizApi.adminFetchSupportTickets()
+      setTickets(Array.isArray(res) ? res : (res?.tickets || []))
+    } catch { onError('Failed to load support tickets') }
+    finally { setLoading(false) }
+  }, [onError])
+
+  useEffect(() => { load() }, [load])
+
+  const act = async (key: string, fn: () => Promise<any>, reload = true) => {
+    setBusy(key)
+    try {
+      await fn()
+      if (reload) await load()
+    } catch (e: any) {
+      onError(e?.response?.data?.detail || 'Action failed')
+    } finally { setBusy(null) }
+  }
+
+  const safeTickets = Array.isArray(tickets) ? tickets : []
+  const visible = safeTickets.filter(t => filter === 'all' || t.status === filter)
+
+  return (
+    <Panel title="Support Tickets" icon={<LifeBuoy size={14} />} count={safeTickets.length}
+      actions={
+        <div className="flex items-center gap-1 flex-wrap">
+          {(['all', 'open', 'resolved', 'dismissed'] as const).map(f => (
+            <button key={f} onClick={() => setFilter(f)}
+              className={`px-2.5 py-1 rounded text-[11px] font-mono transition-colors capitalize ${
+                filter === f ? 'bg-gisviz-accent text-white' : 'bg-gisviz-canvas border border-gisviz-border text-gisviz-ink-soft hover:text-gisviz-ink'
+              }`}>
+              {f}
+            </button>
+          ))}
+          <button onClick={load} title="Refresh" className="p-1.5 ml-1 rounded hover:bg-gisviz-canvas text-gisviz-ink-soft hover:text-gisviz-ink transition-colors">
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+          </button>
+        </div>
+      }
+    >
+      {loading ? <Spinner /> : visible.length === 0 ? <EmptyState text={`No ${filter === 'all' ? '' : filter} tickets.`} /> : (
+        <div className="divide-y divide-gisviz-border/50">
+          {visible.map(t => (
+            <div key={t.ticket_id} className="px-5 py-4 hover:bg-gisviz-canvas/30 transition-colors">
+              <div className="flex items-start gap-3 mb-3">
+                <LifeBuoy size={14} className={`mt-0.5 shrink-0 ${t.status === 'open' ? 'text-yellow-500' : t.status === 'resolved' ? 'text-green-600' : 'text-gisviz-ink-soft'}`} />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                    <Badge color={t.status}>{t.status}</Badge>
+                    <span className="text-[11px] font-mono px-2 py-0.5 bg-gisviz-canvas border border-gisviz-border rounded capitalize text-gisviz-ink-soft">
+                      {t.category.replace('_', ' ')}
+                    </span>
+                    <span className="text-[11px] font-mono text-gisviz-ink-soft">
+                      {new Date(t.created_timestamp).toLocaleDateString()}
+                    </span>
+                  </div>
+                  <p className="text-[13px] font-bold text-gisviz-ink mt-2">{t.subject}</p>
+                  <p className="text-[12px] font-mono text-gisviz-ink-soft mt-1">{t.description}</p>
+
+                  <div className="flex gap-4 mt-3 p-3 bg-gisviz-canvas/50 border border-gisviz-border rounded-md">
+                    {t.user_handle ? (
+                      <p className="text-[11px] font-mono text-gisviz-ink-soft">Registered User: <span className="text-gisviz-ink font-bold">@{t.user_handle}</span></p>
+                    ) : (
+                      <p className="text-[11px] font-mono text-gisviz-ink-soft italic">Anonymous Visitor</p>
+                    )}
+                    {t.contact_email && <p className="text-[11px] font-mono text-gisviz-ink-soft">Email: <span className="text-gisviz-ink">{t.contact_email}</span></p>}
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap pl-[26px]">
+                {t.status !== 'resolved' && (
+                  <button onClick={() => act(`res-${t.ticket_id}`, () => gisvizApi.adminUpdateSupportStatus(t.ticket_id, 'resolved'))} disabled={!!busy}
+                    className="flex items-center gap-1.5 px-3 py-1 rounded text-[11px] font-mono bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 transition-colors disabled:opacity-40">
+                    {busy === `res-${t.ticket_id}` ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />} Resolve
+                  </button>
+                )}
+                {t.status !== 'dismissed' && (
+                  <button onClick={() => act(`dis-${t.ticket_id}`, () => gisvizApi.adminUpdateSupportStatus(t.ticket_id, 'dismissed'))} disabled={!!busy}
+                    className="flex items-center gap-1.5 px-3 py-1 rounded text-[11px] font-mono bg-gisviz-canvas text-gisviz-ink-soft border border-gisviz-border hover:text-gisviz-ink transition-colors disabled:opacity-40">
+                    {busy === `dis-${t.ticket_id}` ? <Loader2 size={11} className="animate-spin" /> : <X size={11} />} Dismiss
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </Panel>
   )
 }
@@ -1114,7 +1238,7 @@ function RolesPanel({ onError }: { onError: (e: string) => void }) {
           <div className="px-6 py-4 border-b border-gisviz-border bg-gisviz-canvas/30 space-y-3">
             <div className="flex gap-3 items-end flex-wrap">
               <div>
-                <label className="block text-[11px] font-mono text-gisviz-ink-soft mb-1 uppercase">Role Name</label>
+                <label className="block text-[12px] font-mono text-gisviz-ink-soft mb-1 uppercase">Role Name</label>
                 <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="e.g. moderator"
                   className="bg-gisviz-canvas border border-gisviz-border rounded px-3 py-1.5 text-[12px] font-mono text-gisviz-ink focus:ring-1 focus:ring-gisviz-accent outline-none" />
               </div>
@@ -1127,7 +1251,7 @@ function RolesPanel({ onError }: { onError: (e: string) => void }) {
                     className="mt-0.5 accent-gisviz-accent" />
                   <div>
                     <p className="text-[12px] font-mono text-gisviz-ink group-hover:text-gisviz-accent transition-colors">{p.label}</p>
-                    <p className="text-[10px] font-mono text-gisviz-ink-soft">{p.desc}</p>
+                    <p className="text-[12px] font-mono text-gisviz-ink-soft">{p.desc}</p>
                   </div>
                 </label>
               ))}
@@ -1151,7 +1275,7 @@ function RolesPanel({ onError }: { onError: (e: string) => void }) {
                   <th className="text-left px-6 py-3 text-gisviz-ink-soft uppercase tracking-wider">Role</th>
                   {PERM_KEYS.map(p => (
                     <th key={p.key} className="px-3 py-3 text-center">
-                      <div className="text-[10px] font-mono text-gisviz-ink-soft uppercase tracking-wider">{p.label}</div>
+                      <div className="text-[12px] font-mono text-gisviz-ink-soft uppercase tracking-wider">{p.label}</div>
                       <div className="text-[9px] font-mono text-gisviz-border">{p.desc}</div>
                     </th>
                   ))}

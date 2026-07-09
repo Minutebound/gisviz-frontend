@@ -60,12 +60,12 @@ export default function AccessRestricted({
           {/* Role info pills */}
           <div className="flex flex-wrap items-center justify-center gap-3 mb-8">
             {currentRole && (
-              <div className="flex items-center gap-2 bg-gisviz-canvas border border-gisviz-border rounded-sm px-4 py-2 font-mono text-[11px]">
+              <div className="flex items-center gap-2 bg-gisviz-canvas border border-gisviz-border rounded-sm px-4 py-2 font-mono text-[12px]">
                 <span className="text-gisviz-ink-soft uppercase tracking-wider">Your Role</span>
                 <span className="font-bold text-gisviz-ink uppercase">{currentRole}</span>
               </div>
             )}
-            <div className="flex items-center gap-2 bg-gisviz-alert/5 border border-gisviz-alert/20 rounded-sm px-4 py-2 font-mono text-[11px]">
+            <div className="flex items-center gap-2 bg-gisviz-alert/5 border border-gisviz-alert/20 rounded-sm px-4 py-2 font-mono text-[12px]">
               <Lock size={10} className="text-gisviz-alert/60" />
               <span className="text-gisviz-ink-soft uppercase tracking-wider">Required</span>
               <span className="font-bold text-gisviz-alert/80 uppercase">

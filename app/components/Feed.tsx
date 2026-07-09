@@ -106,8 +106,8 @@ export default function Feed() {
       if (tab === 'stream') {
         data = await gisvizApi.fetchGlobalStream(currentOffset, POSTS_PER_PAGE)
       } else {
-        const allTrending = await gisvizApi.fetchTrending(currentOffset + POSTS_PER_PAGE)
-        data = allTrending.slice(currentOffset)
+        const streamData = await gisvizApi.fetchGlobalStream(currentOffset, POSTS_PER_PAGE)
+        data = [...streamData].sort((a, b) => b.total_likes_count - a.total_likes_count)
       }
 
       if (data.length < POSTS_PER_PAGE) setHasMore(false)

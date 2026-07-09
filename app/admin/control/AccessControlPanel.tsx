@@ -161,7 +161,7 @@ function RolesSection({ roles, onError, onChanged }: {
       count={roles.length}
       actions={
         <button onClick={() => setShowNew(v => !v)}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-gisviz-accent/10 text-gisviz-accent border border-gisviz-accent/30 rounded font-mono text-[11px] hover:bg-gisviz-accent/20 transition-colors">
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-gisviz-accent/10 text-gisviz-accent border border-gisviz-accent/30 rounded font-mono text-[12px] hover:bg-gisviz-accent/20 transition-colors">
           <Plus size={13} /> New Role
         </button>
       }
@@ -173,7 +173,7 @@ function RolesSection({ roles, onError, onChanged }: {
             placeholder="role name (e.g. curator)"
             className="flex-1 min-w-[180px] px-3 py-1.5 bg-gisviz-card border border-gisviz-border rounded font-mono text-[12px] text-gisviz-ink focus:border-gisviz-accent outline-none" />
           <button onClick={create} disabled={createBusy}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 text-green-700 border border-green-200 rounded font-mono text-[11px] hover:bg-green-100 transition-colors disabled:opacity-50">
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 text-green-700 border border-green-200 rounded font-mono text-[12px] hover:bg-green-100 transition-colors disabled:opacity-50">
             {createBusy ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />} Create
           </button>
           <button onClick={() => { setShowNew(false); setNewName('') }}
@@ -205,7 +205,7 @@ function RolesSection({ roles, onError, onChanged }: {
                 </td>
                 <td className="px-4 py-3 text-gisviz-ink-soft">{role.user_count}</td>
                 <td className="px-4 py-3 hidden sm:table-cell">
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold border ${
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-[12px] font-bold border ${
                     isSystem
                       ? 'bg-gisviz-accent/10 text-gisviz-accent border-gisviz-accent/20'
                       : 'bg-gisviz-canvas text-gisviz-ink-soft border-gisviz-border'}`}>
@@ -231,7 +231,7 @@ function RolesSection({ roles, onError, onChanged }: {
                         </button>
                         {confirmId === role.role_id ? (
                           <button onClick={() => remove(role)} disabled={rowBusy === role.role_id}
-                            className="flex items-center gap-1 px-2 py-1 bg-red-50 text-gisviz-alert border border-red-200 rounded text-[11px] hover:bg-red-100 transition-colors">
+                            className="flex items-center gap-1 px-2 py-1 bg-red-50 text-gisviz-alert border border-red-200 rounded text-[12px] hover:bg-red-100 transition-colors">
                             {rowBusy === role.role_id ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />} Sure?
                           </button>
                         ) : (
@@ -278,17 +278,17 @@ function PageAccessSection({ pages, roles }: { pages: MatrixPage[]; roles: Matri
                     <FileText size={13} className="text-gisviz-ink-soft/50 shrink-0" />
                     <div>
                       <p className="font-bold text-gisviz-ink">{page.label}</p>
-                      <p className="text-[10px] text-gisviz-ink-soft">{page.path}</p>
+                      <p className="text-[12px] text-gisviz-ink-soft">{page.path}</p>
                     </div>
                   </div>
                 </td>
                 <td className="px-4 py-3 hidden md:table-cell">
                   {page.required_permission ? (
-                    <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-gisviz-canvas text-gisviz-ink-soft border border-gisviz-border">
+                    <span className="inline-block px-2 py-0.5 rounded text-[12px] font-bold bg-gisviz-canvas text-gisviz-ink-soft border border-gisviz-border">
                       {page.required_permission}
                     </span>
                   ) : (
-                    <span className="text-gisviz-ink-soft/50 text-[11px]">any user</span>
+                    <span className="text-gisviz-ink-soft/50 text-[12px]">any user</span>
                   )}
                 </td>
                 {roles.map(r => (
@@ -305,7 +305,7 @@ function PageAccessSection({ pages, roles }: { pages: MatrixPage[]; roles: Matri
           </tbody>
         </table>
       </div>
-      <div className="px-6 py-3 border-t border-gisviz-border bg-gisviz-canvas/30 text-[11px] font-mono text-gisviz-ink-soft">
+      <div className="px-6 py-3 border-t border-gisviz-border bg-gisviz-canvas/30 text-[12px] font-mono text-gisviz-ink-soft">
         Derived from role permissions below — read-only. To change access, toggle the role's permission.
       </div>
     </Panel>

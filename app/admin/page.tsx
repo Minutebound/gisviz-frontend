@@ -111,9 +111,9 @@ export default function AdminHomePage() {
             className="group bg-gisviz-card border border-gisviz-border rounded-sm p-4 shadow-sm hover:border-gisviz-accent transition-colors flex flex-col gap-2">
             <div className="flex items-center gap-2 text-gisviz-ink">
               <span className="text-gisviz-ink-soft group-hover:text-gisviz-accent transition-colors">{t.icon}</span>
-              <span className="text-[13px] font-mono font-bold">{t.label}</span>
+              <span className="text-[12px] font-mono font-bold">{t.label}</span>
             </div>
-            <p className="text-[11px] font-mono text-gisviz-ink-soft leading-snug">{t.desc}</p>
+            <p className="text-[12px] font-mono text-gisviz-ink-soft leading-snug">{t.desc}</p>
           </Link>
         ))}
       </div>

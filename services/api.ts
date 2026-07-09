@@ -121,7 +121,7 @@ export const gisvizApi = {
   verifyEmailChange: async (newEmail: string, otp: string) =>
     (await axiosInstance.post('/users/email/verify', { new_email: newEmail, otp })).data,
 
-  deleteAccount: async (currentPassword: string) =>
+  deactivateAccount: async (currentPassword: string) =>
     (await axiosInstance.delete('/users/me', { data: { current_password: currentPassword } })).data,
 
   // ── Uploads ───────────────────────────────────────────────────────────────
@@ -385,22 +385,28 @@ export const gisvizApi = {
   updateReportStatus: async (reportId: string, status: 'resolved' | 'dismissed') =>
     (await axiosInstance.put(`/posts/reports/${reportId}/status`, { status })).data,
 
-  // ─── PASTE ALL OF THESE INTO THE gisvizApi OBJECT IN services/api.ts ─────────
-// Add after the existing methods, before the closing brace.
-// These call the new /api/v1/admin/* endpoints registered in main.py.
+  // services/api.ts — admin analytics section only
+// Replace the Admin Analytics block in your full api.ts with this.
+// Everything else in api.ts stays exactly the same.
 
-  // ── Admin — Analytics ────────────────────────────────────────────────────
-  adminFetchOverview: async () =>
-    (await axiosInstance.get('/admin/analytics/overview')).data,
+// ── Admin — Analytics (live OLTP — always fresh) ──────────────────────────
+adminFetchOverview: async () =>
+  (await axiosInstance.get('/admin/analytics/overview')).data,
 
-  adminFetchTopPosts: async (by: 'likes' | 'bookmarks' | 'comments' = 'likes', limit = 10) =>
-    (await axiosInstance.get('/admin/analytics/top-posts', { params: { by, limit } })).data,
+adminFetchTopPosts: async (by: 'likes' | 'bookmarks' | 'comments' = 'likes', limit = 10) =>
+  (await axiosInstance.get('/admin/analytics/top-posts', { params: { by, limit } })).data,
 
-  adminFetchTopUsers: async (by: 'followers' | 'posts' = 'followers', limit = 10) =>
-    (await axiosInstance.get('/admin/analytics/top-users', { params: { by, limit } })).data,
+adminFetchTopUsers: async (by: 'followers' | 'posts' = 'followers', limit = 10) =>
+  (await axiosInstance.get('/admin/analytics/top-users', { params: { by, limit } })).data,
 
-  adminFetchTopCommenters: async (limit = 10) =>
-    (await axiosInstance.get('/admin/analytics/active-commenters', { params: { limit } })).data,
+adminFetchTopCommenters: async (limit = 10) =>
+  (await axiosInstance.get('/admin/analytics/active-commenters', { params: { limit } })).data,
+
+// ── Admin — Snapshot trigger ───────────────────────────────────────────────
+// Called by the Refresh button. Runs run_daily_snapshot() on the backend,
+// which writes today's data into analytics_db so trend charts update.
+adminRunSnapshot: async () =>
+  (await axiosInstance.post('/admin/run-snapshot')).data,
 
   // ── Admin — Roles ────────────────────────────────────────────────────────
   adminFetchRoles: async () =>
@@ -470,5 +476,15 @@ export const gisvizApi = {
  
   adminFetchAccessMatrix: async () =>
     (await axiosInstance.get('/admin/access/matrix')).data,
+
+  // ── Support / Contact ──────────────────────────────────────────────────
+  submitSupportTicket: async (payload: { category: string; subject: string; description: string; contact_email?: string }) =>
+    (await axiosInstance.post('/users/support', payload)).data,
+
+  adminFetchSupportTickets: async () =>
+    (await axiosInstance.get('/users/support/all')).data,
+
+  adminUpdateSupportStatus: async (ticketId: string, status: 'open' | 'resolved' | 'dismissed') =>
+    (await axiosInstance.put(`/users/support/${ticketId}/status`, { status })).data,
  
 }

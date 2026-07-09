@@ -135,8 +135,8 @@ export default function SettingsPage() {
   const togglePwd = (name: string) => setShowPwd(p => ({ ...p, [name]: !p[name] }))
 
   // ---- Delete account ----
-  const [deletePassword,    setDeletePassword]    = useState('')
-  const [deleteConfirmText, setDeleteConfirmText] = useState('')
+  const [deactivatePassword,    setDeactivatePassword]    = useState('')
+  const [deactivateConfirmText, setDeactivateConfirmText] = useState('')
 
   // ---------------------------------------------------------------
   // Hydrate
@@ -207,7 +207,7 @@ export default function SettingsPage() {
       <button
         type="button"
         onClick={() => toggleEdit(fieldName)}
-        className={`text-[10px] font-mono px-2 py-0.5 rounded border transition-colors flex items-center gap-1 ${
+        className={`text-[12px] font-mono px-2 py-0.5 rounded border transition-colors flex items-center gap-1 ${
           editingFields[fieldName]
             ? 'border-gisviz-alert/40 text-gisviz-alert bg-gisviz-alert/5'
             : 'border-gisviz-border text-gisviz-ink-soft hover:border-gisviz-accent hover:text-gisviz-accent'
@@ -347,19 +347,19 @@ export default function SettingsPage() {
     } finally { setSave('password', false) }
   }
 
-  const submitDelete = async (e: React.FormEvent) => {
+  const submitDeactivate = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (deleteConfirmText !== user?.user_handle) {
-      setMsg('delete', { type: 'error', text: `Type your exact handle to confirm: ${user?.user_handle}` }); return
+    if (deactivateConfirmText !== user?.user_handle) {
+      setMsg('deactivate', { type: 'error', text: `Type your exact handle to confirm: ${user?.user_handle}` }); return
     }
-    setSave('delete', true); setMsg('delete', null)
+    setSave('deactivate', true); setMsg('deactivate', null)
     try {
+      await gisvizApi.deactivateAccount(deactivatePassword)
       logoutSession()
-      await gisvizApi.deleteAccount(deletePassword)
       router.push('/')
     } catch (err: any) {
-      setSave('delete', false)
-      setMsg('delete', { type: 'error', text: parseError(err, 'Deletion failed. Please try again.') })
+      setSave('deactivate', false)
+      setMsg('deactivate', { type: 'error', text: parseError(err, 'Deactivation failed. Please try again.') })
     }
   }
 
@@ -433,7 +433,7 @@ export default function SettingsPage() {
                       setAvatarFile(f); setAvatarPreview(URL.createObjectURL(f))
                     }}
                   />
-                  {avatarFile && <p className="text-[11px] font-mono text-gisviz-accent mt-2">✓ New avatar selected</p>}
+                  {avatarFile && <p className="text-[12px] font-mono text-gisviz-accent mt-2">✓ New avatar selected</p>}
                 </div>
               </div>
 
@@ -464,10 +464,12 @@ export default function SettingsPage() {
                         value={handleVal}
                         onChange={e => setHandleVal(e.target.value.replace(/^@/, ''))}
                         placeholder={user.user_handle}
+                        minLength={3}
+                        maxLength={16}
                         className="w-full bg-gisviz-canvas border border-gisviz-border rounded-md pl-8 pr-4 py-2.5 text-gisviz-ink text-[16px] font-mono focus:ring-2 focus:ring-gisviz-accent outline-none"
                       />
                     </div>
-                    <p className="text-[11px] font-mono text-gisviz-ink-soft">
+                    <p className="text-[12px] font-mono text-gisviz-ink-soft">
                       Letters, numbers and underscores only · 3–30 characters · must be unique
                     </p>
                   </div>
@@ -501,7 +503,7 @@ export default function SettingsPage() {
                       rel="noopener noreferrer"
                       className="flex items-center gap-2 w-full bg-gisviz-canvas/50 border border-gisviz-border/50 rounded-md px-4 py-2.5 font-mono text-[16px] shadow-inner hover:border-gisviz-accent/50 transition-colors group"
                     >
-                      <span className="text-gisviz-ink-soft text-[13px] shrink-0">linkedin.com/in/</span>
+                      <span className="text-gisviz-ink-soft text-[12px] shrink-0">linkedin.com/in/</span>
                       <span className="text-gisviz-accent font-bold truncate">{linkedinUsername}</span>
                       <ExternalLink size={12} className="ml-auto shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-gisviz-ink-soft" />
                     </a>
@@ -513,7 +515,7 @@ export default function SettingsPage() {
                 ) : (
                   /* Edit mode: prefix is decoration, only username is editable */
                   <div className="flex rounded-md overflow-hidden border border-gisviz-border focus-within:ring-2 focus-within:ring-gisviz-accent">
-                    <span className="flex items-center px-3 bg-gisviz-canvas/80 text-gisviz-ink-soft font-mono text-[13px] border-r border-gisviz-border whitespace-nowrap shrink-0">
+                    <span className="flex items-center px-3 bg-gisviz-canvas/80 text-gisviz-ink-soft font-mono text-[12px] border-r border-gisviz-border whitespace-nowrap shrink-0">
                       linkedin.com/in/
                     </span>
                     <input
@@ -538,7 +540,7 @@ export default function SettingsPage() {
                       rel="noopener noreferrer"
                       className="flex items-center gap-2 w-full bg-gisviz-canvas/50 border border-gisviz-border/50 rounded-md px-4 py-2.5 font-mono text-[16px] shadow-inner hover:border-gisviz-accent/50 transition-colors group"
                     >
-                      <span className="text-gisviz-ink-soft text-[13px] shrink-0">medium.com/@</span>
+                      <span className="text-gisviz-ink-soft text-[12px] shrink-0">medium.com/@</span>
                       <span className="text-gisviz-accent font-bold truncate">{mediumUsername}</span>
                       <ExternalLink size={12} className="ml-auto shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-gisviz-ink-soft" />
                     </a>
@@ -549,7 +551,7 @@ export default function SettingsPage() {
                   )
                 ) : (
                   <div className="flex rounded-md overflow-hidden border border-gisviz-border focus-within:ring-2 focus-within:ring-gisviz-accent">
-                    <span className="flex items-center px-3 bg-gisviz-canvas/80 text-gisviz-ink-soft font-mono text-[13px] border-r border-gisviz-border whitespace-nowrap shrink-0">
+                    <span className="flex items-center px-3 bg-gisviz-canvas/80 text-gisviz-ink-soft font-mono text-[12px] border-r border-gisviz-border whitespace-nowrap shrink-0">
                       medium.com/@
                     </span>
                     <input
@@ -669,7 +671,7 @@ export default function SettingsPage() {
                 }
                 toggleEdit('email')
               }}
-              className={`text-[10px] font-mono px-2 py-0.5 rounded border transition-colors flex items-center gap-1 ${
+              className={`text-[12px] font-mono px-2 py-0.5 rounded border transition-colors flex items-center gap-1 ${
                 editingFields.email
                   ? 'border-gisviz-alert/40 text-gisviz-alert bg-gisviz-alert/5'
                   : 'border-gisviz-border text-gisviz-ink-soft hover:border-gisviz-accent hover:text-gisviz-accent'
@@ -715,7 +717,7 @@ export default function SettingsPage() {
           {editingFields.email && emailStep === 'otp' && (
             <form onSubmit={submitEmailVerify} className="space-y-4">
               {devOtp && (
-                <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md text-[11px] font-mono text-yellow-700">
+                <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md text-[12px] font-mono text-yellow-700">
                   DEV: OTP = {devOtp}
                 </div>
               )}
@@ -723,7 +725,7 @@ export default function SettingsPage() {
                 <label className="text-[16px] font-mono text-gisviz-ink-soft uppercase tracking-wider block mb-2">Verification Code</label>
                 <input type="text" value={emailOtp} onChange={e => setEmailOtp(e.target.value)}
                   maxLength={6} placeholder="••••••"
-                  className="w-full text-center tracking-[0.5em] bg-gisviz-canvas border border-gisviz-border rounded-md px-4 py-3 text-gisviz-ink text-[20px] font-bold focus:ring-2 focus:ring-gisviz-accent outline-none font-mono"
+                  className="w-full text-center tracking-[0.5em] bg-gisviz-canvas border border-gisviz-border rounded-md px-4 py-3 text-gisviz-ink text-[16px] font-bold focus:ring-2 focus:ring-gisviz-accent outline-none font-mono"
                 />
               </div>
               <div className="flex justify-end">
@@ -745,7 +747,7 @@ export default function SettingsPage() {
               <p className="text-[16px] font-mono text-gisviz-ink-soft">••••••••••••</p>
             </div>
             <button type="button" onClick={() => toggleEdit('password')}
-              className={`text-[10px] font-mono px-2 py-0.5 rounded border transition-colors flex items-center gap-1 ${
+              className={`text-[12px] font-mono px-2 py-0.5 rounded border transition-colors flex items-center gap-1 ${
                 editingFields.password
                   ? 'border-gisviz-alert/40 text-gisviz-alert bg-gisviz-alert/5'
                   : 'border-gisviz-border text-gisviz-ink-soft hover:border-gisviz-accent hover:text-gisviz-accent'
@@ -784,48 +786,50 @@ export default function SettingsPage() {
       {/* ============================================================ */}
       {/* DANGER ZONE                                                    */}
       {/* ============================================================ */}
-      <div className="bg-gisviz-card border border-gisviz-alert/30 shadow-md p-6 sm:p-8 rounded-sm mb-6">
-        <h2 className="text-[16px] font-bold text-gisviz-alert border-b border-gisviz-alert/20 pb-2 uppercase tracking-wide font-mono flex items-center gap-2 mb-6">
-          <Trash2 size={14} /> Danger Zone
+      {/* ============================================================ */}
+      {/* ACCOUNT STATUS                                               */}
+      {/* ============================================================ */}
+      <div className="bg-gisviz-card border border-yellow-500/30 shadow-md p-6 sm:p-8 rounded-sm mb-6">
+        <h2 className="text-[16px] font-bold text-yellow-600 border-b border-yellow-500/20 pb-2 uppercase tracking-wide font-mono flex items-center gap-2 mb-6">
+          <Shield size={14} /> Account Status
         </h2>
-        <SectionMsg section="delete" />
+        <SectionMsg section="deactivate" />
         <p className="text-[16px] font-mono text-gisviz-ink-soft mb-4">
-          Permanently delete your account and all associated data. This action cannot be undone.
+          Deactivate your account. Your profile and posts will be hidden from the platform. You can reactivate your account at any time by simply reverifying the account.
         </p>
         <div className="flex items-center justify-between mb-4">
-          <p className="text-[16px] font-mono text-gisviz-ink font-bold">Delete Account</p>
-          <button type="button" onClick={() => toggleEdit('delete')}
-            className={`text-[10px] font-mono px-2 py-0.5 rounded border transition-colors flex items-center gap-1 ${
-              editingFields.delete
-                ? 'border-gisviz-alert/40 text-gisviz-alert bg-gisviz-alert/5'
-                : 'border-gisviz-alert/30 text-gisviz-alert/70 hover:border-gisviz-alert hover:text-gisviz-alert'
+          <button type="button" onClick={() => toggleEdit('deactivate')}
+            className={`text-[16px] font-mono px-2 py-0.5 rounded border transition-colors flex items-center gap-1 ${
+              editingFields.deactivate
+                ? 'border-yellow-500/40 text-yellow-600 bg-yellow-50'
+                : 'border-yellow-500/30 text-yellow-600/70 hover:border-yellow-500 hover:text-yellow-600'
             }`}
           >
-            {editingFields.delete ? <><X size={10} /> Cancel</> : <><Trash2 size={10} /> Delete</>}
+            {editingFields.deactivate ? <><X size={10} /> Cancel</> : <><Shield size={14} /> Deactivate</>}
           </button>
         </div>
-        {editingFields.delete && (
-          <form onSubmit={submitDelete} className="space-y-4">
+        {editingFields.deactivate && (
+          <form onSubmit={submitDeactivate} className="space-y-4">
             <div>
               <label className="text-[16px] font-mono text-gisviz-ink-soft uppercase tracking-wider block mb-2">
                 Type your handle to confirm: <span className="text-gisviz-ink font-bold">{user.user_handle}</span>
               </label>
-              <input type="text" value={deleteConfirmText}
-                onChange={e => setDeleteConfirmText(e.target.value)}
+              <input type="text" value={deactivateConfirmText}
+                onChange={e => setDeactivateConfirmText(e.target.value)}
                 placeholder={user.user_handle}
-                className="w-full bg-gisviz-canvas border border-gisviz-alert/30 rounded-md px-4 py-2.5 text-gisviz-ink text-[16px] font-mono focus:ring-2 focus:ring-gisviz-alert outline-none"
+                className="w-full bg-gisviz-canvas border border-yellow-500/30 rounded-md px-4 py-2.5 text-gisviz-ink text-[16px] font-mono focus:ring-2 focus:ring-yellow-500 outline-none"
               />
             </div>
-            <PwdInput name="deletePassword" label="Current Password" placeholder="Enter your password"
-              value={deletePassword}
+            <PwdInput name="deactivatePassword" label="Current Password" placeholder="Enter your password"
+              value={deactivatePassword}
               showPwd={showPwd} onToggle={togglePwd}
-              onChange={e => setDeletePassword(e.target.value)}
+              onChange={e => setDeactivatePassword(e.target.value)}
             />
             <div className="flex justify-end">
-              <button type="submit" disabled={!!saving.delete || deleteConfirmText !== user.user_handle}
-                className="flex items-center gap-2 bg-gisviz-alert text-white px-6 py-2.5 rounded-md text-[16px] font-mono font-bold hover:bg-gisviz-alert/90 disabled:opacity-40 transition-colors">
-                {saving.delete ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-                {saving.delete ? 'Deleting…' : 'Permanently Delete Account'}
+              <button type="submit" disabled={!!saving.deactivate || deactivateConfirmText !== user.user_handle}
+                className="flex items-center gap-2 bg-yellow-600 text-white px-6 py-2.5 rounded-md text-[16px] font-mono font-bold hover:bg-yellow-700 disabled:opacity-40 transition-colors">
+                {saving.deactivate ? <Loader2 size={14} className="animate-spin" /> : <Shield size={14} />}
+                {saving.deactivate ? 'Deactivating…' : 'Deactivate Account'}
               </button>
             </div>
           </form>
