@@ -240,7 +240,7 @@ export default function Feed() {
 
         <Link
           href="/post/upload"
-          className="flex items-center gap-2 bg-gisviz-accent text-white px-4 py-2 rounded-full text-[12px] font-bold hover:bg-opacity-90 transition-all shadow-sm"
+          className="flex items-center gap-2 bg-gisviz-accent text-gisviz-white px-4 py-2 rounded-full text-[12px] font-bold hover:bg-opacity-90 transition-all shadow-sm"
         >
           <Plus size={16} /> Publish
         </Link>
@@ -295,7 +295,7 @@ export default function Feed() {
                           <div className="border-t border-gisviz-border my-1"></div>
                           <button 
                             onClick={() => { setReportModalId(post.post_id); setOpenDropdownId(null) }}
-                            className="w-full flex items-center gap-3 px-4 py-2 text-[12px] text-gisviz-alert hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                            className="w-full flex items-center gap-3 px-4 py-2 text-[12px] text-gisviz-alert hover:bg-gisviz-alert/10 dark:hover:bg-red-950/30 transition-colors"
                           >
                             <Flag size={16} /> Report
                           </button>
@@ -344,7 +344,7 @@ export default function Feed() {
                             className="w-10 h-10 rounded-full object-cover border border-gisviz-border flex-shrink-0" 
                           />
                         ) : (
-                          <div className="w-10 h-10 rounded-full border border-gisviz-border bg-gradient-to-tr from-gisviz-accent to-gisviz-safe 0 flex items-center justify-center text-white text-[16px] font-bold uppercase font-mono shadow-inner flex-shrink-0">
+                          <div className="w-10 h-10 rounded-full border border-gisviz-border bg-gradient-to-tr from-gisviz-accent to-gisviz-safe 0 flex items-center justify-center text-gisviz-white text-[16px] font-bold uppercase font-mono shadow-inner flex-shrink-0">
                         {post.publisher_handle.charAt(0)}
                       </div>
                         )}

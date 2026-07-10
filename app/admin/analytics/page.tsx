@@ -24,7 +24,7 @@ function Trend({ current, previous }: { current: number; previous: number }) {
     return <span className="text-gisviz-ink-soft font-mono text-[12px]">—</span>
   const pct = previous === 0 ? 100 : Math.round(((current - previous) / previous) * 100)
   if (pct > 0) return (
-    <span className="flex items-center gap-0.5 text-green-600 font-mono text-[12px]">
+    <span className="flex items-center gap-0.5 text-gisviz-safe/70 font-mono text-[12px]">
       <TrendingUp size={11} />+{pct}% vs last week
     </span>
   )
@@ -172,7 +172,7 @@ export default function AdminAnalyticsPage() {
           <button
             onClick={loadAll}
             disabled={loading}
-            className="flex items-center gap-2 px-4 py-2 bg-gisviz-accent text-white rounded-md font-mono text-[12px] font-bold hover:bg-opacity-90 transition-colors disabled:opacity-60 shadow-sm"
+            className="flex items-center gap-2 px-4 py-2 bg-gisviz-accent text-gisviz-white rounded-md font-mono text-[12px] font-bold hover:bg-opacity-90 transition-colors disabled:opacity-60 shadow-sm"
           >
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
             {loading ? 'Loading…' : hasLoaded ? 'Refresh' : 'Load Data'}

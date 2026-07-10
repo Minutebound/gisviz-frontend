@@ -1,0 +1,10 @@
+# /.well-known/security.txt — gisviz
+# Place at: public/.well-known/security.txt
+# Standard defined in RFC 9116 — all serious platforms should have this.
+# It tells security researchers where to report vulnerabilities responsibly.
+
+Contact: mailto:info@gisviz.com
+Expires: 2027-01-01T00:00:00.000Z
+Preferred-Languages: en
+Canonical: https://gisviz.com/.well-known/security.txt
+Policy: https://gisviz.com/security-policy

@@ -144,7 +144,7 @@ export default function PostDetail() {
           {avatarUrl ? (
             <img src={avatarUrl} alt={comment.publisher_handle} className="w-8 h-8 rounded-full object-cover border border-gisviz-border" />
           ) : (
-            <div className="w-8 h-8 rounded-full border border-gisviz-border bg-gradient-to-tr from-gisviz-accent to-gisviz-safe flex items-center justify-center text-white text-[12px] font-bold uppercase font-mono shadow-inner flex-shrink-0">
+            <div className="w-8 h-8 rounded-full border border-gisviz-border bg-gradient-to-tr from-gisviz-accent to-gisviz-safe flex items-center justify-center text-gisviz-white text-[12px] font-bold uppercase font-mono shadow-inner flex-shrink-0">
               {comment.publisher_handle.charAt(0)}
             </div>
           )}
@@ -338,7 +338,7 @@ export default function PostDetail() {
                 {avatarUrl ? (
                   <img src={avatarUrl} alt={displayHandle} className="w-9 h-9 rounded-full object-cover border border-gisviz-border" />
                 ) : (
-                  <div className="w-10 h-10 rounded-full border border-gisviz-border bg-gradient-to-tr from-gisviz-accent to-gisviz-safe flex items-center justify-center text-white text-[16px] font-bold uppercase font-mono shadow-inner flex-shrink-0">
+                  <div className="w-10 h-10 rounded-full border border-gisviz-border bg-gradient-to-tr from-gisviz-accent to-gisviz-safe flex items-center justify-center text-gisviz-white text-[16px] font-bold uppercase font-mono shadow-inner flex-shrink-0">
                     {post.publisher_handle.charAt(0)}
                   </div>
                 )}
@@ -395,7 +395,7 @@ export default function PostDetail() {
                   <button
                     type="submit"
                     disabled={isSubmittingComment || !newComment.trim()}
-                    className="bg-gisviz-accent text-white px-3 py-2 rounded-md disabled:opacity-50 flex items-center"
+                    className="bg-gisviz-accent text-gisviz-white px-3 py-2 rounded-md disabled:opacity-50 flex items-center"
                   >
                     {isSubmittingComment ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
                   </button>
@@ -415,10 +415,10 @@ export default function PostDetail() {
       {/* Fullscreen overlay */}
       {isImageFullscreen && visualUrl && (
         <div
-          className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-gisviz-black/10 z-50 flex items-center justify-center p-4"
           onClick={() => setIsImageFullscreen(false)}
         >
-          <button className="absolute top-4 right-4 text-white hover:text-gisviz-accent transition-colors">
+          <button className="absolute top-4 right-4 text-gisviz-white hover:text-gisviz-accent transition-colors">
             <X size={28} />
           </button>
           <img

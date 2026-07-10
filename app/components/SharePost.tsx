@@ -52,7 +52,7 @@ export default function SharePost({ isOpen, onClose, url, title }: ShareModalPro
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
       {/* Backdrop */}
       <div 
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
+        className="absolute inset-0 bg-gisviz-black/10 backdrop-blur-sm transition-opacity"
         onClick={onClose}
       ></div>
 
@@ -84,7 +84,7 @@ export default function SharePost({ isOpen, onClose, url, title }: ShareModalPro
               </div>
               <button 
                 onClick={handleCopy}
-                className="flex items-center justify-center gap-2 bg-gisviz-accent text-white px-4 py-2 rounded-md hover:bg-opacity-90 transition-all font-mono text-[12px] shrink-0 shadow-sm w-28"
+                className="flex items-center justify-center gap-2 bg-gisviz-accent text-gisviz-white px-4 py-2 rounded-md hover:bg-opacity-90 transition-all font-mono text-[12px] shrink-0 shadow-sm w-28"
               >
                 {copied ? <><Check size={16} /> Copied</> : <><LinkIcon size={16} /> Copy</>}
               </button>

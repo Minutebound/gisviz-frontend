@@ -234,7 +234,7 @@ export default function EditPostPage() {
             {previewUrl ? (
               <>
                 <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
-                <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white gap-3 z-10">
+                <div className="absolute inset-0 bg-gisviz-black/10 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-gisviz-white gap-3 z-10">
                   <button
                     type="button"
                     onClick={() => setIsModalOpen(true)}
@@ -366,7 +366,7 @@ export default function EditPostPage() {
                   {selectedCategoryIds.map(id => {
                     const cat = availableCategories.find(c => c.category_id === id)
                     return cat ? (
-                      <span key={id} className="flex items-center gap-1.5 px-3 py-1 bg-gisviz-accent text-white rounded-md font-mono text-[12px] shadow-sm text-camelcase tracking-wider">
+                      <span key={id} className="flex items-center gap-1.5 px-3 py-1 bg-gisviz-accent text-gisviz-white rounded-md font-mono text-[12px] shadow-sm text-camelcase tracking-wider">
                         {cat.label}
                         <button type="button" onClick={() => removeCategory(id)} className="hover:text-gisviz-alert/60"><X size={12} /></button>
                       </span>
@@ -424,7 +424,7 @@ export default function EditPostPage() {
               <div className="flex flex-col gap-3">
                 <div className="flex flex-wrap gap-2">
                   {keywords.map(kw => (
-                    <span key={kw} className="flex items-center gap-1.5 px-3 py-1 bg-gisviz-accent text-white rounded-md font-mono text-[12px] shadow-sm text-camelcase tracking-wider">
+                    <span key={kw} className="flex items-center gap-1.5 px-3 py-1 bg-gisviz-accent text-gisviz-white rounded-md font-mono text-[12px] shadow-sm text-camelcase tracking-wider">
                       {kw}
                       <button type="button" onClick={() => removeKeyword(kw)} className="hover:text-gisviz-alert/60"><X size={12} /></button>
                     </span>
@@ -459,7 +459,7 @@ export default function EditPostPage() {
               <button
                 type="submit"
                 disabled={isSaving}
-                className="flex items-center gap-2 bg-gisviz-accent text-white py-2.5 px-8 rounded-md hover:bg-opacity-90 transition-all font-mono text-[12px] font-bold shadow-md disabled:opacity-70 uppercase tracking-wide"
+                className="flex items-center gap-2 bg-gisviz-accent text-gisviz-white py-2.5 px-8 rounded-md hover:bg-opacity-90 transition-all font-mono text-[12px] font-bold shadow-md disabled:opacity-70 uppercase tracking-wide"
               >
                 {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Bookmark size={18} />}
                 {isSaving ? 'Saving Changes...' : 'Save Changes'}
@@ -473,7 +473,7 @@ export default function EditPostPage() {
       {/* Image Enlargement Modal */}
       {isModalOpen && previewUrl && (
         <div
-          className="fixed inset-0 z-50 backdrop-blur-xl bg-black/60 flex items-center justify-center p-4 md:p-8"
+          className="fixed inset-0 z-50 backdrop-blur-xl bg-gisviz-black/10 flex items-center justify-center p-4 md:p-8"
           onClick={() => setIsModalOpen(false)}
         >
           <div
@@ -482,7 +482,7 @@ export default function EditPostPage() {
           >
             <button
               onClick={() => setIsModalOpen(false)}
-              className="absolute top-4 right-4 z-20 p-2 bg-white/30 backdrop-blur-md rounded-full text-white hover:bg-white/40 transition-colors shadow-lg"
+              className="absolute top-4 right-4 z-20 p-2 bg-white/30 backdrop-blur-md rounded-full text-gisviz-white hover:bg-white/40 transition-colors shadow-lg"
             >
               <X size={24} className="text-gisviz-ink" />
             </button>

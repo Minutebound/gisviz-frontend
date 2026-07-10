@@ -1,31 +1,13 @@
 'use client'
 
 /**
- * SearchOverlay.tsx — Enterprise Search
+ * SearchOverlay.tsx — Enterprise Smart Search
  *
- * Design decisions:
- *
- * 1. ALIGNMENT — the panel drops directly below the FloatingSearch bar,
- *    inside the same feed column. It is NOT a viewport-centred modal.
- *    `fixed inset-0` on the backdrop, panel pinned via `ref` measurement
- *    of the trigger rect so it tracks the feed column on any screen width.
- *
- * 2. POINTER ISOLATION — the backdrop captures ALL pointer events first.
- *    The panel itself uses `e.stopPropagation()` on every interactive
- *    surface so clicks inside never bubble to the backdrop → no accidental
- *    close, and no hover events bleed through to Feed cards below.
- *
- * 3. OUTSIDE CLICK — backdrop `onPointerDown` calls onClose immediately,
- *    before any mousedown reaches Feed. Using `onPointerDown` (not onClick)
- *    prevents the ~100ms gap where feed hover styles would briefly activate.
- *
- * 4. RESULTS — users (handle + avatar) and posts (thumbnail + title) only.
- *    Categories and tags removed as per product spec.
- *
- * 5. KEYBOARD — arrow keys navigate rows, Enter activates, Escape closes.
- *
- * 6. PANEL FEEL — each row is a full-width interactive surface (not just
- *    the text), with keyboard focus ring matching the design system.
+ * Updates:
+ * - Smart Positioning: Calculates screen space and pops UP if near the bottom, or DOWN if near the top.
+ * - Dynamic Layout: Automatically moves the text input to be closest to the trigger bar.
+ * - Safe Exit: Uses a delayed unmount to ensure smooth fade-outs without blocking clicks.
+ * - Result Limits: Restricts output to max 5 users and max 5 posts.
  */
 
 import React, {
@@ -65,26 +47,17 @@ interface PostResult {
 interface SearchResults {
   users: UserResult[]
   posts: PostResult[]
-  // categories and tags exist on the response but we intentionally ignore them
 }
 
 export interface SearchOverlayProps {
   isOpen: boolean
   onClose: () => void
-  /**
-   * Ref to the FloatingSearch trigger element.
-   * The overlay panel aligns its top-left to this rect.
-   */
   triggerRef: React.RefObject<HTMLDivElement | null>
 }
-
-// ─── Flat result list for keyboard navigation ───────────────────────────────
 
 type FlatResult =
   | { kind: 'user'; data: UserResult }
   | { kind: 'post'; data: PostResult }
-
-// ─── Constants ──────────────────────────────────────────────────────────────
 
 const DEBOUNCE_MS = 280
 const MIN_CHARS   = 3
@@ -107,22 +80,44 @@ export default function SearchOverlay({
   const [error,     setError]     = useState('')
   const [activeIdx, setActiveIdx] = useState(-1)
 
-  // ── Panel position — aligned to trigger ─────────────────────────────────
+  // Delayed Unmount to fix the invisible click-blocking glitch
+  const [shouldRender, setShouldRender] = useState(isOpen)
+  
+  // Smart Positioning State
+  const [popDirection, setPopDirection] = useState<'up' | 'down'>('down')
   const [panelStyle, setPanelStyle] = useState<React.CSSProperties>({})
 
+  // ── Smart Measure & Place ───────────────────────────────────────────────
   const measureAndPlace = useCallback(() => {
     if (!triggerRef.current) return
     const rect = triggerRef.current.getBoundingClientRect()
-    setPanelStyle({
-      position:  'fixed',
-      top:       rect.bottom + 8,      // 8px gap below the search bar
-      left:      rect.left,
-      width:     rect.width,
-      maxHeight: `calc(100vh - ${rect.bottom + 24}px)`,
-    })
+    
+    const spaceBelow = window.innerHeight - rect.bottom
+    const spaceAbove = rect.top
+
+    // If there is more space above the bar, pop UP. Otherwise, pop DOWN.
+    if (spaceAbove > spaceBelow) {
+      setPopDirection('up')
+      setPanelStyle({
+        position:  'fixed',
+        bottom:    window.innerHeight - rect.top + 8, // 8px gap above trigger
+        left:      rect.left,
+        width:     rect.width,
+        maxHeight: `calc(${rect.top}px - 24px)`,      // Max height bounded by screen top
+      })
+    } else {
+      setPopDirection('down')
+      setPanelStyle({
+        position:  'fixed',
+        top:       rect.bottom + 8,                   // 8px gap below trigger
+        left:      rect.left,
+        width:     rect.width,
+        maxHeight: `calc(100vh - ${rect.bottom + 24}px)`,
+      })
+    }
   }, [triggerRef])
 
-  // Re-measure on open and on resize
+  // Re-measure on resize
   useEffect(() => {
     if (!isOpen) return
     measureAndPlace()
@@ -130,20 +125,26 @@ export default function SearchOverlay({
     return () => window.removeEventListener('resize', measureAndPlace)
   }, [isOpen, measureAndPlace])
 
-  // ── Focus + scroll lock ──────────────────────────────────────────────────
+  // ── Mount / Unmount Logic ───────────────────────────────────────────────
   useEffect(() => {
     if (isOpen) {
+      setShouldRender(true)
+      measureAndPlace() 
       setTimeout(() => inputRef.current?.focus(), 60)
       document.body.style.overflow = 'hidden'
     } else {
       document.body.style.overflow = ''
-      setQuery('')
-      setResults(null)
-      setError('')
-      setActiveIdx(-1)
+      // Wait for the CSS fade-out animation to finish, then destroy the element
+      const t = setTimeout(() => {
+        setShouldRender(false)
+        setQuery('')
+        setResults(null)
+        setError('')
+        setActiveIdx(-1)
+      }, 200)
+      return () => clearTimeout(t)
     }
-    return () => { document.body.style.overflow = '' }
-  }, [isOpen])
+  }, [isOpen, measureAndPlace])
 
   // ── Escape key ───────────────────────────────────────────────────────────
   useEffect(() => {
@@ -167,6 +168,11 @@ export default function SearchOverlay({
     const t = setTimeout(async () => {
       try {
         const data = await gisvizApi.globalSearch(trimmed)
+        
+        // LIMIT RESULTS: Max 5 users, Max 5 posts
+        data.users = data.users ? data.users.slice(0, 5) : []
+        data.posts = data.posts ? data.posts.slice(0, 5) : []
+        
         setResults(data)
         setActiveIdx(-1)
       } catch (err: any) {
@@ -180,7 +186,6 @@ export default function SearchOverlay({
     return () => clearTimeout(t)
   }, [query])
 
-  // ── Flat list for keyboard nav ───────────────────────────────────────────
   const flat: FlatResult[] = results
     ? [
         ...results.users.map(u => ({ kind: 'user' as const, data: u })),
@@ -188,17 +193,16 @@ export default function SearchOverlay({
       ]
     : []
 
-  const navigate = (href: string) => {
-    onClose()
-    router.push(href)
-  }
-
   const activateResult = (item: FlatResult) => {
-    if (item.kind === 'user') navigate(`/profile/${item.data.user_handle}`)
-    else                      navigate(`/${item.data.post_id}`)
+    onClose()
+    if (item.kind === 'user') {
+      router.push(`/profile/${item.data.user_handle}`)
+    } else {
+      // Changed from item.data.post_id to item.data.share_slug, utilizing the /p/ prefix
+      router.push(`/p/${item.data.share_slug}`)
+    }
   }
 
-  // ── Arrow-key / Enter navigation ─────────────────────────────────────────
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (!flat.length) return
     if (e.key === 'ArrowDown') {
@@ -213,7 +217,6 @@ export default function SearchOverlay({
     }
   }
 
-  // Scroll active item into view
   useEffect(() => {
     if (activeIdx < 0 || !panelRef.current) return
     const el = panelRef.current.querySelector<HTMLElement>(
@@ -222,36 +225,197 @@ export default function SearchOverlay({
     el?.scrollIntoView({ block: 'nearest' })
   }, [activeIdx])
 
+  if (!shouldRender) return null
+
   const hasUsers = (results?.users.length ?? 0) > 0
   const hasPosts = (results?.posts.length ?? 0) > 0
   const hasAny   = hasUsers || hasPosts
 
-  if (!isOpen) return null
+  // ────────────────────────────────────────────────────────────────────────
+  // DYNAMIC RENDER BLOCKS
+  // By splitting these out, we can easily re-order them based on pop direction!
+  // ────────────────────────────────────────────────────────────────────────
+  
+  const InputBar = (
+    <div key="input-bar" className={`flex items-center gap-3 px-4 py-3.5 bg-gisviz-canvas/60 shrink-0 ${popDirection === 'up' ? 'border-t border-gisviz-border' : 'border-b border-gisviz-border'}`}>
+      {loading
+        ? <Loader2 className="w-4 h-4 text-gisviz-accent animate-spin shrink-0" />
+        : <Search  className="w-4 h-4 text-gisviz-ink-soft/60 shrink-0" />
+      }
+
+      <input
+        ref={inputRef}
+        type="search"
+        autoComplete="off"
+        spellCheck={false}
+        role="combobox"
+        aria-expanded={hasAny}
+        aria-controls={listId}
+        aria-activedescendant={activeIdx >= 0 ? `result-${activeIdx}` : undefined}
+        placeholder="Search posts and users…"
+        value={query}
+        onChange={e => setQuery(e.target.value)}
+        onKeyDown={handleKeyDown}
+        className="flex-1 min-w-0 bg-transparent outline-none text-[16px] font-mono text-gisviz-ink placeholder:text-gisviz-ink-soft/50 [&::-webkit-search-cancel-button]:hidden"
+      />
+
+      <button
+        type="button"
+        aria-label={query ? "Clear search" : "Close search"}
+        onClick={() => {
+          if (query) { setQuery(''); inputRef.current?.focus() } 
+          else { onClose() }
+        }}
+        className="p-1.5 rounded-md shrink-0 text-gisviz-ink-soft/60 hover:text-gisviz-ink hover:bg-gisviz-border/40 transition-colors"
+      >
+        <X className="w-4 h-4" />
+      </button>
+    </div>
+  )
+
+  const ShortcutsFooter = (
+    <div key="shortcuts" className={`px-4 py-2.5 bg-gisviz-canvas/40 shrink-0 flex items-center gap-4 ${popDirection === 'up' ? 'border-b border-gisviz-border/30' : 'border-t border-gisviz-border/30'}`}>
+      <span className="text-[12px] font-mono text-gisviz-ink-soft/40 flex items-center gap-1">
+        <kbd className="px-1.5 py-0.5 rounded bg-gisviz-border/30 text-[12px] font-mono">↑↓</kbd> navigate
+      </span>
+      <span className="text-[12px] font-mono text-gisviz-ink-soft/40 flex items-center gap-1">
+        <kbd className="px-1.5 py-0.5 rounded bg-gisviz-border/30 text-[12px] font-mono">↵</kbd> open
+      </span>
+      <span className="text-[12px] font-mono text-gisviz-ink-soft/40 flex items-center gap-1">
+        <kbd className="px-1.5 py-0.5 rounded bg-gisviz-border/30 text-[12px] font-mono">Esc</kbd> close
+      </span>
+    </div>
+  )
+
+  const ResultsArea = (
+    <div key="results-area" id={listId} role="listbox" aria-label="Search results" className="overflow-y-auto overscroll-contain flex-1">
+      {!query.trim() && (
+        <div className="py-10 flex flex-col items-center gap-3 text-gisviz-ink-soft/40">
+          <Search className="w-7 h-7" />
+          <span className="text-[12px] font-mono">Search posts and user handles</span>
+        </div>
+      )}
+
+      {query.trim().length > 0 && query.trim().length < MIN_CHARS && (
+        <div className="py-10 text-center text-[12px] font-mono text-gisviz-ink-soft/60">
+          Type {MIN_CHARS - query.trim().length} more character{query.trim().length < MIN_CHARS - 1 ? 's' : ''}…
+        </div>
+      )}
+
+      {error && <div className="py-8 text-center text-[12px] font-mono text-gisviz-alert/80">{error}</div>}
+
+      {!loading && !error && query.trim().length >= MIN_CHARS && !hasAny && (
+        <div className="py-12 flex flex-col items-center gap-2">
+          <p className="text-[12px] font-mono text-gisviz-ink-soft">
+            No results for <span className="text-gisviz-ink font-bold">"{query.trim()}"</span>
+          </p>
+          <p className="text-[12px] font-mono text-gisviz-ink-soft/50">Try a different keyword</p>
+        </div>
+      )}
+
+      {hasUsers && results && (
+        <section aria-label="User handles">
+          <div className="flex items-center gap-2 px-4 pt-3 pb-1.5 sticky top-0 bg-gisviz-card/95 backdrop-blur-sm border-b border-gisviz-border/30 z-10">
+            <User className="w-3 h-3 text-gisviz-accent" />
+            <span className="text-[12px] font-mono font-bold text-gisviz-ink-soft uppercase tracking-[0.12em]">Users</span>
+            <span className="ml-auto text-[12px] font-mono text-gisviz-ink-soft/50">{results.users.length}</span>
+          </div>
+          <ul className="px-2 py-1.5">
+            {results.users.map((u, sectionIdx) => {
+              const flatIdx = sectionIdx
+              const isActive = flatIdx === activeIdx
+              const avatarUrl = resolveUrl(u.avatar_path)
+              return (
+                <li key={u.user_id}>
+                  <button
+                    id={`result-${flatIdx}`}
+                    role="option"
+                    aria-selected={isActive}
+                    data-result-idx={flatIdx}
+                    type="button"
+                    onClick={() => activateResult({ kind: 'user', data: u })}
+                    onMouseEnter={() => setActiveIdx(flatIdx)}
+                    onMouseLeave={() => setActiveIdx(-1)}
+                    className={`
+                      w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors duration-100 group
+                      focus:outline-none focus-visible:ring-2 focus-visible:ring-gisviz-accent
+                      ${isActive ? 'bg-gisviz-canvas text-gisviz-ink' : 'text-gisviz-ink hover:bg-gisviz-canvas/60'}
+                    `}
+                  >
+                    <div className="w-8 h-8 rounded-full shrink-0 overflow-hidden bg-gisviz-border/30 flex items-center justify-center border border-gisviz-border/40">
+                      {avatarUrl ? <img src={avatarUrl} alt={u.user_handle} className="w-full h-full object-cover" /> :(
+                      <div className="w-10 h-10 rounded-full border border-gisviz-border bg-gradient-to-tr from-gisviz-accent to-gisviz-safe 0 flex items-center justify-center text-gisviz-white text-[16px] font-bold uppercase font-mono shadow-inner flex-shrink-0">
+                        {u.user_handle.charAt(0)}
+                      </div>
+                    )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[12px] font-mono font-bold text-gisviz-ink truncate leading-none">@{u.user_handle}</p>
+                    </div>
+                    <ArrowUpRight className={`w-3.5 h-3.5 shrink-0 transition-opacity text-gisviz-accent ${isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-60'}`} />
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        </section>
+      )}
+
+      {hasPosts && results && (
+        <section aria-label="Posts">
+          <div className="flex items-center gap-2 px-4 pt-3 pb-1.5 sticky top-0 bg-gisviz-card/95 backdrop-blur-sm border-b border-gisviz-border/30 z-10">
+            <FileText className="w-3 h-3 text-gisviz-accent" />
+            <span className="text-[12px] font-mono font-bold text-gisviz-ink-soft uppercase tracking-[0.12em]">Posts</span>
+            <span className="ml-auto text-[12px] font-mono text-gisviz-ink-soft/50">{results.posts.length}</span>
+          </div>
+          <ul className="px-2 py-1.5">
+            {results.posts.map((p, sectionIdx) => {
+              const flatIdx = (results?.users.length ?? 0) + sectionIdx
+              const isActive = flatIdx === activeIdx
+              const thumbUrl = resolveUrl(p.visual_image_path)
+              return (
+                <li key={p.post_id}>
+                  <button
+                    id={`result-${flatIdx}`}
+                    role="option"
+                    aria-selected={isActive}
+                    data-result-idx={flatIdx}
+                    type="button"
+                    onClick={() => activateResult({ kind: 'post', data: p })}
+                    onMouseEnter={() => setActiveIdx(flatIdx)}
+                    onMouseLeave={() => setActiveIdx(-1)}
+                    className={`
+                      w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors duration-100 group
+                      focus:outline-none focus-visible:ring-2 focus-visible:ring-gisviz-accent
+                      ${isActive ? 'bg-gisviz-canvas text-gisviz-ink' : 'text-gisviz-ink hover:bg-gisviz-canvas/60'}
+                    `}
+                  >
+                    <div className="w-10 h-10 rounded-md shrink-0 overflow-hidden bg-gisviz-border/20 flex items-center justify-center border border-gisviz-border/30">
+                      {thumbUrl ? <img src={thumbUrl} alt={p.title} className="w-full h-full object-cover" /> : <FileText className="w-4 h-4 text-gisviz-ink-soft/40" />}
+                    </div>
+                    <p className="flex-1 min-w-0 text-[12px] font-mono font-bold text-gisviz-ink truncate leading-snug">{p.title}</p>
+                    <ArrowUpRight className={`w-3.5 h-3.5 shrink-0 transition-opacity text-gisviz-accent ${isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-60'}`} />
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        </section>
+      )}
+    </div>
+  )
 
   return (
     <>
-      {/* ── Full-screen backdrop — captures all pointer events ─────────────
-          Using onPointerDown (fires before onMouseEnter on feed cards)
-          so feed hover never activates while the overlay is open.        */}
       <div
         aria-hidden="true"
-        style={{
-          position:       'fixed',
-          inset:          0,
-          zIndex:         40,
-          // Intentionally transparent — no dim, feed visible through
-          background:     'transparent',
-          cursor:         'default',
-        }}
-        onPointerDown={(e) => {
-          // Only close if the click is genuinely outside the panel
-          if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
-            onClose()
-          }
-        }}
+        className={`fixed inset-0 z-40 transition-opacity duration-200 ${
+          isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+        }`}
+        style={{ background: 'transparent' }}
+        onClick={onClose}
       />
 
-      {/* ── Search panel — sits above backdrop ───────────────────────────── */}
       <div
         ref={panelRef}
         role="dialog"
@@ -259,347 +423,34 @@ export default function SearchOverlay({
         aria-modal="true"
         style={{
           ...panelStyle,
-          zIndex:       50,
+          zIndex:       9999,
           display:      'flex',
           flexDirection:'column',
           overflow:     'hidden',
-          // Isolate the panel from the backdrop layer completely
           isolation:    'isolate',
         }}
-        className="
-          bg-gisviz-card
-          border border-gisviz-border
-          rounded-xl
-          shadow-[0_8px_40px_-8px_rgba(0,0,0,0.28)]
-          animate-in fade-in slide-in-from-top-2 duration-200
-        "
-        // Stop ALL pointer events from bubbling up to the backdrop
-        onPointerDown={e => e.stopPropagation()}
+        className={`
+          bg-gisviz-card border border-gisviz-border rounded-xl
+          transition-all duration-200 ease-out
+          ${popDirection === 'up' ? 'shadow-[0_-8px_40px_-8px_rgba(0,0,0,0.28)]' : 'shadow-[0_8px_40px_-8px_rgba(0,0,0,0.28)]'}
+          ${isOpen ? 'opacity-100 translate-y-0 pointer-events-auto' : `opacity-0 pointer-events-none ${popDirection === 'up' ? 'translate-y-3' : '-translate-y-3'}`}
+        `}
         onClick={e => e.stopPropagation()}
-        onMouseEnter={e => e.stopPropagation()}
       >
-
-        {/* ── Search input bar ─────────────────────────────────────────── */}
-        <div className="
-          flex items-center gap-3 px-4 py-3.5
-          border-b border-gisviz-border
-          bg-gisviz-canvas/60 shrink-0
-        ">
-          {loading
-            ? <Loader2 className="w-4 h-4 text-gisviz-accent animate-spin shrink-0" />
-            : <Search  className="w-4 h-4 text-gisviz-ink-soft/60 shrink-0" />
-          }
-
-          <input
-            ref={inputRef}
-            type="search"
-            autoComplete="off"
-            spellCheck={false}
-            role="combobox"
-            aria-expanded={hasAny}
-            aria-controls={listId}
-            aria-activedescendant={activeIdx >= 0 ? `result-${activeIdx}` : undefined}
-            placeholder="Search posts and users…"
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-            onKeyDown={handleKeyDown}
-            className="
-              flex-1 min-w-0
-              bg-transparent outline-none
-              text-[16px] font-mono text-gisviz-ink
-              placeholder:text-gisviz-ink-soft/50
-              [&::-webkit-search-cancel-button]:hidden
-            "
-          />
-
-          {query && (
-            <button
-              type="button"
-              aria-label="Clear"
-              onClick={() => { setQuery(''); inputRef.current?.focus() }}
-              className="
-                p-1 rounded-md shrink-0
-                text-gisviz-ink-soft/60
-                hover:text-gisviz-ink hover:bg-gisviz-border/40
-                transition-colors
-              "
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          )}
-
-          <button
-            type="button"
-            aria-label="Close search"
-            onClick={onClose}
-            className="
-              p-1 rounded-md shrink-0
-              text-gisviz-ink-soft/60
-              hover:text-gisviz-ink hover:bg-gisviz-border/40
-              transition-colors
-            "
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* ── Results scrollable area ───────────────────────────────────── */}
-        <div
-          id={listId}
-          role="listbox"
-          aria-label="Search results"
-          className="overflow-y-auto overscroll-contain flex-1"
-        >
-
-          {/* Idle / too short */}
-          {!query.trim() && (
-            <div className="py-10 flex flex-col items-center gap-3 text-gisviz-ink-soft/40">
-              <Search className="w-7 h-7" />
-              <span className="text-[12px] font-mono">
-                Search posts and user handles
-              </span>
-            </div>
-          )}
-
-          {query.trim().length > 0 && query.trim().length < MIN_CHARS && (
-            <div className="py-10 text-center text-[12px] font-mono text-gisviz-ink-soft/60">
-              Type {MIN_CHARS - query.trim().length} more character{query.trim().length < MIN_CHARS - 1 ? 's' : ''}…
-            </div>
-          )}
-
-          {/* Error */}
-          {error && (
-            <div className="py-8 text-center text-[12px] font-mono text-gisviz-alert/80">
-              {error}
-            </div>
-          )}
-
-          {/* No results */}
-          {!loading && !error && query.trim().length >= MIN_CHARS && !hasAny && (
-            <div className="py-12 flex flex-col items-center gap-2">
-              <p className="text-[12px] font-mono text-gisviz-ink-soft">
-                No results for{' '}
-                <span className="text-gisviz-ink font-bold">"{query.trim()}"</span>
-              </p>
-              <p className="text-[12px] font-mono text-gisviz-ink-soft/50">
-                Try a different keyword
-              </p>
-            </div>
-          )}
-
-          {/* ── USER RESULTS ────────────────────────────────────────────── */}
-          {hasUsers && results && (
-            <section aria-label="User handles">
-              <div className="
-                flex items-center gap-2 px-4 pt-3 pb-1.5
-                sticky top-0 bg-gisviz-card/95
-                backdrop-blur-sm
-                border-b border-gisviz-border/30
-              ">
-                <User className="w-3 h-3 text-gisviz-accent" />
-                <span className="
-                  text-[12px] font-mono font-bold
-                  text-gisviz-ink-soft uppercase tracking-[0.12em]
-                ">
-                  Users
-                </span>
-                <span className="ml-auto text-[12px] font-mono text-gisviz-ink-soft/50">
-                  {results.users.length}
-                </span>
-              </div>
-
-              <ul className="px-2 py-1.5">
-                {results.users.map((u, sectionIdx) => {
-                  const flatIdx = sectionIdx            // users come first in flat[]
-                  const isActive = flatIdx === activeIdx
-                  const avatarUrl = resolveUrl(u.avatar_path)
-                  return (
-                    <li key={u.user_id}>
-                      <button
-                        id={`result-${flatIdx}`}
-                        role="option"
-                        aria-selected={isActive}
-                        data-result-idx={flatIdx}
-                        type="button"
-                        onClick={() => navigate(`/profile/${u.user_handle}`)}
-                        onMouseEnter={() => setActiveIdx(flatIdx)}
-                        onMouseLeave={() => setActiveIdx(-1)}
-                        className={`
-                          w-full flex items-center gap-3 px-3 py-2.5 rounded-lg
-                          text-left transition-colors duration-100 group
-                          focus:outline-none focus-visible:ring-2
-                          focus-visible:ring-gisviz-accent
-                          ${isActive
-                            ? 'bg-gisviz-canvas text-gisviz-ink'
-                            : 'text-gisviz-ink hover:bg-gisviz-canvas/60'
-                          }
-                        `}
-                      >
-                        {/* Avatar */}
-                        <div className="
-                          w-8 h-8 rounded-full shrink-0 overflow-hidden
-                          bg-gisviz-border/30
-                          flex items-center justify-center
-                          border border-gisviz-border/40
-                        ">
-                          {avatarUrl
-                            ? <img
-                                src={avatarUrl}
-                                alt={u.user_handle}
-                                className="w-full h-full object-cover"
-                              />
-                            : <User className="w-4 h-4 text-gisviz-ink-soft/60" />
-                          }
-                        </div>
-
-                        {/* Handle */}
-                        <div className="flex-1 min-w-0">
-                          <p className="
-                            text-[12px] font-mono font-bold
-                            text-gisviz-ink truncate leading-none
-                          ">
-                            @{u.user_handle}
-                          </p>
-                        </div>
-
-                        {/* Arrow — only visible on active/hover */}
-                        <ArrowUpRight className={`
-                          w-3.5 h-3.5 shrink-0 transition-opacity
-                          text-gisviz-accent
-                          ${isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-60'}
-                        `} />
-                      </button>
-                    </li>
-                  )
-                })}
-              </ul>
-            </section>
-          )}
-
-          {/* ── POST RESULTS ────────────────────────────────────────────── */}
-          {hasPosts && results && (
-            <section aria-label="Posts">
-              <div className="
-                flex items-center gap-2 px-4 pt-3 pb-1.5
-                sticky top-0 bg-gisviz-card/95
-                backdrop-blur-sm
-                border-b border-gisviz-border/30
-              ">
-                <FileText className="w-3 h-3 text-gisviz-accent" />
-                <span className="
-                  text-[12px] font-mono font-bold
-                  text-gisviz-ink-soft uppercase tracking-[0.12em]
-                ">
-                  Posts
-                </span>
-                <span className="ml-auto text-[12px] font-mono text-gisviz-ink-soft/50">
-                  {results.posts.length}
-                </span>
-              </div>
-
-              <ul className="px-2 py-1.5">
-                {results.posts.map((p, sectionIdx) => {
-                  const flatIdx = (results?.users.length ?? 0) + sectionIdx
-                  const isActive = flatIdx === activeIdx
-                  const thumbUrl = resolveUrl(p.visual_image_path)
-                  return (
-                    <li key={p.post_id}>
-                      <button
-                        id={`result-${flatIdx}`}
-                        role="option"
-                        aria-selected={isActive}
-                        data-result-idx={flatIdx}
-                        type="button"
-                        onClick={() => navigate(`/${p.post_id}`)}
-                        onMouseEnter={() => setActiveIdx(flatIdx)}
-                        onMouseLeave={() => setActiveIdx(-1)}
-                        className={`
-                          w-full flex items-center gap-3 px-3 py-2.5 rounded-lg
-                          text-left transition-colors duration-100 group
-                          focus:outline-none focus-visible:ring-2
-                          focus-visible:ring-gisviz-accent
-                          ${isActive
-                            ? 'bg-gisviz-canvas text-gisviz-ink'
-                            : 'text-gisviz-ink hover:bg-gisviz-canvas/60'
-                          }
-                        `}
-                      >
-                        {/* Thumbnail */}
-                        <div className="
-                          w-10 h-10 rounded-md shrink-0 overflow-hidden
-                          bg-gisviz-border/20
-                          flex items-center justify-center
-                          border border-gisviz-border/30
-                        ">
-                          {thumbUrl
-                            ? <img
-                                src={thumbUrl}
-                                alt={p.title}
-                                className="w-full h-full object-cover"
-                              />
-                            : <FileText className="w-4 h-4 text-gisviz-ink-soft/40" />
-                          }
-                        </div>
-
-                        {/* Title */}
-                        <p className="
-                          flex-1 min-w-0
-                          text-[12px] font-mono font-bold
-                          text-gisviz-ink truncate leading-snug
-                        ">
-                          {p.title}
-                        </p>
-
-                        {/* Arrow */}
-                        <ArrowUpRight className={`
-                          w-3.5 h-3.5 shrink-0 transition-opacity
-                          text-gisviz-accent
-                          ${isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-60'}
-                        `} />
-                      </button>
-                    </li>
-                  )
-                })}
-              </ul>
-            </section>
-          )}
-
-        </div>
-
-        {/* ── Footer ──────────────────────────────────────────────────────── */}
-        <div className="
-          px-4 py-2.5
-          border-t border-gisviz-border/30
-          bg-gisviz-canvas/40
-          shrink-0
-          flex items-center gap-4
-        ">
-          <span className="text-[12px] font-mono text-gisviz-ink-soft/40 flex items-center gap-1">
-            <kbd className="
-              px-1.5 py-0.5 rounded
-              bg-gisviz-border/30
-              text-[9px] font-mono
-            ">↑↓</kbd>
-            navigate
-          </span>
-          <span className="text-[12px] font-mono text-gisviz-ink-soft/40 flex items-center gap-1">
-            <kbd className="
-              px-1.5 py-0.5 rounded
-              bg-gisviz-border/30
-              text-[9px] font-mono
-            ">↵</kbd>
-            open
-          </span>
-          <span className="text-[12px] font-mono text-gisviz-ink-soft/40 flex items-center gap-1">
-            <kbd className="
-              px-1.5 py-0.5 rounded
-              bg-gisviz-border/30
-              text-[9px] font-mono
-            ">Esc</kbd>
-            close
-          </span>
-        </div>
-
+        {/* If popping UP, put the input at the bottom so it sits right next to the trigger button! */}
+        {popDirection === 'up' ? (
+          <>
+            {ShortcutsFooter}
+            {ResultsArea}
+            {InputBar}
+          </>
+        ) : (
+          <>
+            {InputBar}
+            {ResultsArea}
+            {ShortcutsFooter}
+          </>
+        )}
       </div>
     </>
   )

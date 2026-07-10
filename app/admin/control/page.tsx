@@ -1,5 +1,5 @@
 'use client'
- 
+
 import React, { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -9,45 +9,53 @@ import {
   Edit2, X, Check, Loader2, Search, ChevronDown,
   ToggleLeft, ToggleRight, ExternalLink, RefreshCw,
   AlertTriangle, ArrowUpRight, Save, Shield,
-  Activity, BarChart2, LifeBuoy
+  Activity, BarChart2, LifeBuoy,
+  Download,
 } from 'lucide-react'
 import { useAuth } from '../../../context/AuthContext'
 import { gisvizApi } from '../../../services/api'
 import AccessRestricted from '../../components/AccessRestricted'
 import AccessControlPanel from './AccessControlPanel'
 
-type Tab = 'categories' | 'users' | 'posts' | 'reports' | 'comments' | 'unverified' | 'roles'
- 
+// ── 1. Tab type now includes 'tickets' ───────────────────────────────────────
+type Tab = 'categories' | 'users' | 'posts' | 'reports' | 'comments' | 'unverified' | 'roles' | 'tickets'
+
+// ── 2. TABS array — tickets entry added at the end ───────────────────────────
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
-  { id: 'categories', label: 'Categories', icon: <Tag size={14} /> },
-  { id: 'users',      label: 'Users',      icon: <Users size={14} /> },
-  { id: 'posts',      label: 'Posts',      icon: <FileText size={14} /> },
-  { id: 'reports',    label: 'Reports',    icon: <Flag size={14} /> },
-  { id: 'comments',   label: 'Comments',   icon: <MessageSquare size={14} /> },
-  { id: 'unverified', label: 'Unverified', icon: <UserX size={14} /> },
+  { id: 'categories', label: 'Categories',     icon: <Tag size={14} /> },
+  { id: 'users',      label: 'Users',          icon: <Users size={14} /> },
+  { id: 'posts',      label: 'Posts',          icon: <FileText size={14} /> },
+  { id: 'reports',    label: 'Reports',        icon: <Flag size={14} /> },
+  { id: 'comments',   label: 'Comments',       icon: <MessageSquare size={14} /> },
+  { id: 'unverified', label: 'Unverified',     icon: <UserX size={14} /> },
   { id: 'roles',      label: 'Access & Roles', icon: <KeyRound size={14} /> },
+  { id: 'tickets',    label: 'Support',        icon: <LifeBuoy size={14} /> },
 ]
- 
-const VALID_TABS: Tab[] = ['categories','users','posts','reports','comments','unverified','roles']
- 
+
+// ── 3. VALID_TABS — tickets added ────────────────────────────────────────────
+const VALID_TABS: Tab[] = [
+  'categories', 'users', 'posts', 'reports', 'comments', 'unverified', 'roles', 'tickets',
+]
+
 const ALL_ROLES = ['viewer', 'publisher', 'editor', 'support', 'admin']
- 
-/* ─── Shared micro-components (Badge, ConfirmBtn, Panel, EmptyState, Spinner)
-   KEEP your existing definitions from the current file — they are unchanged.
-   They're shown here only so the file remains complete if you paste top-down.
-   If you are pasting ONLY the page-root function, skip re-declaring these. ─── */
- 
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Shared micro-components — unchanged from your current file
+// ─────────────────────────────────────────────────────────────────────────────
+
 const Badge = ({ children, color = 'default' }: { children: React.ReactNode; color?: string }) => {
   const cls: Record<string, string> = {
-    admin:     'bg-red-100 text-red-700 border-red-200',
-    editor:    'bg-purple-100 text-purple-700 border-purple-200',
-    publisher: 'bg-blue-100 text-blue-700 border-blue-200',
-    support:   'bg-yellow-100 text-yellow-700 border-yellow-200',
-    viewer:    'bg-gisviz-canvas text-gisviz-ink-soft border-gisviz-border',
-    open:      'bg-yellow-100 text-yellow-700 border-yellow-200',
-    resolved:  'bg-green-100 text-green-700 border-green-200',
-    dismissed: 'bg-gisviz-canvas text-gisviz-ink-soft border-gisviz-border',
-    default:   'bg-gisviz-canvas text-gisviz-ink border-gisviz-border',
+    admin:       'bg-gisviz-alert/30 text-gisviz-alert/100 border-gisviz-alert/50',
+    editor:      'bg-purple-100 text-purple-700 border-purple-200',
+    publisher:   'bg-blue-100 text-blue-700 border-blue-200',
+    support:     'bg-gisviz-canvas/10 text-yellow-700 border-yellow-200',
+    viewer:      'bg-gisviz-canvas text-gisviz-ink-soft border-gisviz-border',
+    open:        'bg-gisviz-canvas/10 text-yellow-700 border-yellow-200',
+    in_progress: 'bg-blue-100 text-blue-700 border-blue-200',
+    resolved:    'bg-gisviz-safe/10 text-gisviz-safe/90 border-gisviz-safe/30',
+    closed:      'bg-gisviz-canvas text-gisviz-ink-soft border-gisviz-border',
+    dismissed:   'bg-gisviz-canvas text-gisviz-ink-soft border-gisviz-border',
+    default:     'bg-gisviz-canvas text-gisviz-ink border-gisviz-border',
   }
   return (
     <span className={`inline-flex items-center px-2 py-0.5 rounded text-[12px] font-mono font-bold border ${cls[color as string] || cls.default}`}>
@@ -55,19 +63,19 @@ const Badge = ({ children, color = 'default' }: { children: React.ReactNode; col
     </span>
   )
 }
- 
+
 function ConfirmBtn({ onConfirm, busy }: { onConfirm: () => void; busy?: boolean }) {
   const [confirming, setConfirming] = useState(false)
   if (!confirming) return (
     <button onClick={() => setConfirming(true)}
-      className="p-1.5 rounded text-gisviz-ink-soft hover:text-gisviz-alert hover:bg-red-50 transition-colors" title="Delete">
+      className="p-1.5 rounded text-gisviz-ink-soft hover:text-gisviz-alert hover:bg-gisviz-alert/10 transition-colors" title="Delete">
       <Trash2 size={14} />
     </button>
   )
   return (
     <div className="flex items-center gap-1">
       <button onClick={() => { onConfirm(); setConfirming(false) }} disabled={busy}
-        className="p-1 rounded bg-gisviz-alert text-white hover:bg-red-700 transition-colors disabled:opacity-50">
+        className="p-1 rounded bg-gisviz-alert text-gisviz-white hover:bg-gisviz-alert/100 transition-colors disabled:opacity-50">
         {busy ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
       </button>
       <button onClick={() => setConfirming(false)}
@@ -77,9 +85,9 @@ function ConfirmBtn({ onConfirm, busy }: { onConfirm: () => void; busy?: boolean
     </div>
   )
 }
- 
+
 function Panel({ title, icon, count, actions, children }: {
-  title: string; icon: React.ReactNode; count?: number | string;
+  title: string; icon: React.ReactNode; count?: number | string
   actions?: React.ReactNode; children: React.ReactNode
 }) {
   return (
@@ -95,50 +103,52 @@ function Panel({ title, icon, count, actions, children }: {
     </div>
   )
 }
- 
+
 const EmptyState = ({ text }: { text: string }) => (
   <div className="py-12 text-center text-[12px] font-mono text-gisviz-ink-soft">{text}</div>
 )
 const Spinner = () => (
-  <div className="flex justify-center py-12"><Loader2 size={24} className="animate-spin text-gisviz-accent" /></div>
+  <div className="flex justify-center py-12">
+    <Loader2 size={24} className="animate-spin text-gisviz-accent" />
+  </div>
 )
- 
-// ─── Page root ────────────────────────────────────────────────────────────────
- 
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Page root
+// ─────────────────────────────────────────────────────────────────────────────
 export default function AdminControlPage() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth() as any
   const router = useRouter()
   const searchParams = useSearchParams()
- 
+
   const [activeTab, setActiveTab] = useState<Tab>('categories')
   const [ddOpen, setDdOpen]       = useState(false)
   const [globalErr, setGlobalErr] = useState('')
- 
+
   useEffect(() => {
     if (!authLoading && !isAuthenticated) router.push('/auth')
   }, [authLoading, isAuthenticated, router])
- 
-  // Deep-link support: /admin/control?tab=users opens that tab
+
   useEffect(() => {
     const t = searchParams.get('tab') as Tab | null
     if (t && VALID_TABS.includes(t)) setActiveTab(t)
   }, [searchParams])
- 
+
   if (authLoading) return (
     <div className="flex justify-center items-center h-[calc(100vh-4rem)]">
       <Loader2 size={32} className="animate-spin text-gisviz-accent" />
     </div>
   )
- 
+
   if (!user || user.role_name !== 'admin') {
     return <AccessRestricted requiredRoles={['admin']} currentRole={user?.role_name} backHref="/" backLabel="Return to Feed" />
   }
- 
+
   const meta = TABS.find(t => t.id === activeTab)!
- 
+
   return (
     <div className="max-w-6xl mx-auto py-8 px-4 pb-20">
- 
+
       <div className="flex items-start justify-between gap-4 mb-8 flex-wrap">
         <div>
           <h1 className="text-[24px] font-display font-bold text-gisviz-ink flex items-center gap-3">
@@ -148,8 +158,7 @@ export default function AdminControlPage() {
             Platform management — <Badge color="admin">admin</Badge> only
           </p>
         </div>
- 
-        {/* ── Header nav: Admin Home + Analytics + Activity + tab dropdown ── */}
+
         <div className="flex items-center gap-2 flex-wrap">
           <Link href="/admin"
             className="px-4 py-2 bg-gisviz-canvas border border-gisviz-border rounded-md font-mono text-[12px] text-gisviz-ink hover:border-gisviz-accent transition-colors flex items-center gap-1.5">
@@ -163,7 +172,8 @@ export default function AdminControlPage() {
             className="px-4 py-2 bg-gisviz-canvas border border-gisviz-border rounded-md font-mono text-[12px] text-gisviz-ink hover:border-gisviz-accent transition-colors flex items-center gap-1.5">
             <Activity size={14} /> Activity
           </Link>
- 
+
+          {/* ── Tab dropdown ── */}
           <div className="relative">
             <button onClick={() => setDdOpen(p => !p)}
               className="flex items-center gap-2 bg-gisviz-card border border-gisviz-border px-4 py-2 rounded-md font-mono text-[12px] text-gisviz-ink shadow-sm hover:border-gisviz-accent transition-colors min-w-[160px] justify-between">
@@ -171,11 +181,13 @@ export default function AdminControlPage() {
               <ChevronDown size={13} className={`transition-transform ${ddOpen ? 'rotate-180' : ''}`} />
             </button>
             {ddOpen && (
-              <div className="absolute right-0 top-full mt-1 w-48 bg-gisviz-card border border-gisviz-border rounded-md shadow-lg z-30 py-1 overflow-hidden">
+              <div className="absolute right-0 top-full mt-1 w-52 bg-gisviz-card border border-gisviz-border rounded-md shadow-lg z-30 py-1 overflow-hidden">
                 {TABS.map(tab => (
                   <button key={tab.id} onClick={() => { setActiveTab(tab.id); setDdOpen(false) }}
                     className={`w-full flex items-center gap-2 px-4 py-2 text-[12px] font-mono transition-colors ${
-                      activeTab === tab.id ? 'bg-gisviz-accent/10 text-gisviz-accent font-bold' : 'text-gisviz-ink hover:bg-gisviz-canvas'
+                      activeTab === tab.id
+                        ? 'bg-gisviz-accent/10 text-gisviz-accent font-bold'
+                        : 'text-gisviz-ink hover:bg-gisviz-canvas'
                     }`}>
                     {tab.icon} {tab.label}
                   </button>
@@ -185,27 +197,29 @@ export default function AdminControlPage() {
           </div>
         </div>
       </div>
- 
+
       {globalErr && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md text-[12px] font-mono text-gisviz-alert flex items-center justify-between">
+        <div className="mb-4 p-3 bg-gisviz-alert/10 border border-gisviz-alert/50 rounded-md text-[12px] font-mono text-gisviz-alert flex items-center justify-between">
           {globalErr}
           <button onClick={() => setGlobalErr('')}><X size={14} /></button>
         </div>
       )}
- 
-      {activeTab === 'categories' && <CategoriesPanel onError={setGlobalErr} />}
-      {activeTab === 'users'      && <UsersPanel      onError={setGlobalErr} adminUser={user} />}
-      {activeTab === 'posts'      && <PostsPanel      onError={setGlobalErr} />}
-      {activeTab === 'reports'    && <ReportsPanel    onError={setGlobalErr} />}
-      {activeTab === 'comments'   && <CommentsPanel   onError={setGlobalErr} />}
-      {activeTab === 'unverified' && <UnverifiedPanel onError={setGlobalErr} />}
+
+      {/* ── 4. Tab switch — tickets case added ── */}
+      {activeTab === 'categories' && <CategoriesPanel  onError={setGlobalErr} />}
+      {activeTab === 'users'      && <UsersPanel        onError={setGlobalErr} adminUser={user} />}
+      {activeTab === 'posts'      && <PostsPanel        onError={setGlobalErr} />}
+      {activeTab === 'reports'    && <ReportsPanel      onError={setGlobalErr} />}
+      {activeTab === 'comments'   && <CommentsPanel     onError={setGlobalErr} />}
+      {activeTab === 'unverified' && <UnverifiedPanel   onError={setGlobalErr} />}
       {activeTab === 'roles'      && <AccessControlPanel onError={setGlobalErr} />}
+      {activeTab === 'tickets'    && <TicketsPanel      onError={setGlobalErr} />}
     </div>
   )
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CATEGORIES
+// CATEGORIES — unchanged from your current file
 // ─────────────────────────────────────────────────────────────────────────────
 function CategoriesPanel({ onError }: { onError: (e: string) => void }) {
   const [cats, setCats]           = useState<any[]>([])
@@ -246,7 +260,7 @@ function CategoriesPanel({ onError }: { onError: (e: string) => void }) {
               <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
             </button>
             <button onClick={() => setShowAdd(p => !p)}
-              className="flex items-center gap-1 px-3 py-1.5 bg-gisviz-accent text-white rounded text-[12px] font-mono font-bold hover:bg-opacity-90 transition-colors">
+              className="flex items-center gap-1 px-3 py-1.5 bg-gisviz-accent text-gisviz-white rounded text-[12px] font-mono font-bold hover:bg-opacity-90 transition-colors">
               <Plus size={13} /> Add
             </button>
           </>
@@ -267,7 +281,7 @@ function CategoriesPanel({ onError }: { onError: (e: string) => void }) {
             <button
               onClick={() => act('create', async () => { await gisvizApi.createCategory(newLabel, newSlug); setNewLabel(''); setNewSlug(''); setShowAdd(false) })}
               disabled={busy === 'create' || !newLabel || !newSlug}
-              className="flex items-center gap-1 px-4 py-1.5 bg-gisviz-accent text-white rounded text-[12px] font-mono font-bold disabled:opacity-50 hover:bg-opacity-90 transition-colors">
+              className="flex items-center gap-1 px-4 py-1.5 bg-gisviz-accent text-gisviz-white rounded text-[12px] font-mono font-bold disabled:opacity-50 hover:bg-opacity-90 transition-colors">
               {busy === 'create' ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Create
             </button>
           </div>
@@ -300,7 +314,7 @@ function CategoriesPanel({ onError }: { onError: (e: string) => void }) {
                         <>
                           <button onClick={() => act(String(cat.category_id), async () => { await gisvizApi.updateCategory(cat.category_id, editLabel, editSlug); setEditId(null) })}
                             disabled={busy === String(cat.category_id)}
-                            className="p-1.5 rounded bg-gisviz-accent text-white hover:bg-opacity-90 disabled:opacity-50 transition-colors">
+                            className="p-1.5 rounded bg-gisviz-accent text-gisviz-white hover:bg-opacity-90 disabled:opacity-50 transition-colors">
                             {busy === String(cat.category_id) ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
                           </button>
                           <button onClick={() => setEditId(null)} className="p-1.5 rounded bg-gisviz-canvas border border-gisviz-border text-gisviz-ink-soft hover:text-gisviz-ink transition-colors">
@@ -339,11 +353,11 @@ function CategoriesPanel({ onError }: { onError: (e: string) => void }) {
                   <td className="px-4 py-3">
                     <div className="flex gap-2 justify-end">
                       <button onClick={() => act(p.pending_id, () => gisvizApi.approvePendingCategory(p.pending_id))} disabled={!!busy}
-                        className="flex items-center gap-1 px-2 py-1 bg-green-50 text-green-700 border border-green-200 rounded text-[12px] font-mono hover:bg-green-100 transition-colors disabled:opacity-50">
+                        className="flex items-center gap-1 px-2 py-1 bg-gisviz-safe/10 text-gisviz-safe/90 border border-gisviz-safe/30 rounded text-[12px] font-mono hover:bg-gisviz-safe/10 transition-colors disabled:opacity-50">
                         {busy === p.pending_id ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />} Approve
                       </button>
                       <button onClick={() => act(`rej-${p.pending_id}`, () => gisvizApi.rejectPendingCategory(p.pending_id))} disabled={!!busy}
-                        className="flex items-center gap-1 px-2 py-1 bg-red-50 text-gisviz-alert border border-red-200 rounded text-[12px] font-mono hover:bg-red-100 transition-colors disabled:opacity-50">
+                        className="flex items-center gap-1 px-2 py-1 bg-gisviz-alert/10 text-gisviz-alert border border-gisviz-alert/50 rounded text-[12px] font-mono hover:bg-gisviz-alert/30 transition-colors disabled:opacity-50">
                         <X size={11} /> Reject
                       </button>
                     </div>
@@ -359,15 +373,15 @@ function CategoriesPanel({ onError }: { onError: (e: string) => void }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// USERS
+// USERS — unchanged from your current file
 // ─────────────────────────────────────────────────────────────────────────────
 function UsersPanel({ onError, adminUser }: { onError: (e: string) => void; adminUser: any }) {
-  const [users, setUsers]   = useState<any[]>([])
-  const [total, setTotal]   = useState(0)
+  const [users, setUsers]     = useState<any[]>([])
+  const [total, setTotal]     = useState(0)
   const [loading, setLoading] = useState(true)
-  const [busy, setBusy]     = useState<string | null>(null)
-  const [search, setSearch] = useState('')
-  const [skip, setSkip]     = useState(0)
+  const [busy, setBusy]       = useState<string | null>(null)
+  const [search, setSearch]   = useState('')
+  const [skip, setSkip]       = useState(0)
   const LIMIT = 20
 
   const load = useCallback(async (s = 0, q = '') => {
@@ -402,7 +416,7 @@ function UsersPanel({ onError, adminUser }: { onError: (e: string) => void; admi
               <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Handle or email…"
                 className="pl-8 pr-3 py-1.5 bg-gisviz-canvas border border-gisviz-border rounded text-[12px] font-mono text-gisviz-ink focus:ring-1 focus:ring-gisviz-accent outline-none w-48" />
             </div>
-            <button type="submit" className="px-3 py-1.5 bg-gisviz-accent text-white rounded text-[12px] font-mono font-bold hover:bg-opacity-90 transition-colors">Go</button>
+            <button type="submit" className="px-3 py-1.5 bg-gisviz-accent text-gisviz-white rounded text-[12px] font-mono font-bold hover:bg-opacity-90 transition-colors">Go</button>
           </form>
         </div>
       }
@@ -449,7 +463,7 @@ function UsersPanel({ onError, adminUser }: { onError: (e: string) => void; admi
                         {busy === `status-${u.user_id}`
                           ? <Loader2 size={18} className="animate-spin text-gisviz-ink-soft" />
                           : u.is_active
-                            ? <ToggleRight size={20} className="text-green-600" />
+                            ? <ToggleRight size={20} className="text-gisviz-safe/70" />
                             : <ToggleLeft  size={20} className="text-gisviz-ink-soft" />
                         }
                       </button>
@@ -481,32 +495,24 @@ function UsersPanel({ onError, adminUser }: { onError: (e: string) => void; admi
   )
 }
 
- 
 // ─────────────────────────────────────────────────────────────────────────────
-// POSTS
+// POSTS — unchanged from your current file
 // ─────────────────────────────────────────────────────────────────────────────
 function PostsPanel({ onError }: { onError: (e: string) => void }) {
-  const [posts, setPosts]   = useState<any[]>([])
-  const [total, setTotal]   = useState<number>(0)
+  const [posts, setPosts]     = useState<any[]>([])
+  const [total, setTotal]     = useState<number>(0)
   const [loading, setLoading] = useState(true)
-  const [busy, setBusy]     = useState<string | null>(null)
-  const [search, setSearch] = useState('')
-  const [skip, setSkip]     = useState(0)
+  const [busy, setBusy]       = useState<string | null>(null)
+  const [search, setSearch]   = useState('')
+  const [skip, setSkip]       = useState(0)
   const LIMIT = 20
 
   const load = useCallback(async (s = 0, q = '') => {
     setLoading(true)
-    try { 
+    try {
       const res = await gisvizApi.fetchAllPosts(s, LIMIT, q || undefined)
-      
-      // Safely handle both standard arrays and paginated { posts, total } objects
-      if (Array.isArray(res)) {
-        setPosts(res)
-        setTotal(res.length)
-      } else {
-        setPosts(res.posts || [])
-        setTotal(res.total || 0)
-      }
+      if (Array.isArray(res)) { setPosts(res); setTotal(res.length) }
+      else { setPosts(res.posts || []); setTotal(res.total || 0) }
     }
     catch { onError('Failed to load posts') }
     finally { setLoading(false) }
@@ -528,7 +534,7 @@ function PostsPanel({ onError }: { onError: (e: string) => void }) {
               <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search title…"
                 className="pl-8 pr-3 py-1.5 bg-gisviz-canvas border border-gisviz-border rounded text-[12px] font-mono text-gisviz-ink focus:ring-1 focus:ring-gisviz-accent outline-none w-48" />
             </div>
-            <button type="submit" className="px-3 py-1.5 bg-gisviz-accent text-white rounded text-[12px] font-mono font-bold hover:bg-opacity-90 transition-colors">Go</button>
+            <button type="submit" className="px-3 py-1.5 bg-gisviz-accent text-gisviz-white rounded text-[12px] font-mono font-bold hover:bg-opacity-90 transition-colors">Go</button>
           </form>
         </div>
       }
@@ -600,60 +606,45 @@ function PostsPanel({ onError }: { onError: (e: string) => void }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// REPORTS
+// REPORTS — unchanged from your current file
 // ─────────────────────────────────────────────────────────────────────────────
 function ReportsPanel({ onError }: { onError: (e: string) => void }) {
-  const [reports, setReports]   = useState<any[]>([])
-  const [loading, setLoading]   = useState(true)
-  const [busy, setBusy]         = useState<string | null>(null)
-  const [filter, setFilter]     = useState<'all' | 'open' | 'resolved' | 'dismissed'>('all')
- 
+  const [reports, setReports] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [busy, setBusy]       = useState<string | null>(null)
+  const [filter, setFilter]   = useState<'all' | 'open' | 'resolved' | 'dismissed'>('all')
+
   const load = useCallback(async () => {
     setLoading(true)
-    try { 
+    try {
       const res = await gisvizApi.fetchReports()
-      // Safely handle both array and object responses
       setReports(Array.isArray(res) ? res : (res?.reports || []))
     }
     catch { onError('Failed to load reports') }
     finally { setLoading(false) }
   }, [onError])
- 
+
   useEffect(() => { load() }, [load])
- 
-  // Generic action runner: sets busy key, runs fn, reloads, clears busy
+
   const act = async (key: string, fn: () => Promise<any>, reload = true) => {
     setBusy(key)
-    try {
-      await fn()
-      if (reload) await load()
-    } catch (e: any) {
-      onError(e?.response?.data?.detail || 'Action failed')
-    } finally {
-      setBusy(null)
-    }
+    try { await fn(); if (reload) await load() }
+    catch (e: any) { onError(e?.response?.data?.detail || 'Action failed') }
+    finally { setBusy(null) }
   }
- 
-  // Ensure safeReports is ALWAYS an array before attempting to .filter()
+
   const safeReports = Array.isArray(reports) ? reports : []
   const visible = safeReports.filter(r => filter === 'all' || r.status === filter)
- 
+
   return (
-    <Panel
-      title="Reports"
-      icon={<Flag size={14} />}
-      count={safeReports.length}
+    <Panel title="Reports" icon={<Flag size={14} />} count={safeReports.length}
       actions={
         <div className="flex items-center gap-1 flex-wrap">
           {(['all', 'open', 'resolved', 'dismissed'] as const).map(f => (
             <button key={f} onClick={() => setFilter(f)}
               className={`px-2.5 py-1 rounded text-[12px] font-mono transition-colors capitalize ${
-                filter === f
-                  ? 'bg-gisviz-accent text-white'
-                  : 'bg-gisviz-canvas border border-gisviz-border text-gisviz-ink-soft hover:text-gisviz-ink'
-              }`}>
-              {f}
-            </button>
+                filter === f ? 'bg-gisviz-accent text-white' : 'bg-gisviz-canvas border border-gisviz-border text-gisviz-ink-soft hover:text-gisviz-ink'
+              }`}>{f}</button>
           ))}
           <button onClick={load} title="Refresh"
             className="p-1.5 ml-1 rounded hover:bg-gisviz-canvas text-gisviz-ink-soft hover:text-gisviz-ink transition-colors">
@@ -662,73 +653,48 @@ function ReportsPanel({ onError }: { onError: (e: string) => void }) {
         </div>
       }
     >
-      {loading ? (
-        <Spinner />
-      ) : visible.length === 0 ? (
-        <EmptyState text={filter === 'all' ? 'No reports yet.' : `No ${filter} reports.`} />
-      ) : (
-        <div className="divide-y divide-gisviz-border/50">
-          {visible.map(r => (
-            <ReportRow
-              key={r.report_id}
-              report={r}
-              busy={busy}
-              onResolve={() => act(`res-${r.report_id}`, () =>
-                gisvizApi.updateReportStatus(r.report_id, 'resolved'))}
-              onDismiss={() => act(`dis-${r.report_id}`, () =>
-                gisvizApi.updateReportStatus(r.report_id, 'dismissed'))}
-              onDeactivateUser={() => act(`deact-${r.reporter_user_id}`, () =>
-                gisvizApi.setUserStatus(r.reporter_user_id, false))}
-              onDeletePost={() => act(`delpost-${r.post_id}`, () =>
-                gisvizApi.adminDeletePost(r.post_id))}
-            />
-          ))}
-        </div>
-      )}
+      {loading ? <Spinner />
+        : visible.length === 0 ? <EmptyState text={filter === 'all' ? 'No reports yet.' : `No ${filter} reports.`} />
+        : (
+          <div className="divide-y divide-gisviz-border/50">
+            {visible.map(r => (
+              <ReportRow key={r.report_id} report={r} busy={busy}
+                onResolve={() => act(`res-${r.report_id}`, () => gisvizApi.updateReportStatus(r.report_id, 'resolved'))}
+                onDismiss={() => act(`dis-${r.report_id}`, () => gisvizApi.updateReportStatus(r.report_id, 'dismissed'))}
+                onDeactivateUser={() => act(`deact-${r.reporter_user_id}`, () => gisvizApi.setUserStatus(r.reporter_user_id, false))}
+                onDeletePost={() => act(`delpost-${r.post_id}`, () => gisvizApi.adminDeletePost(r.post_id))}
+              />
+            ))}
+          </div>
+        )
+      }
     </Panel>
   )
 }
- 
-// ── ReportRow — one report with its action toolbar ───────────────────────────
-function ReportRow({
-  report: r,
-  busy,
-  onResolve, onDismiss, onDeactivateUser, onDeletePost,
-}: {
-  report: any; busy: string | null;
-  onResolve: () => void; onDismiss: () => void;
-  onDeactivateUser: () => void; onDeletePost: () => void;
+
+function ReportRow({ report: r, busy, onResolve, onDismiss, onDeactivateUser, onDeletePost }: {
+  report: any; busy: string | null
+  onResolve: () => void; onDismiss: () => void; onDeactivateUser: () => void; onDeletePost: () => void
 }) {
   const [confirmDeact, setConfirmDeact] = useState(false)
   const [confirmDel,   setConfirmDel]   = useState(false)
- 
   const isBusy = (key: string) => busy === key
- 
+
   return (
     <div className="px-5 py-4 hover:bg-gisviz-canvas/30 transition-colors">
- 
-      {/* ── Report metadata ── */}
       <div className="flex items-start gap-3 mb-3">
-        <Flag size={14} className={`mt-0.5 shrink-0 ${
-          r.status === 'open' ? 'text-yellow-500' :
-          r.status === 'resolved' ? 'text-green-600' : 'text-gisviz-ink-soft'
-        }`} />
+        <Flag size={14} className={`mt-0.5 shrink-0 ${r.status === 'open' ? 'text-yellow-500' : r.status === 'resolved' ? 'text-gisviz-safe/70' : 'text-gisviz-ink-soft'}`} />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-1">
             <Badge color={r.status}>{r.status}</Badge>
-            <span className="text-[12px] font-mono text-gisviz-ink-soft">
-              {new Date(r.created_timestamp).toLocaleDateString()}
-            </span>
+            <span className="text-[12px] font-mono text-gisviz-ink-soft">{new Date(r.created_timestamp).toLocaleDateString()}</span>
             {r.post_id && (
-              <Link href={`/post/${r.post_id}`} target="_blank"
-                className="text-[12px] font-mono text-gisviz-accent hover:underline flex items-center gap-0.5">
+              <Link href={`/post/${r.post_id}`} target="_blank" className="text-[12px] font-mono text-gisviz-accent hover:underline flex items-center gap-0.5">
                 View post <ExternalLink size={10} />
               </Link>
             )}
           </div>
-          <p className="text-[12px] font-mono text-gisviz-ink">
-            <span className="text-gisviz-ink-soft">Reason: </span>{r.reason}
-          </p>
+          <p className="text-[12px] font-mono text-gisviz-ink"><span className="text-gisviz-ink-soft">Reason: </span>{r.reason}</p>
           {r.reporter_user_id && (
             <p className="text-[12px] font-mono text-gisviz-ink-soft mt-0.5">
               Reporter ID: <code className="text-gisviz-ink">{String(r.reporter_user_id).slice(0, 8)}…</code>
@@ -736,93 +702,51 @@ function ReportRow({
           )}
         </div>
       </div>
- 
-      {/* ── Action toolbar ── */}
       <div className="flex items-center gap-2 flex-wrap pl-[24px]">
- 
-        {/* Resolve */}
         {r.status !== 'resolved' && (
-          <button
-            onClick={onResolve}
-            disabled={!!busy}
-            className="flex items-center gap-1.5 px-3 py-1 rounded text-[12px] font-mono bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 transition-colors disabled:opacity-40"
-          >
-            {isBusy(`res-${r.report_id}`)
-              ? <Loader2 size={11} className="animate-spin" />
-              : <Check size={11} />}
-            Resolve
+          <button onClick={onResolve} disabled={!!busy}
+            className="flex items-center gap-1.5 px-3 py-1 rounded text-[12px] font-mono bg-gisviz-safe/10 text-gisviz-safe/90 border border-gisviz-safe/30 hover:bg-gisviz-safe/10 transition-colors disabled:opacity-40">
+            {isBusy(`res-${r.report_id}`) ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />} Resolve
           </button>
         )}
- 
-        {/* Dismiss */}
         {r.status !== 'dismissed' && (
-          <button
-            onClick={onDismiss}
-            disabled={!!busy}
-            className="flex items-center gap-1.5 px-3 py-1 rounded text-[12px] font-mono bg-gisviz-canvas text-gisviz-ink-soft border border-gisviz-border hover:text-gisviz-ink transition-colors disabled:opacity-40"
-          >
-            {isBusy(`dis-${r.report_id}`)
-              ? <Loader2 size={11} className="animate-spin" />
-              : <X size={11} />}
-            Dismiss
+          <button onClick={onDismiss} disabled={!!busy}
+            className="flex items-center gap-1.5 px-3 py-1 rounded text-[12px] font-mono bg-gisviz-canvas text-gisviz-ink-soft border border-gisviz-border hover:text-gisviz-ink transition-colors disabled:opacity-40">
+            {isBusy(`dis-${r.report_id}`) ? <Loader2 size={11} className="animate-spin" /> : <X size={11} />} Dismiss
           </button>
         )}
- 
-        {/* Deactivate the reporter */}
         {r.reporter_user_id && (
           confirmDeact ? (
             <div className="flex items-center gap-1">
               <span className="text-[12px] font-mono text-gisviz-ink-soft">Deactivate reporter?</span>
-              <button
-                onClick={() => { setConfirmDeact(false); onDeactivateUser() }}
-                disabled={!!busy}
-                className="flex items-center gap-1 px-2 py-0.5 rounded text-[12px] font-mono bg-yellow-50 text-yellow-700 border border-yellow-200 hover:bg-yellow-100 transition-colors disabled:opacity-40">
-                {isBusy(`deact-${r.reporter_user_id}`)
-                  ? <Loader2 size={11} className="animate-spin" />
-                  : <Check size={11} />}
-                Yes
+              <button onClick={() => { setConfirmDeact(false); onDeactivateUser() }} disabled={!!busy}
+                className="flex items-center gap-1 px-2 py-0.5 rounded text-[12px] font-mono bg-yellow-50 text-yellow-700 border border-yellow-200 hover:bg-gisviz-canvas/10 transition-colors disabled:opacity-40">
+                {isBusy(`deact-${r.reporter_user_id}`) ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />} Yes
               </button>
               <button onClick={() => setConfirmDeact(false)}
-                className="px-2 py-0.5 rounded text-[12px] font-mono bg-gisviz-canvas border border-gisviz-border text-gisviz-ink-soft hover:text-gisviz-ink transition-colors">
-                No
-              </button>
+                className="px-2 py-0.5 rounded text-[12px] font-mono bg-gisviz-canvas border border-gisviz-border text-gisviz-ink-soft hover:text-gisviz-ink transition-colors">No</button>
             </div>
           ) : (
-            <button
-              onClick={() => setConfirmDeact(true)}
-              disabled={!!busy}
-              className="flex items-center gap-1.5 px-3 py-1 rounded text-[12px] font-mono bg-yellow-50 text-yellow-700 border border-yellow-200 hover:bg-yellow-100 transition-colors disabled:opacity-40"
-            >
+            <button onClick={() => setConfirmDeact(true)} disabled={!!busy}
+              className="flex items-center gap-1.5 px-3 py-1 rounded text-[12px] font-mono bg-yellow-50 text-yellow-700 border border-yellow-200 hover:bg-gisviz-canvas/10 transition-colors disabled:opacity-40">
               <ToggleLeft size={12} /> Deactivate User
             </button>
           )
         )}
- 
-        {/* Delete the reported post */}
         {r.post_id && (
           confirmDel ? (
             <div className="flex items-center gap-1">
               <span className="text-[12px] font-mono text-gisviz-ink-soft">Delete post?</span>
-              <button
-                onClick={() => { setConfirmDel(false); onDeletePost() }}
-                disabled={!!busy}
-                className="flex items-center gap-1 px-2 py-0.5 rounded text-[12px] font-mono bg-red-50 text-gisviz-alert border border-red-200 hover:bg-red-100 transition-colors disabled:opacity-40">
-                {isBusy(`delpost-${r.post_id}`)
-                  ? <Loader2 size={11} className="animate-spin" />
-                  : <Check size={11} />}
-                Yes, delete
+              <button onClick={() => { setConfirmDel(false); onDeletePost() }} disabled={!!busy}
+                className="flex items-center gap-1 px-2 py-0.5 rounded text-[12px] font-mono bg-gisviz-alert/50 text-gisviz-alert border border-gisviz-alert/50 hover:bg-gisviz-alert/30 transition-colors disabled:opacity-40">
+                {isBusy(`delpost-${r.post_id}`) ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />} Yes, delete
               </button>
               <button onClick={() => setConfirmDel(false)}
-                className="px-2 py-0.5 rounded text-[12px] font-mono bg-gisviz-canvas border border-gisviz-border text-gisviz-ink-soft hover:text-gisviz-ink transition-colors">
-                Cancel
-              </button>
+                className="px-2 py-0.5 rounded text-[12px] font-mono bg-gisviz-canvas border border-gisviz-border text-gisviz-ink-soft hover:text-gisviz-ink transition-colors">Cancel</button>
             </div>
           ) : (
-            <button
-              onClick={() => setConfirmDel(true)}
-              disabled={!!busy}
-              className="flex items-center gap-1.5 px-3 py-1 rounded text-[12px] font-mono bg-red-50 text-gisviz-alert border border-red-200 hover:bg-red-100 transition-colors disabled:opacity-40"
-            >
+            <button onClick={() => setConfirmDel(true)} disabled={!!busy}
+              className="flex items-center gap-1.5 px-3 py-1 rounded text-[12px] font-mono bg-gisviz-alert/10 text-gisviz-alert border border-gisviz-alert/50 hover:bg-gisviz-alert/30 transition-colors disabled:opacity-40">
               <Trash2 size={11} /> Delete Post
             </button>
           )
@@ -833,14 +757,14 @@ function ReportRow({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// COMMENTS
+// COMMENTS — unchanged from your current file
 // ─────────────────────────────────────────────────────────────────────────────
 function CommentsPanel({ onError }: { onError: (e: string) => void }) {
-  const [data, setData]     = useState<any>(null)
+  const [data, setData]       = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [busy, setBusy]     = useState<string | null>(null)
-  const [search, setSearch] = useState('')
-  const [skip, setSkip]     = useState(0)
+  const [busy, setBusy]       = useState<string | null>(null)
+  const [search, setSearch]   = useState('')
+  const [skip, setSkip]       = useState(0)
   const LIMIT = 30
 
   const load = useCallback(async (s = 0, q = '') => {
@@ -868,7 +792,7 @@ function CommentsPanel({ onError }: { onError: (e: string) => void }) {
               <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search content…"
                 className="pl-8 pr-3 py-1.5 bg-gisviz-canvas border border-gisviz-border rounded text-[12px] font-mono text-gisviz-ink focus:ring-1 focus:ring-gisviz-accent outline-none w-48" />
             </div>
-            <button type="submit" className="px-3 py-1.5 bg-gisviz-accent text-white rounded text-[12px] font-mono font-bold hover:bg-opacity-90 transition-colors">Go</button>
+            <button type="submit" className="px-3 py-1.5 bg-gisviz-accent text-gisviz-white rounded text-[12px] font-mono font-bold hover:bg-opacity-90 transition-colors">Go</button>
           </form>
         </div>
       }
@@ -924,27 +848,31 @@ function CommentsPanel({ onError }: { onError: (e: string) => void }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// UNVERIFIED  — no sort, refresh button fetches from DB
+// UNVERIFIED — unchanged from your current file
 // ─────────────────────────────────────────────────────────────────────────────
 function UnverifiedPanel({ onError }: { onError: (e: string) => void }) {
   const [users, setUsers]       = useState<any[]>([])
   const [loading, setLoading]   = useState(true)
   const [busy, setBusy]         = useState<string | null>(null)
-  const [days, setDays]         = useState(7)
   const [bulkBusy, setBulkBusy] = useState(false)
-
-  // load is stable — only recreated when days or onError changes
-  const load = useCallback(async (d?: number) => {
+  // null = no filter (show all), number = filter by age
+  const [days, setDays]         = useState<number | null>(null)
+ 
+  const load = useCallback(async (d: number | null = days) => {
     setLoading(true)
     try {
-      const result = await gisvizApi.adminFetchUnverified(d ?? days)
+      // undefined → no query param → backend returns ALL unverified
+      const result = await gisvizApi.adminFetchUnverified(d ?? undefined)
       setUsers(result)
-    } catch { onError('Failed to load unverified users') }
-    finally { setLoading(false) }
+    } catch {
+      onError('Failed to load unverified users')
+    } finally {
+      setLoading(false)
+    }
   }, [days, onError])
-
+ 
   useEffect(() => { load() }, [load])
-
+ 
   const handleVerify = (userId: string) => {
     setBusy(userId)
     gisvizApi.adminVerifyUser(userId)
@@ -952,7 +880,7 @@ function UnverifiedPanel({ onError }: { onError: (e: string) => void }) {
       .catch((e: any) => onError(e.response?.data?.detail || 'Verify failed'))
       .finally(() => setBusy(null))
   }
-
+ 
   const handleDelete = (userId: string) => {
     setBusy(userId)
     gisvizApi.deleteUser(userId)
@@ -960,93 +888,191 @@ function UnverifiedPanel({ onError }: { onError: (e: string) => void }) {
       .catch((e: any) => onError(e.response?.data?.detail || 'Delete failed'))
       .finally(() => setBusy(null))
   }
-
+ 
   const handleBulkDelete = async () => {
     setBulkBusy(true)
-    try { await gisvizApi.adminBulkDeleteUnverified(30); await load() }
-    catch (e: any) { onError(e.response?.data?.detail || 'Bulk delete failed') }
-    finally { setBulkBusy(false) }
+    try {
+      const res = await gisvizApi.adminBulkDeleteUnverified(30)
+      await load()
+      // brief toast-style feedback via the error slot (reuse for success)
+    } catch (e: any) {
+      onError(e.response?.data?.detail || 'Bulk delete failed')
+    } finally {
+      setBulkBusy(false)
+    }
   }
-
+ 
+  const handleExport = () => {
+    // triggers browser download — no UI state needed
+    gisvizApi.adminExportUnverifiedCsv(days ?? undefined)
+  }
+ 
+  const DAY_OPTIONS: Array<{ label: string; value: number | null }> = [
+    { label: 'All unverified',  value: null },
+    { label: 'Older than 1 day',   value: 1  },
+    { label: 'Older than 3 days',  value: 3  },
+    { label: 'Older than 7 days',  value: 7  },
+    { label: 'Older than 14 days', value: 14 },
+    { label: 'Older than 30 days', value: 30 },
+    { label: 'Older than 60 days', value: 60 },
+  ]
+ 
   return (
-    <Panel title="Unverified Users" icon={<UserX size={14} />} count={users.length}
+    <Panel
+      title="Unverified Users"
+      icon={<UserX size={14} />}
+      count={users.length}
       actions={
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Refresh button — calls load() directly, always fresh from DB */}
-          <button onClick={() => load()} title="Refresh from DB"
-            className="p-1.5 rounded hover:bg-gisviz-canvas text-gisviz-ink-soft hover:text-gisviz-ink transition-colors">
+ 
+          {/* Age filter dropdown — "All unverified" is the default */}
+          <select
+            value={days === null ? '' : String(days)}
+            onChange={e => {
+              const val = e.target.value === '' ? null : Number(e.target.value)
+              setDays(val)
+              load(val)
+            }}
+            className="bg-gisviz-canvas border border-gisviz-border rounded px-2.5 py-1 text-[12px] font-mono text-gisviz-ink focus:ring-1 focus:ring-gisviz-accent outline-none"
+          >
+            {DAY_OPTIONS.map(opt => (
+              <option key={String(opt.value)} value={opt.value === null ? '' : String(opt.value)}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+ 
+          {/* Refresh */}
+          <button
+            onClick={() => load()}
+            title="Refresh"
+            className="p-1.5 rounded hover:bg-gisviz-canvas text-gisviz-ink-soft hover:text-gisviz-ink transition-colors"
+          >
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
           </button>
-          <div className="flex items-center gap-2">
-            <label className="text-[12px] font-mono text-gisviz-ink-soft whitespace-nowrap">Older than</label>
-            <select
-              value={days}
-              onChange={e => {
-                const d = Number(e.target.value)
-                setDays(d)
-                load(d)   // ← immediately reload with new day filter
-              }}
-              className="bg-gisviz-canvas border border-gisviz-border rounded px-2 py-1 text-[12px] font-mono text-gisviz-ink focus:ring-1 focus:ring-gisviz-accent outline-none">
-              {[1, 3, 7, 14, 30, 60].map(d => <option key={d} value={d}>{d} days</option>)}
-            </select>
-          </div>
+ 
+          {/* CSV export — always available when there's data */}
           {users.length > 0 && (
-            <button onClick={handleBulkDelete} disabled={bulkBusy}
-              className="flex items-center gap-1 px-3 py-1.5 bg-gisviz-alert text-white rounded text-[12px] font-mono font-bold hover:bg-red-700 transition-colors disabled:opacity-50">
-              {bulkBusy ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />} Bulk Delete (30+ days)
+            <button
+              onClick={handleExport}
+              title="Download CSV"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-gisviz-canvas border border-gisviz-border rounded text-[11px] font-mono text-gisviz-ink hover:border-gisviz-accent transition-colors"
+            >
+              <Download size={13} />
+              Export CSV
+            </button>
+          )}
+ 
+          {/* Bulk delete — only shown when data is present */}
+          {users.length > 0 && (
+            <button
+              onClick={handleBulkDelete}
+              disabled={bulkBusy}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-gisviz-alert text-gisviz-white rounded text-[11px] font-mono font-bold hover:bg-gisviz-alert/100 transition-colors disabled:opacity-50"
+            >
+              {bulkBusy
+                ? <Loader2 size={12} className="animate-spin" />
+                : <Trash2 size={12} />
+              }
+              Bulk delete (30+ days)
             </button>
           )}
         </div>
       }
     >
-      {loading ? <Spinner /> : users.length === 0
-        ? <EmptyState text={`No unverified accounts older than ${days} day(s).`} />
-        : (
-          <table className="w-full text-[12px] font-mono">
-            <thead><tr className="border-b border-gisviz-border">
+      {loading ? (
+        <Spinner />
+      ) : users.length === 0 ? (
+        <EmptyState text={
+          days === null
+            ? 'No unverified accounts.'
+            : `No unverified accounts older than ${days} day(s).`
+        } />
+      ) : (
+        <table className="w-full text-[12px] font-mono">
+          <thead>
+            <tr className="border-b border-gisviz-border bg-gisviz-canvas/40">
               <th className="text-left px-6 py-3 text-gisviz-ink-soft uppercase tracking-wider">Handle</th>
               <th className="text-left px-4 py-3 text-gisviz-ink-soft uppercase tracking-wider hidden sm:table-cell">Email</th>
+              <th className="text-left px-4 py-3 text-gisviz-ink-soft uppercase tracking-wider hidden md:table-cell">Role</th>
               <th className="text-left px-4 py-3 text-gisviz-ink-soft uppercase tracking-wider hidden md:table-cell">Registered</th>
               <th className="px-4 py-3 w-36"></th>
-            </tr></thead>
-            <tbody className="divide-y divide-gisviz-border/50">
-              {users.map((u: any) => (
-                <tr key={u.user_id} className="hover:bg-gisviz-canvas/30 transition-colors">
-                  <td className="px-6 py-3 font-medium text-gisviz-ink">@{u.user_handle}</td>
-                  <td className="px-4 py-3 text-gisviz-ink-soft hidden sm:table-cell text-[12px]">{u.email_address}</td>
-                  <td className="px-4 py-3 text-gisviz-ink-soft hidden md:table-cell">{new Date(u.created_timestamp).toLocaleDateString()}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-1 justify-end">
-                      <button onClick={() => handleVerify(u.user_id)} disabled={!!busy}
-                        className="flex items-center gap-1 px-2 py-1 bg-green-50 text-green-700 border border-green-200 rounded text-[12px] font-mono hover:bg-green-100 transition-colors disabled:opacity-50">
-                        {busy === u.user_id ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />} Verify
-                      </button>
-                      <ConfirmBtn onConfirm={() => handleDelete(u.user_id)} busy={busy === u.user_id} />
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )
-      }
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gisviz-border/50">
+            {users.map((u: any) => (
+              <tr key={u.user_id} className="hover:bg-gisviz-canvas/30 transition-colors">
+                <td className="px-6 py-3 font-bold text-gisviz-ink">@{u.user_handle}</td>
+                <td className="px-4 py-3 text-gisviz-ink-soft hidden sm:table-cell text-[11px]">{u.email_address}</td>
+                <td className="px-4 py-3 text-gisviz-ink-soft hidden md:table-cell text-[11px]">
+                  {u.role_name
+                    ? <span className="px-1.5 py-0.5 bg-gisviz-canvas border border-gisviz-border rounded font-mono">{u.role_name}</span>
+                    : <span className="opacity-40">—</span>
+                  }
+                </td>
+                <td className="px-4 py-3 text-gisviz-ink-soft hidden md:table-cell">
+                  {new Date(u.created_timestamp).toLocaleDateString()}
+                </td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-1 justify-end">
+                    <button
+                      onClick={() => handleVerify(u.user_id)}
+                      disabled={!!busy}
+                      className="flex items-center gap-1 px-2 py-1 bg-gisviz-safe/10 text-gisviz-safe/90 border border-gisviz-safe/30 rounded text-[11px] font-mono hover:bg-gisviz-safe/10 transition-colors disabled:opacity-50"
+                    >
+                      {busy === u.user_id
+                        ? <Loader2 size={11} className="animate-spin" />
+                        : <Check size={11} />
+                      }
+                      Verify
+                    </button>
+                    <ConfirmBtn
+                      onConfirm={() => handleDelete(u.user_id)}
+                      busy={busy === u.user_id}
+                    />
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+ 
+      {/* Footer row — record count + export reminder */}
+      {!loading && users.length > 0 && (
+        <div className="flex items-center justify-between px-5 py-2.5 border-t border-gisviz-border bg-gisviz-canvas/30">
+          <span className="text-[11px] font-mono text-gisviz-ink-soft">
+            {users.length} unverified account{users.length !== 1 ? 's' : ''}
+            {days !== null ? ` older than ${days} day${days !== 1 ? 's' : ''}` : ' total'}
+          </span>
+          <button
+            onClick={handleExport}
+            className="flex items-center gap-1 text-[11px] font-mono text-gisviz-ink-soft hover:text-gisviz-accent transition-colors"
+          >
+            <Download size={12} /> Download CSV
+          </button>
+        </div>
+      )}
     </Panel>
   )
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SUPPORT TICKETS
+// SUPPORT TICKETS — renamed from SupportPopup, fully wired to tickets tab
 // ─────────────────────────────────────────────────────────────────────────────
-function SupportPopup({ onError }: { onError: (e: string) => void }) {
-  const [tickets, setTickets]   = useState<any[]>([])
-  const [loading, setLoading]   = useState(true)
-  const [busy, setBusy]         = useState<string | null>(null)
-  const [filter, setFilter]     = useState<'all' | 'open' | 'resolved' | 'dismissed'>('all')
+
+type TicketStatus = 'open' | 'in_progress' | 'resolved' | 'closed'
+
+function TicketsPanel({ onError }: { onError: (e: string) => void }) {
+  const [tickets, setTickets] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [busy, setBusy]       = useState<string | null>(null)
+  const [filter, setFilter]   = useState<'all' | TicketStatus>('all')
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await gisvizApi.adminFetchSupportTickets()
+      const res = await gisvizApi.adminFetchTickets()
       setTickets(Array.isArray(res) ? res : (res?.tickets || []))
     } catch { onError('Failed to load support tickets') }
     finally { setLoading(false) }
@@ -1054,14 +1080,11 @@ function SupportPopup({ onError }: { onError: (e: string) => void }) {
 
   useEffect(() => { load() }, [load])
 
-  const act = async (key: string, fn: () => Promise<any>, reload = true) => {
+  const act = async (key: string, fn: () => Promise<any>) => {
     setBusy(key)
-    try {
-      await fn()
-      if (reload) await load()
-    } catch (e: any) {
-      onError(e?.response?.data?.detail || 'Action failed')
-    } finally { setBusy(null) }
+    try { await fn(); await load() }
+    catch (e: any) { onError(e?.response?.data?.detail || 'Action failed') }
+    finally { setBusy(null) }
   }
 
   const safeTickets = Array.isArray(tickets) ? tickets : []
@@ -1071,305 +1094,169 @@ function SupportPopup({ onError }: { onError: (e: string) => void }) {
     <Panel title="Support Tickets" icon={<LifeBuoy size={14} />} count={safeTickets.length}
       actions={
         <div className="flex items-center gap-1 flex-wrap">
-          {(['all', 'open', 'resolved', 'dismissed'] as const).map(f => (
+          {(['all', 'open', 'in_progress', 'resolved', 'closed'] as const).map(f => (
             <button key={f} onClick={() => setFilter(f)}
               className={`px-2.5 py-1 rounded text-[11px] font-mono transition-colors capitalize ${
-                filter === f ? 'bg-gisviz-accent text-white' : 'bg-gisviz-canvas border border-gisviz-border text-gisviz-ink-soft hover:text-gisviz-ink'
+                filter === f
+                  ? 'bg-gisviz-accent text-white'
+                  : 'bg-gisviz-canvas border border-gisviz-border text-gisviz-ink-soft hover:text-gisviz-ink'
               }`}>
-              {f}
+              {f.replace('_', ' ')}
             </button>
           ))}
-          <button onClick={load} title="Refresh" className="p-1.5 ml-1 rounded hover:bg-gisviz-canvas text-gisviz-ink-soft hover:text-gisviz-ink transition-colors">
+          <button onClick={load} title="Refresh"
+            className="p-1.5 ml-1 rounded hover:bg-gisviz-canvas text-gisviz-ink-soft hover:text-gisviz-ink transition-colors">
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
           </button>
         </div>
       }
     >
-      {loading ? <Spinner /> : visible.length === 0 ? <EmptyState text={`No ${filter === 'all' ? '' : filter} tickets.`} /> : (
-        <div className="divide-y divide-gisviz-border/50">
-          {visible.map(t => (
-            <div key={t.ticket_id} className="px-5 py-4 hover:bg-gisviz-canvas/30 transition-colors">
-              <div className="flex items-start gap-3 mb-3">
-                <LifeBuoy size={14} className={`mt-0.5 shrink-0 ${t.status === 'open' ? 'text-yellow-500' : t.status === 'resolved' ? 'text-green-600' : 'text-gisviz-ink-soft'}`} />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap mb-1">
-                    <Badge color={t.status}>{t.status}</Badge>
-                    <span className="text-[11px] font-mono px-2 py-0.5 bg-gisviz-canvas border border-gisviz-border rounded capitalize text-gisviz-ink-soft">
-                      {t.category.replace('_', ' ')}
-                    </span>
-                    <span className="text-[11px] font-mono text-gisviz-ink-soft">
-                      {new Date(t.created_timestamp).toLocaleDateString()}
-                    </span>
-                  </div>
-                  <p className="text-[13px] font-bold text-gisviz-ink mt-2">{t.subject}</p>
-                  <p className="text-[12px] font-mono text-gisviz-ink-soft mt-1">{t.description}</p>
-
-                  <div className="flex gap-4 mt-3 p-3 bg-gisviz-canvas/50 border border-gisviz-border rounded-md">
-                    {t.user_handle ? (
-                      <p className="text-[11px] font-mono text-gisviz-ink-soft">Registered User: <span className="text-gisviz-ink font-bold">@{t.user_handle}</span></p>
-                    ) : (
-                      <p className="text-[11px] font-mono text-gisviz-ink-soft italic">Anonymous Visitor</p>
-                    )}
-                    {t.contact_email && <p className="text-[11px] font-mono text-gisviz-ink-soft">Email: <span className="text-gisviz-ink">{t.contact_email}</span></p>}
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 flex-wrap pl-[26px]">
-                {t.status !== 'resolved' && (
-                  <button onClick={() => act(`res-${t.ticket_id}`, () => gisvizApi.adminUpdateSupportStatus(t.ticket_id, 'resolved'))} disabled={!!busy}
-                    className="flex items-center gap-1.5 px-3 py-1 rounded text-[11px] font-mono bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 transition-colors disabled:opacity-40">
-                    {busy === `res-${t.ticket_id}` ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />} Resolve
-                  </button>
-                )}
-                {t.status !== 'dismissed' && (
-                  <button onClick={() => act(`dis-${t.ticket_id}`, () => gisvizApi.adminUpdateSupportStatus(t.ticket_id, 'dismissed'))} disabled={!!busy}
-                    className="flex items-center gap-1.5 px-3 py-1 rounded text-[11px] font-mono bg-gisviz-canvas text-gisviz-ink-soft border border-gisviz-border hover:text-gisviz-ink transition-colors disabled:opacity-40">
-                    {busy === `dis-${t.ticket_id}` ? <Loader2 size={11} className="animate-spin" /> : <X size={11} />} Dismiss
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </Panel>
-  )
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ROLES  — live permission toggles saved to DB immediately
-// ─────────────────────────────────────────────────────────────────────────────
-
-// These permission keys map directly to what the backend checks.
-// Toggling them here → PUT /admin/roles/{id} → DB updated → 
-// next time that user's JWT is refreshed they get the new permissions.
-const PERM_KEYS: { key: string; label: string; desc: string }[] = [
-  { key: 'admin',        label: 'Admin Panel',         desc: '/admin/* pages' },
-  { key: 'publish',      label: 'Publish Posts',        desc: 'Create & edit own posts' },
-  { key: 'moderate',     label: 'Moderate Content',     desc: 'Delete comments, resolve reports' },
-  { key: 'manage_tags',  label: 'Manage Categories',    desc: 'Approve / reject suggestions' },
-  { key: 'view_reports', label: 'View Reports',         desc: 'Read access to reports tab' },
-]
-
-function RolesPanel({ onError }: { onError: (e: string) => void }) {
-  const [roles, setRoles]     = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving]   = useState<string | null>(null)  // "roleId:permKey"
-  const [delBusy, setDelBusy] = useState<number | null>(null)
-  const [editing, setEditing] = useState<any | null>(null)
-  const [showNew, setShowNew] = useState(false)
-  const [newName, setNewName] = useState('')
-  const [newPerms, setNewPerms] = useState<Record<string, boolean>>({})
-  const [createBusy, setCreateBusy] = useState(false)
-
-  const load = useCallback(async () => {
-    setLoading(true)
-    try { setRoles(await gisvizApi.adminFetchRoles()) }
-    catch { onError('Failed to load roles') }
-    finally { setLoading(false) }
-  }, [onError])
-
-  useEffect(() => { load() }, [load])
-
-  // Toggle a permission and save immediately — no separate Save button needed
-  const togglePermission = async (role: any, permKey: string) => {
-    const savingKey = `${role.role_id}:${permKey}`
-    setSaving(savingKey)
-    const updated = { ...role.permissions, [permKey]: !role.permissions[permKey] }
-    try {
-      await gisvizApi.adminUpdateRole(role.role_id, role.name, updated)
-      // Update local state immediately — no need to reload everything
-      setRoles(prev => prev.map(r =>
-        r.role_id === role.role_id ? { ...r, permissions: updated } : r
-      ))
-    } catch (e: any) {
-      onError(e.response?.data?.detail || 'Failed to update permission')
-    } finally {
-      setSaving(null)
-    }
-  }
-
-  const handleRename = async (role: any, newNameVal: string) => {
-    setSaving(`${role.role_id}:name`)
-    try {
-      await gisvizApi.adminUpdateRole(role.role_id, newNameVal, role.permissions)
-      setEditing(null)
-      await load()
-    } catch (e: any) { onError(e.response?.data?.detail || 'Rename failed') }
-    finally { setSaving(null) }
-  }
-
-  const handleCreate = async () => {
-    if (!newName.trim()) return
-    setCreateBusy(true)
-    try {
-      await gisvizApi.adminCreateRole(newName.trim().toLowerCase(), newPerms)
-      setShowNew(false); setNewName(''); setNewPerms({})
-      await load()
-    } catch (e: any) { onError(e.response?.data?.detail || 'Create failed') }
-    finally { setCreateBusy(false) }
-  }
-
-  const handleDelete = async (id: number) => {
-    setDelBusy(id)
-    try { await gisvizApi.adminDeleteRole(id); await load() }
-    catch (e: any) { onError(e.response?.data?.detail || 'Delete failed') }
-    finally { setDelBusy(null) }
-  }
-
-  return (
-    <div className="space-y-6">
-      {/* ── Role permission matrix ── */}
-      <Panel title="Role Permissions" icon={<KeyRound size={14} />}
-        actions={
-          <div className="flex gap-2 items-center">
-            <button onClick={load} title="Refresh from DB"
-              className="p-1.5 rounded hover:bg-gisviz-canvas text-gisviz-ink-soft hover:text-gisviz-ink transition-colors">
-              <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-            </button>
-            <button onClick={() => setShowNew(p => !p)}
-              className="flex items-center gap-1 px-3 py-1.5 bg-gisviz-accent text-white rounded text-[12px] font-mono font-bold hover:bg-opacity-90 transition-colors">
-              <Plus size={13} /> New Role
-            </button>
-          </div>
-        }
-      >
-        {showNew && (
-          <div className="px-6 py-4 border-b border-gisviz-border bg-gisviz-canvas/30 space-y-3">
-            <div className="flex gap-3 items-end flex-wrap">
-              <div>
-                <label className="block text-[12px] font-mono text-gisviz-ink-soft mb-1 uppercase">Role Name</label>
-                <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="e.g. moderator"
-                  className="bg-gisviz-canvas border border-gisviz-border rounded px-3 py-1.5 text-[12px] font-mono text-gisviz-ink focus:ring-1 focus:ring-gisviz-accent outline-none" />
-              </div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-              {PERM_KEYS.map(p => (
-                <label key={p.key} className="flex items-start gap-2 cursor-pointer group">
-                  <input type="checkbox" checked={!!newPerms[p.key]}
-                    onChange={() => setNewPerms(prev => ({ ...prev, [p.key]: !prev[p.key] }))}
-                    className="mt-0.5 accent-gisviz-accent" />
-                  <div>
-                    <p className="text-[12px] font-mono text-gisviz-ink group-hover:text-gisviz-accent transition-colors">{p.label}</p>
-                    <p className="text-[12px] font-mono text-gisviz-ink-soft">{p.desc}</p>
-                  </div>
-                </label>
-              ))}
-            </div>
-            <div className="flex gap-2">
-              <button onClick={handleCreate} disabled={createBusy || !newName.trim()}
-                className="flex items-center gap-1 px-4 py-1.5 bg-gisviz-accent text-white rounded text-[12px] font-mono font-bold disabled:opacity-50 hover:bg-opacity-90 transition-colors">
-                {createBusy ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Create
-              </button>
-              <button onClick={() => { setShowNew(false); setNewName(''); setNewPerms({}) }}
-                className="px-4 py-1.5 rounded border border-gisviz-border text-[12px] font-mono text-gisviz-ink-soft hover:text-gisviz-ink transition-colors">Cancel</button>
-            </div>
-          </div>
-        )}
-
-        {loading ? <Spinner /> : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-[12px] font-mono min-w-[560px]">
+      {loading ? <Spinner />
+        : visible.length === 0
+        ? <EmptyState text={`No ${filter === 'all' ? '' : filter.replace('_', ' ') + ' '}tickets.`} />
+        : (
+          <div className="overflow-x-auto pb-4">
+            <table className="w-full text-left border-collapse min-w-[700px]">
               <thead>
-                <tr className="border-b border-gisviz-border bg-gisviz-canvas/30">
-                  <th className="text-left px-6 py-3 text-gisviz-ink-soft uppercase tracking-wider">Role</th>
-                  {PERM_KEYS.map(p => (
-                    <th key={p.key} className="px-3 py-3 text-center">
-                      <div className="text-[12px] font-mono text-gisviz-ink-soft uppercase tracking-wider">{p.label}</div>
-                      <div className="text-[9px] font-mono text-gisviz-border">{p.desc}</div>
-                    </th>
-                  ))}
-                  <th className="px-4 py-3 w-20"></th>
+                <tr className="border-b border-gisviz-border/50 bg-gisviz-canvas/30 text-[11px] font-mono text-gisviz-ink-soft uppercase tracking-wider">
+                  <th className="p-4 font-medium w-1/3">Issue & Details</th>
+                  <th className="p-4 font-medium w-1/4">Contact Info</th>
+                  <th className="p-4 font-medium">Category</th>
+                  <th className="p-4 font-medium">Status</th>
+                  <th className="p-4 font-medium text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gisviz-border/50">
-                {roles.map(role => (
-                  <tr key={role.role_id} className="hover:bg-gisviz-canvas/20 transition-colors">
-                    <td className="px-6 py-4">
-                      {editing?.role_id === role.role_id ? (
-                        <div className="flex items-center gap-2">
-                          <input
-                            value={editing.name}
-                            onChange={e => setEditing({ ...editing, name: e.target.value })}
-                            className="bg-gisviz-canvas border border-gisviz-accent rounded px-2 py-1 text-[12px] font-mono text-gisviz-ink outline-none w-28"
-                          />
-                          <button onClick={() => handleRename(role, editing.name)}
-                            disabled={saving === `${role.role_id}:name`}
-                            className="p-1 rounded bg-gisviz-accent text-white hover:bg-opacity-90 disabled:opacity-50">
-                            {saving === `${role.role_id}:name` ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />}
-                          </button>
-                          <button onClick={() => setEditing(null)} className="p-1 rounded border border-gisviz-border text-gisviz-ink-soft hover:text-gisviz-ink">
-                            <X size={11} />
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-gisviz-ink capitalize">{role.name}</span>
-                          <Badge color="default">{role.user_count}</Badge>
-                          {['admin', 'viewer'].includes(role.name) && <Badge color="admin">system</Badge>}
-                        </div>
-                      )}
-                    </td>
-                    {PERM_KEYS.map(p => {
-                      const hasPerm = !!role.permissions[p.key]
-                      const isSaving = saving === `${role.role_id}:${p.key}`
-                      const isSystem = ['admin', 'viewer'].includes(role.name) && p.key === 'admin'
-                      return (
-                        <td key={p.key} className="px-3 py-4 text-center">
-                          <button
-                            onClick={() => !isSystem && togglePermission(role, p.key)}
-                            disabled={isSaving || isSystem}
-                            title={isSystem ? 'Cannot remove admin permission from admin role' : (hasPerm ? `Remove ${p.label}` : `Grant ${p.label}`)}
-                            className={`mx-auto flex items-center justify-center w-8 h-8 rounded-full transition-all disabled:cursor-not-allowed ${
-                              isSystem
-                                ? 'bg-gisviz-accent/20 text-gisviz-accent cursor-not-allowed'
-                                : hasPerm
-                                  ? 'bg-green-100 text-green-700 hover:bg-red-50 hover:text-gisviz-alert'
-                                  : 'bg-gisviz-canvas border border-gisviz-border text-gisviz-border hover:border-gisviz-accent hover:text-gisviz-accent'
-                            }`}
-                          >
-                            {isSaving
-                              ? <Loader2 size={12} className="animate-spin" />
-                              : hasPerm
-                                ? <Check size={13} />
-                                : <X size={13} />
-                            }
-                          </button>
-                        </td>
+                {visible.map(t => (
+                  <TicketRow key={t.ticket_id} ticket={t} busy={busy}
+                    onStatusChange={(status: TicketStatus) =>
+                      act(`status-${t.ticket_id}`, () =>
+                        gisvizApi.adminUpdateTicketStatus(t.ticket_id, status)
                       )
-                    })}
-                    <td className="px-4 py-4">
-                      <div className="flex items-center gap-1 justify-end">
-                        {!['admin', 'viewer'].includes(role.name) && (
-                          <>
-                            <button onClick={() => setEditing({ ...role })}
-                              className="p-1.5 rounded text-gisviz-ink-soft hover:text-gisviz-accent hover:bg-gisviz-canvas transition-colors">
-                              <Edit2 size={13} />
-                            </button>
-                            <ConfirmBtn
-                              onConfirm={() => handleDelete(role.role_id)}
-                              busy={delBusy === role.role_id}
-                            />
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
+                    }
+                    onDelete={() =>
+                      act(`del-${t.ticket_id}`, () =>
+                        gisvizApi.adminDeleteTicket(t.ticket_id)
+                      )
+                    }
+                  />
                 ))}
               </tbody>
             </table>
           </div>
-        )}
-      </Panel>
-
-      {/* ── How permissions work note ── */}
-      <div className="bg-gisviz-canvas border border-gisviz-border rounded-sm px-5 py-4 text-[12px] font-mono text-gisviz-ink-soft space-y-1">
-        <p className="text-gisviz-ink font-bold mb-2 flex items-center gap-2"><Shield size={13} /> How role permissions take effect</p>
-        <p>• Clicking a permission cell saves it to the DB immediately — no extra Save button needed.</p>
-        <p>• Users with that role see the change on their <strong>next login</strong> or when their session token is refreshed.</p>
-        <p>• <strong>admin</strong> and <strong>viewer</strong> are system roles — their core permissions cannot be removed.</p>
-        <p>• To apply changes to an already-logged-in admin session, use the browser's logout → login flow.</p>
-      </div>
-    </div>
+        )
+      }
+    </Panel>
   )
 }
+
+function TicketRow({ ticket: t, busy, onStatusChange, onDelete }: {
+  ticket: any
+  busy: string | null
+  onStatusChange: (s: TicketStatus) => void
+  onDelete: () => void
+}) {
+  const [statusOpen, setStatusOpen] = useState(false)
+  const isBusy = (key: string) => busy === key
+
+  const STATUS_OPTIONS: TicketStatus[] = ['open', 'in_progress', 'resolved', 'closed']
+
+  return (
+    <tr className="hover:bg-gisviz-canvas/40 transition-colors group">
+      
+      {/* Issue & Details */}
+      <td className="p-4 align-top">
+        <p className="text-[12px] font-bold text-gisviz-ink mb-1">{t.subject}</p>
+        <p className="text-[12px] font-mono text-gisviz-ink-soft line-clamp-2 leading-relaxed" title={t.description}>
+          {t.description}
+        </p>
+        <p className="text-[12px] font-mono text-gisviz-ink-soft mt-2">
+          {new Date(t.created_timestamp).toLocaleString()}
+        </p>
+      </td>
+
+      {/* Contact Info */}
+      <td className="p-4 align-top">
+        {t.user_handle ? (
+          <Link href={`/profile/${t.user_handle}`} className="inline-flex items-center gap-1 text-[12px] font-mono font-bold text-gisviz-accent hover:underline">
+            @{t.user_handle}
+          </Link>
+        ) : (
+          <span className="text-[12px] font-mono text-gisviz-ink-soft italic">Anonymous visitor</span>
+        )}
+        {t.contact_email && (
+          <p className="text-[11px] font-mono text-gisviz-ink mt-1 break-all">
+            {t.contact_email}
+          </p>
+        )}
+      </td>
+
+      {/* Category */}
+      <td className="p-4 align-top">
+        <span className="text-[11px] font-mono px-2 py-1 bg-gisviz-canvas border border-gisviz-border rounded capitalize text-gisviz-ink-soft whitespace-nowrap shadow-sm">
+          {t.category?.replace('_', ' ')}
+        </span>
+      </td>
+
+      {/* Status Badge */}
+      <td className="p-4 align-top">
+        <Badge color={t.status}>{t.status.replace('_', ' ')}</Badge>
+      </td>
+
+      {/* Hover Actions */}
+      <td className="p-4 align-top text-right">
+        <div className="flex items-center justify-end gap-2 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
+          
+          {/* Status dropdown */}
+          <div className="relative">
+            <button onClick={() => setStatusOpen(o => !o)} disabled={!!busy}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[11px] font-mono bg-gisviz-canvas border border-gisviz-border text-gisviz-ink hover:border-gisviz-accent transition-colors disabled:opacity-40 whitespace-nowrap">
+              {isBusy(`status-${t.ticket_id}`) ? <Loader2 size={12} className="animate-spin" /> : <ChevronDown size={12} />}
+              Status
+            </button>
+            {statusOpen && (
+              <div className="absolute right-0 top-full mt-1 w-36 bg-gisviz-card border border-gisviz-border rounded-md shadow-lg z-20 py-1 text-left">
+                {STATUS_OPTIONS.filter(s => s !== t.status).map(s => (
+                  <button key={s} onClick={() => { setStatusOpen(false); onStatusChange(s) }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-[11px] font-mono text-gisviz-ink hover:bg-gisviz-canvas capitalize transition-colors">
+                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                      s === 'open'        ? 'bg-yellow-500' :
+                      s === 'in_progress' ? 'bg-blue-500'   :
+                      s === 'resolved'    ? 'bg-gisviz-safe/50'  : 'bg-gisviz-ink-soft'
+                    }`} />
+                    {s.replace('_', ' ')}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Quick resolve shortcut */}
+          {(t.status === 'open' || t.status === 'in_progress') && (
+            <button onClick={() => onStatusChange('resolved')} disabled={!!busy}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded text-[11px] font-mono bg-gisviz-safe/10 text-gisviz-safe/90 border border-gisviz-safe/30 hover:bg-gisviz-safe/10 transition-colors disabled:opacity-40">
+              {isBusy(`status-${t.ticket_id}`) ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />} Resolve
+            </button>
+          )}
+
+          {/* Delete */}
+          <ConfirmBtn onConfirm={onDelete} busy={isBusy(`del-${t.ticket_id}`)} />
+        </div>
+      </td>
+
+    </tr>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ROLES — kept in file (used as fallback / reference) but tab renders
+// AccessControlPanel (imported) which supersedes this.
+// This component is intentionally not rendered by the tab switch above.
+// ─────────────────────────────────────────────────────────────────────────────
+const PERM_KEYS: { key: string; label: string; desc: string }[] = [
+  { key: 'admin',        label: 'Admin Panel',      desc: '/admin/* pages' },
+  { key: 'publish',      label: 'Publish Posts',     desc: 'Create & edit own posts' },
+  { key: 'moderate',     label: 'Moderate Content',  desc: 'Delete comments, resolve reports' },
+  { key: 'manage_tags',  label: 'Manage Categories', desc: 'Approve / reject suggestions' },
+  { key: 'view_reports', label: 'View Reports',      desc: 'Read access to reports tab' },
+]

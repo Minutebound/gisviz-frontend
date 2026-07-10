@@ -1,55 +1,61 @@
 'use client'
 
-/**
- * app/admin/page.tsx — Admin Home
- *
- * Landing page with navigation cards to every admin destination:
- *   Analytics · Control Panel · Activity (audit trail)
- * plus deep links into each Control Panel tab.
- */
-
 import React, { useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
   ShieldCheck, BarChart2, Tag, Users, Hash, FileText, Flag,
   MessageSquare, UserX, KeyRound, ArrowRight, Activity, Loader2,
+  Cpu, Database, HeadphonesIcon,
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import AccessRestricted from '../components/AccessRestricted'
 
-// Main areas — Analytics, Control Panel, Activity
+// ── Main area cards (top section) ────────────────────────────────────────────
 const AREAS = [
   {
     href: '/admin/analytics',
     icon: <BarChart2 size={22} />,
     title: 'Analytics Dashboard',
-    desc: 'Platform metrics, top posts & users, growth trends. Served from the snapshot warehouse.',
+    desc: 'Platform metrics, top posts & users, growth trends.',
   },
   {
     href: '/admin/control',
     icon: <ShieldCheck size={22} />,
     title: 'Control Panel',
-    desc: 'Full moderation workspace — manage every part of the platform.',
+    desc: 'Full moderation workspace — users, posts, reports, roles.',
   },
   {
     href: '/admin/activity',
     icon: <Activity size={22} />,
     title: 'Admin Activity',
-    desc: 'Permanent audit trail of every moderation action — who did what, and when.',
+    desc: 'Permanent audit trail — who did what, and when.',
+  },
+  {
+    href: '/admin/architecture',
+    icon: <Cpu size={22} />,
+    title: 'System Architecture',
+    desc: 'AI-generated diagram of services, layers, and tech stack — from actual code.',
+  },
+  {
+    href: '/admin/erd',
+    icon: <Database size={22} />,
+    title: 'ERD',
+    desc: 'AI-generated entity-relationship diagram across all 4 databases — from models.py.',
   },
 ]
 
-// Control-panel tabs, as deep links
+// ── Control-panel tab deep links (lower grid) ─────────────────────────────────
 const CONTROL_TABS = [
-  { tab: 'categories', icon: <Tag size={16} />,           label: 'Categories',      desc: 'Approve / edit category tags' },
-  { tab: 'users',      icon: <Users size={16} />,         label: 'Users',           desc: 'Roles, status, deletion' },
-  { tab: 'keywords',   icon: <Hash size={16} />,          label: 'Keywords',        desc: 'Manage keyword tags' },
-  { tab: 'posts',      icon: <FileText size={16} />,      label: 'Posts',           desc: 'Moderate publications' },
-  { tab: 'reports',    icon: <Flag size={16} />,          label: 'Reports',         desc: 'Resolve content reports' },
-  { tab: 'comments',   icon: <MessageSquare size={16} />, label: 'Comments',        desc: 'Moderate comments' },
-  { tab: 'unverified', icon: <UserX size={16} />,         label: 'Unverified',      desc: 'Verify / purge accounts' },
-  { tab: 'roles',      icon: <KeyRound size={16} />,      label: 'Access & Roles',  desc: 'Roles, permissions, page access' },
+  { tab: 'categories', icon: <Tag size={16} />,             label: 'Categories',      desc: 'Approve / edit category tags' },
+  { tab: 'users',      icon: <Users size={16} />,           label: 'Users',           desc: 'Roles, status, deletion' },
+  { tab: 'keywords',   icon: <Hash size={16} />,            label: 'Keywords',        desc: 'Manage keyword tags' },
+  { tab: 'posts',      icon: <FileText size={16} />,        label: 'Posts',           desc: 'Moderate publications' },
+  { tab: 'reports',    icon: <Flag size={16} />,            label: 'Reports',         desc: 'Resolve content reports' },
+  { tab: 'comments',   icon: <MessageSquare size={16} />,   label: 'Comments',        desc: 'Moderate comments' },
+  { tab: 'unverified', icon: <UserX size={16} />,           label: 'Unverified',      desc: 'Verify / purge accounts' },
+  { tab: 'roles',      icon: <KeyRound size={16} />,        label: 'Access & Roles',  desc: 'Roles, permissions, page access' },
+  { tab: 'tickets',    icon: <HeadphonesIcon size={16} />,  label: 'Support Tickets', desc: 'View and resolve user support requests' },
 ]
 
 export default function AdminHomePage() {
@@ -83,7 +89,7 @@ export default function AdminHomePage() {
         </p>
       </div>
 
-      {/* Main areas — now 3 cards */}
+      {/* Main area cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-10">
         {AREAS.map(a => (
           <Link key={a.href} href={a.href}
@@ -113,7 +119,7 @@ export default function AdminHomePage() {
               <span className="text-gisviz-ink-soft group-hover:text-gisviz-accent transition-colors">{t.icon}</span>
               <span className="text-[12px] font-mono font-bold">{t.label}</span>
             </div>
-            <p className="text-[12px] font-mono text-gisviz-ink-soft leading-snug">{t.desc}</p>
+            <p className="text-[11px] font-mono text-gisviz-ink-soft leading-snug">{t.desc}</p>
           </Link>
         ))}
       </div>

@@ -251,12 +251,12 @@ export default function ProfileHandlePage() {
                     e.currentTarget.nextElementSibling?.classList.remove('hidden')
                   }}
                 />
-                <div className="hidden w-full h-full bg-gradient-to-tr from-gisviz-accent to-gisviz-safe flex items-center justify-center text-white text-[24px] font-bold uppercase font-mono shadow-inner">
+                <div className="hidden w-full h-full bg-gradient-to-tr from-gisviz-accent to-gisviz-safe flex items-center justify-center text-gisviz-white text-[24px] font-bold uppercase font-mono shadow-inner">
                   {profile.user_handle.charAt(0)}
                 </div>
               </>
             ) : (
-              <div className="w-full h-full bg-gradient-to-tr from-gisviz-accent to-gisviz-safe flex items-center justify-center text-white text-[24px] font-bold uppercase font-mono shadow-inner">
+              <div className="w-full h-full bg-gradient-to-tr from-gisviz-accent to-gisviz-safe flex items-center justify-center text-gisviz-white text-[24px] font-bold uppercase font-mono shadow-inner">
                 {profile.user_handle.charAt(0)}
               </div>
             )}
@@ -318,8 +318,8 @@ export default function ProfileHandlePage() {
               disabled={followLoading}
               className={`group/btn flex items-center justify-center gap-2 px-5 py-2 rounded-full transition-all font-mono text-[16px] font-bold shadow-sm disabled:opacity-50 border ${
                 isFollowing
-                  ? 'bg-gisviz-canvas border-gisviz-border text-gisviz-ink hover:bg-red-50 hover:text-gisviz-alert/90 hover:border-gisviz-alert/60'
-                  : 'bg-gisviz-accent border-transparent text-white hover:bg-opacity-90'
+                  ? 'bg-gisviz-canvas border-gisviz-border text-gisviz-ink hover:bg-gisviz-alert/10 hover:text-gisviz-alert/90 hover:border-gisviz-alert/60'
+                  : 'bg-gisviz-accent border-transparent text-gisviz-white hover:bg-opacity-90'
               }`}
             >
               {followLoading ? (
@@ -365,7 +365,7 @@ export default function ProfileHandlePage() {
   {isOwnProfile && (
     <Link
       href="/post/upload"
-      className="flex items-center gap-2 bg-gisviz-accent text-white px-4 py-2 rounded-full text-[12px] font-bold hover:bg-opacity-90 transition-all shadow-sm"
+      className="flex items-center gap-2 bg-gisviz-accent text-gisviz-white px-4 py-2 rounded-full text-[12px] font-bold hover:bg-opacity-90 transition-all shadow-sm"
     >
       <Plus size={16} /> Publish
     </Link>

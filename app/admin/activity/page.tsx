@@ -39,7 +39,7 @@ const META: Record<string, { Icon: any; color: string }> = {
   'comment.delete':              { Icon: MessageSquare, color: 'text-gisviz-alert' },
   'user.delete':                 { Icon: UserX,         color: 'text-gisviz-alert' },
   'user.bulk_delete_unverified': { Icon: UserX,         color: 'text-gisviz-alert' },
-  'user.verify':                 { Icon: ShieldCheck,   color: 'text-green-600' },
+  'user.verify':                 { Icon: ShieldCheck,   color: 'text-gisviz-safe/70' },
   'user.status_change':          { Icon: ShieldCheck,   color: 'text-gisviz-accent' },
   'user.role_change':            { Icon: ShieldCheck,   color: 'text-gisviz-accent' },
   'role.create':                 { Icon: Tag,           color: 'text-gisviz-accent' },

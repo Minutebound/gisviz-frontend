@@ -6,6 +6,7 @@ import { Home, User, LogOut, Sun, Moon, Menu, X, LogIn, Settings, Notebook, Phon
 import Sidebar from './Sidebar'
 import Logo from './Logo'
 import { useAuth } from '../../context/AuthContext'
+import { SupportPopup } from './SupportPopup' // ← NEW: Import the component
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL 
 
@@ -17,7 +18,7 @@ export default function Navbar() {
   const [isDarkMode, setIsDarkMode] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [imageError, setImageError] = useState(false)
-  const [isSupportOpen,    setIsSupportOpen]    = useState(false)   // ← NEW
+  const [isSupportOpen, setIsSupportOpen] = useState(false)   // State is already here!
 
   const dropdownRef = useRef<HTMLDivElement>(null)
 
@@ -64,7 +65,6 @@ export default function Navbar() {
   const displayHandle = user?.user_handle ?? 'guest'
   const avatarUrl = user?.avatar_path ? `${API_BASE_URL}${user.avatar_path}` : null
 
-  
   return (
     <>
       <header className="sticky top-0 z-50 bg-gisviz-canvas/80 backdrop-blur-md border-b border-gisviz-border">
@@ -92,7 +92,6 @@ export default function Navbar() {
               {mounted ? (
                 isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />
               ) : (
-                /* Replaced the <div> with a valid inline <svg> to prevent HTML nesting hydration mismatches */
                 <svg className="w-5 h-5 opacity-0" aria-hidden="true" />
               )}
             </button>
@@ -114,7 +113,7 @@ export default function Navbar() {
                       onError={() => setImageError(true)}
                     />
                   ) : (
-                    <div className="w-full h-full bg-gradient-to-tr from-gisviz-accent to-gisviz-safe  0 flex items-center justify-center text-white text-[16px] font-bold uppercase font-mono shadow-inner">
+                    <div className="w-full h-full bg-gradient-to-tr from-gisviz-accent to-gisviz-safe  0 flex items-center justify-center text-gisviz-white text-[16px] font-bold uppercase font-mono shadow-inner">
                       {displayHandle.charAt(0)}
                     </div>
                   )}
@@ -143,7 +142,6 @@ export default function Navbar() {
                     
                     {user?.role_name === 'admin' && (
                     <>
-                      
                       <Link
                         href="/admin"
                         onClick={() => setIsProfileOpen(false)}
@@ -165,23 +163,21 @@ export default function Navbar() {
                     {/* Sign out */}
                     <button
                       onClick={() => { logoutSession(); setIsProfileOpen(false) }}
-                      className="flex items-center w-full gap-3 px-4 py-2 hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-gisviz-alert/90 text-[16px] text-gisviz-ink text-left transition-colors"
+                      className="flex items-center w-full gap-3 px-4 py-2 hover:bg-gisviz-alert/10 dark:hover:bg-red-950/30 hover:text-gisviz-alert/90 text-[16px] text-gisviz-ink text-left transition-colors border-b border-gisviz-border"
                     >
                       <LogOut size={16} /> Sign out
                     </button>
  
-                    {/* ── Help & Support — opens SupportPopup ── */}
+                    {/* ── Help & Support ── */}
                     <button
                       onClick={() => {
-                        setIsProfileOpen(false)   // close dropdown first
-                        setIsSupportOpen(true)    // then open modal
+                        setIsProfileOpen(false)   
+                        setIsSupportOpen(true)    
                       }}
                       className="flex items-center w-full gap-3 px-4 py-2 hover:bg-gisviz-canvas rounded-b-xl hover:text-gisviz-accent text-[16px] text-gisviz-ink transition-colors text-left"
                     >
-                      <LifeBuoy size={16} /> Help & Support
+                      <LifeBuoy size={16} /> Support?
                     </button>
-
-                    
 
                   </div>
                 )}
@@ -189,7 +185,7 @@ export default function Navbar() {
             ) : (
               <Link
                 href="/auth"
-                className="flex items-center gap-2 px-5 py-2 bg-gisviz-accent text-white rounded-md hover:bg-opacity-90 transition-all font-mono text-[16px] shadow-sm"
+                className="flex items-center gap-2 px-5 py-2 bg-gisviz-accent text-gisviz-white rounded-md hover:bg-opacity-90 transition-all font-mono text-[16px] shadow-sm"
               >
                 <LogIn size={16} />
                 <span className="hidden sm:inline">Log in / Sign up</span>
@@ -202,7 +198,7 @@ export default function Navbar() {
 
       {isMobileMenuOpen && (
         <div className="fixed inset-0 z-[100] lg:hidden flex">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)}></div>
+          <div className="absolute inset-0 bg-gisviz-black/10 backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)}></div>
           <div className="relative w-80 max-w-[85vw] bg-gisviz-canvas h-full border-r border-gisviz-border shadow-2xl flex flex-col">
             <div className="flex items-center justify-between p-4 border-b border-gisviz-border">
               <Link href="/" onClick={() => setIsMobileMenuOpen(false)} className="font-display font-bold text-gisviz-ink text-[16px] flex items-center gap-2">
@@ -218,6 +214,12 @@ export default function Navbar() {
           </div>
         </div>
       )}
+
+      {/* ── NEW: Render the Support Popup Component ── */}
+      <SupportPopup 
+        isOpen={isSupportOpen} 
+        onClose={() => setIsSupportOpen(false)} 
+      />
     </>
   )
 }

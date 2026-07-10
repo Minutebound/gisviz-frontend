@@ -173,7 +173,7 @@ function RolesSection({ roles, onError, onChanged }: {
             placeholder="role name (e.g. curator)"
             className="flex-1 min-w-[180px] px-3 py-1.5 bg-gisviz-card border border-gisviz-border rounded font-mono text-[12px] text-gisviz-ink focus:border-gisviz-accent outline-none" />
           <button onClick={create} disabled={createBusy}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 text-green-700 border border-green-200 rounded font-mono text-[12px] hover:bg-green-100 transition-colors disabled:opacity-50">
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-gisviz-safe/10 text-gisviz-safe/90 border border-gisviz-safe/30 rounded font-mono text-[12px] hover:bg-gisviz-safe/10 transition-colors disabled:opacity-50">
             {createBusy ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />} Create
           </button>
           <button onClick={() => { setShowNew(false); setNewName('') }}
@@ -217,7 +217,7 @@ function RolesSection({ roles, onError, onChanged }: {
                     {isEditing ? (
                       <>
                         <button onClick={() => rename(role)} disabled={rowBusy === role.role_id}
-                          className="p-1.5 rounded text-green-600 hover:bg-green-50">
+                          className="p-1.5 rounded text-gisviz-safe/70 hover:bg-gisviz-safe/10">
                           {rowBusy === role.role_id ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
                         </button>
                         <button onClick={() => setEditingId(null)}
@@ -231,12 +231,12 @@ function RolesSection({ roles, onError, onChanged }: {
                         </button>
                         {confirmId === role.role_id ? (
                           <button onClick={() => remove(role)} disabled={rowBusy === role.role_id}
-                            className="flex items-center gap-1 px-2 py-1 bg-red-50 text-gisviz-alert border border-red-200 rounded text-[12px] hover:bg-red-100 transition-colors">
+                            className="flex items-center gap-1 px-2 py-1 bg-gisviz-alert/10 text-gisviz-alert border border-gisviz-alert/50 rounded text-[12px] hover:bg-gisviz-alert/30 transition-colors">
                             {rowBusy === role.role_id ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />} Sure?
                           </button>
                         ) : (
                           <button onClick={() => setConfirmId(role.role_id)}
-                            className="p-1.5 rounded text-gisviz-ink-soft hover:text-gisviz-alert hover:bg-red-50 transition-colors">
+                            className="p-1.5 rounded text-gisviz-ink-soft hover:text-gisviz-alert hover:bg-gisviz-alert/10 transition-colors">
                             <Trash2 size={13} />
                           </button>
                         )}
@@ -294,7 +294,7 @@ function PageAccessSection({ pages, roles }: { pages: MatrixPage[]; roles: Matri
                 {roles.map(r => (
                   <td key={r.role_id} className="px-3 py-3 text-center">
                     {page.access[r.role_id] ? (
-                      <Check size={14} className="inline text-green-600" />
+                      <Check size={14} className="inline text-gisviz-safe/70" />
                     ) : (
                       <X size={14} className="inline text-gisviz-border" />
                     )}
@@ -365,7 +365,7 @@ function PermissionsSection({ roles, perms, onError, onChanged }: {
                           locked
                             ? 'bg-gisviz-accent/20 text-gisviz-accent cursor-not-allowed'
                             : hasPerm
-                              ? 'bg-green-100 text-green-700 hover:bg-red-50 hover:text-gisviz-alert'
+                              ? 'bg-gisviz-safe/10 text-gisviz-safe/90 hover:bg-gisviz-alert/10 hover:text-gisviz-alert'
                               : 'bg-gisviz-canvas border border-gisviz-border text-gisviz-border hover:border-gisviz-accent hover:text-gisviz-accent'
                         }`}>
                         {isSaving ? <Loader2 size={12} className="animate-spin" />

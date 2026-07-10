@@ -43,13 +43,13 @@ export default function ResetPasswordPage() {
       <div className="w-full max-w-md bg-gisviz-card border border-gisviz-border shadow-lg p-8 rounded-sm">
         
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-12 h-12 bg-gisviz-alert/90 text-white rounded-full mb-4">
+          <div className="inline-flex items-center justify-center w-12 h-12 bg-gisviz-alert/90 text-gisviz-white rounded-full mb-4">
             <Lock size={24} />
           </div>
           <h2 className="text-[24px] font-display font-bold text-gisviz-ink">Reconfigure Password</h2>
         </div>
 
-        {errorMsg && <div className="p-3 mb-6 bg-red-50 border border-gisviz-alert/60 text-gisviz-alert/90 text-[12px] font-mono rounded-md">{errorMsg}</div>}
+        {errorMsg && <div className="p-3 mb-6 bg-gisviz-alert/10 border border-gisviz-alert/60 text-gisviz-alert/90 text-[12px] font-mono rounded-md">{errorMsg}</div>}
         {successMsg && <div className="p-3 mb-6 bg-gisviz-safe/5  border border-gisviz-safe/20    text-gisviz-safe/70       text-[12px] font-mono rounded-md">{successMsg}</div>}
 
         <form onSubmit={handleReset} className="space-y-4">
@@ -71,7 +71,7 @@ export default function ResetPasswordPage() {
           <button 
             type="submit" 
             disabled={isLoading || !token || !!successMsg} 
-            className="w-full flex items-center justify-center gap-2 bg-gisviz-ink text-white py-2.5 rounded-md hover:bg-opacity-90 transition-all font-mono text-[12px] font-bold mt-6 disabled:opacity-50"
+            className="w-full flex items-center justify-center gap-2 bg-gisviz-ink text-gisviz-white py-2.5 rounded-md hover:bg-opacity-90 transition-all font-mono text-[12px] font-bold mt-6 disabled:opacity-50"
           >
             {isLoading ? <Loader2 size={16} className="animate-spin" /> : <><Save size={16} /> Reset Password</>}
           </button>

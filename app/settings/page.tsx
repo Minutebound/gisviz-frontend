@@ -225,7 +225,7 @@ export default function SettingsPage() {
       <div className={`p-4 mb-4 rounded-md text-[16px] font-mono border ${
         m.type === 'success'
           ? 'bg-gisviz-safe/5 text-gisviz-safe/70 border-gisviz-safe/20'
-          : 'bg-red-50 text-gisviz-alert/90 border-gisviz-alert/60'
+          : 'bg-gisviz-alert/10 text-gisviz-alert/90 border-gisviz-alert/60'
       }`}>
         {m.text}
       </div>
@@ -236,7 +236,7 @@ export default function SettingsPage() {
     <button
       type="submit"
       disabled={!!saving[section]}
-      className="flex items-center gap-2 bg-gisviz-accent text-white px-6 py-2.5 rounded-md text-[16px] font-mono font-bold hover:bg-gisviz-accent/90 disabled:opacity-60 transition-colors"
+      className="flex items-center gap-2 bg-gisviz-accent text-gisviz-white px-6 py-2.5 rounded-md text-[16px] font-mono font-bold hover:bg-gisviz-accent/90 disabled:opacity-60 transition-colors"
     >
       {saving[section] ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
       {saving[section] ? 'Saving…' : label}
@@ -416,7 +416,7 @@ export default function SettingsPage() {
                     ? <img src={avatarPreview} alt="Preview" className="w-full h-full object-cover" />
                     : <ImageIcon className="text-gisviz-ink-soft" size={32} />
                   }
-                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white text-[16px] font-mono">
+                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-gisviz-white text-[16px] font-mono">
                     Upload
                   </div>
                 </div>
@@ -706,7 +706,7 @@ export default function SettingsPage() {
               />
               <div className="flex justify-end">
                 <button type="submit" disabled={!!saving.email}
-                  className="flex items-center gap-2 bg-gisviz-accent text-white px-6 py-2.5 rounded-md text-[16px] font-mono font-bold hover:bg-gisviz-accent/90 disabled:opacity-60 transition-colors">
+                  className="flex items-center gap-2 bg-gisviz-accent text-gisviz-white px-6 py-2.5 rounded-md text-[16px] font-mono font-bold hover:bg-gisviz-accent/90 disabled:opacity-60 transition-colors">
                   {saving.email ? <Loader2 size={14} className="animate-spin" /> : <Mail size={14} />}
                   {saving.email ? 'Sending…' : 'Send Verification Code'}
                 </button>
@@ -730,7 +730,7 @@ export default function SettingsPage() {
               </div>
               <div className="flex justify-end">
                 <button type="submit" disabled={!!saving.email}
-                  className="flex items-center gap-2 bg-gisviz-accent text-white px-6 py-2.5 rounded-md text-[16px] font-mono font-bold hover:bg-gisviz-accent/90 disabled:opacity-60 transition-colors">
+                  className="flex items-center gap-2 bg-gisviz-accent text-gisviz-white px-6 py-2.5 rounded-md text-[16px] font-mono font-bold hover:bg-gisviz-accent/90 disabled:opacity-60 transition-colors">
                   {saving.email ? <Loader2 size={14} className="animate-spin" /> : <ShieldCheck size={14} />}
                   {saving.email ? 'Verifying…' : 'Verify & Update Email'}
                 </button>
@@ -827,7 +827,7 @@ export default function SettingsPage() {
             />
             <div className="flex justify-end">
               <button type="submit" disabled={!!saving.deactivate || deactivateConfirmText !== user.user_handle}
-                className="flex items-center gap-2 bg-yellow-600 text-white px-6 py-2.5 rounded-md text-[16px] font-mono font-bold hover:bg-yellow-700 disabled:opacity-40 transition-colors">
+                className="flex items-center gap-2 bg-yellow-600 text-gisviz-white px-6 py-2.5 rounded-md text-[16px] font-mono font-bold hover:bg-yellow-700 disabled:opacity-40 transition-colors">
                 {saving.deactivate ? <Loader2 size={14} className="animate-spin" /> : <Shield size={14} />}
                 {saving.deactivate ? 'Deactivating…' : 'Deactivate Account'}
               </button>

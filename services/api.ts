@@ -3,7 +3,7 @@ import axios from 'axios'
 // ── Base URL ──────────────────────────────────────────────────────────────────
 //
 // Uses NEXT_PUBLIC_API_URL directly (e.g. http:// in dev,
-// https://api.yourdomain.com in prod). The browser hits the backend directly;
+// https://api.gisviz.com in prod). The browser hits the backend directly;
 // Docker exposes port 8001 to the host so this works in every environment.
 //
 // Do NOT use a relative '/api/v1' base — that only works when the Next.js
@@ -316,8 +316,8 @@ export const gisvizApi = {
   verifyEmail: async (email: string, otp: string) =>
     (await axiosInstance.post('/auth/verify', { email_address: email, otp })).data,
 
-  resendOtp: async (payload: { email_address: string }) =>
-    (await axiosInstance.post('/auth/resend-otp', payload)).data,
+  resendOtp: async (email_address: string) =>
+    (await axiosInstance.post('/auth/resend-otp', { email_address })).data,
 
   loginUser: async (payload: URLSearchParams) =>
     (await axiosInstance.post('/auth/login', payload, {
@@ -432,15 +432,45 @@ adminRunSnapshot: async () =>
     (await axiosInstance.delete(`/admin/comments/${commentId}`)).data,
 
   // ── Admin — Unverified Users ─────────────────────────────────────────────
-  adminFetchUnverified: async (olderThanDays = 7) =>
-    (await axiosInstance.get('/admin/users/unverified', { params: { older_than_days: olderThanDays } })).data,
-
+    adminFetchUnverified: async (olderThanDays?: number) => {
+    const params: any = {}
+    if (olderThanDays !== undefined) params.older_than_days = olderThanDays
+    return (await axiosInstance.get('/admin/users/unverified', { params })).data
+  },
+ 
   adminVerifyUser: async (userId: string) =>
     (await axiosInstance.put(`/admin/users/${userId}/verify`)).data,
-
+ 
   adminBulkDeleteUnverified: async (olderThanDays = 30) =>
-    (await axiosInstance.delete('/admin/users/unverified/bulk', { params: { older_than_days: olderThanDays } })).data,
-
+    (await axiosInstance.delete('/admin/users/unverified/bulk', {
+      params: { older_than_days: olderThanDays },
+    })).data,
+ 
+  adminExportUnverifiedCsv: (olderThanDays?: number): void => {
+    const base = axiosInstance.defaults.baseURL || ''
+    const params = olderThanDays ? `?older_than_days=${olderThanDays}` : ''
+    // Build the full URL with auth header injected via a hidden anchor
+    // (fetch approach below keeps the JWT in the request)
+    const token = typeof window !== 'undefined'
+      ? localStorage.getItem('gisviz_token') || ''
+      : ''
+    fetch(`${base}/admin/users/unverified/export${params}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(res => res.blob())
+      .then(blob => {
+        const url  = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href  = url
+        link.download = olderThanDays
+          ? `unverified_users_older_than_${olderThanDays}d.csv`
+          : 'unverified_users_all.csv'
+        link.click()
+        URL.revokeObjectURL(url)
+      })
+      .catch(console.error)
+  },
+ 
 
   // ── Admin — Historical trends (analytics_db / snapshots) ──────────────
   adminFetchTrendsDaily: async (days = 90) =>
@@ -477,14 +507,40 @@ adminRunSnapshot: async () =>
   adminFetchAccessMatrix: async () =>
     (await axiosInstance.get('/admin/access/matrix')).data,
 
-  // ── Support / Contact ──────────────────────────────────────────────────
-  submitSupportTicket: async (payload: { category: string; subject: string; description: string; contact_email?: string }) =>
-    (await axiosInstance.post('/users/support', payload)).data,
-
-  adminFetchSupportTickets: async () =>
-    (await axiosInstance.get('/users/support/all')).data,
-
-  adminUpdateSupportStatus: async (ticketId: string, status: 'open' | 'resolved' | 'dismissed') =>
-    (await axiosInstance.put(`/users/support/${ticketId}/status`, { status })).data,
+  // ── Support tickets (public submission) ───────────────────────────────────
+  submitSupportTicket: async (payload: {
+    contact_email?: string
+    category: 'bug' | 'billing' | 'account' | 'feature' | 'other'
+    subject: string
+    description: string
+  }) =>
+    (await axiosInstance.post('/support/ticket', payload)).data,
  
+  // ── Admin — Support Tickets ────────────────────────────────────────────────
+  adminFetchTickets: async (opts: {
+    skip?:     number
+    limit?:    number
+    status?:   string
+    category?: string
+    q?:        string
+  } = {}) => {
+    const params: any = { skip: opts.skip ?? 0, limit: opts.limit ?? 50 }
+    if (opts.status)   params.status   = opts.status
+    if (opts.category) params.category = opts.category
+    if (opts.q)        params.q        = opts.q
+    return (await axiosInstance.get('/admin/tickets', { params })).data
+  },
+ 
+  adminUpdateTicketStatus: async (
+    ticketId: string,
+    status: 'open' | 'in_progress' | 'resolved' | 'closed',
+  ) =>
+    (await axiosInstance.put(`/admin/tickets/${ticketId}/status`, { status })).data,
+ 
+  adminDeleteTicket: async (ticketId: string) =>
+    (await axiosInstance.delete(`/admin/tickets/${ticketId}`)).data,
+ 
+ //-- SLUG --
+ getPostBySlug: async (slug: string) =>
+    (await axiosInstance.get(`/posts/slug/${slug}`)).data,
 }

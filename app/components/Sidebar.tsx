@@ -169,7 +169,7 @@ export default function Sidebar() {
                         />
                       </>
                     ) : (
-                      <div className="w-10 h-10 rounded-full border border-gisviz-border bg-gradient-to-tr from-gisviz-accent to-gisviz-safe 0 flex items-center justify-center text-white text-[16px] font-bold uppercase font-mono shadow-inner flex-shrink-0">
+                      <div className="w-10 h-10 rounded-full border border-gisviz-border bg-gradient-to-tr from-gisviz-accent to-gisviz-safe 0 flex items-center justify-center text-gisviz-white text-[16px] font-bold uppercase font-mono shadow-inner flex-shrink-0">
                         {pub.user_handle.charAt(0)}
                       </div>
                     )}
@@ -191,7 +191,7 @@ export default function Sidebar() {
                       title={pub.is_followed ? "Unfollow" : "Follow"}
                       className={`group/btn flex items-center justify-center w-10 h-8 rounded-full transition-all flex-shrink-0 border shadow-sm ${
                         pub.is_followed 
-                          ? 'bg-gisviz-rail-soft text-gisviz-ink border-transparent hover:border-gisviz-alert/60 hover:text-gisviz-alert hover:bg-red-50' 
+                          ? 'bg-gisviz-rail-soft text-gisviz-ink border-transparent hover:border-gisviz-alert/60 hover:text-gisviz-alert hover:bg-gisviz-alert/10' 
                           : 'bg-transparent text-gisviz-ink border-gisviz-border hover:border-gisviz-accent hover:text-gisviz-accent hover:bg-gisviz-rail-soft'
                       }`}
                     >
@@ -225,7 +225,7 @@ export default function Sidebar() {
         </div>
         
         <div className="relative z-10">
-          <h4 className="font-display font-semibold text-[12px] text-white mb-1.5 leading-snug group-hover:text-gisviz-accent transition-colors">
+          <h4 className="font-display font-semibold text-[12px] text-gisviz-white mb-1.5 leading-snug group-hover:text-gisviz-accent transition-colors">
             Enterprise Spatial Analytics
           </h4>
           <p className="text-[12px] text-slate-400 mb-3 leading-relaxed font-sans">
@@ -240,14 +240,15 @@ export default function Sidebar() {
         <div className="absolute top-0 right-0 w-full h-full bg-[url('https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=400&fit=crop')] bg-cover bg-center opacity-[0.08] mix-blend-overlay pointer-events-none"></div>
       </div>
 
-      {/* Footer */}
+     {/* Footer */}
       <div className="mt-auto flex flex-col gap-4 pt-4">
         <div className="flex flex-wrap gap-x-3 gap-y-2 text-[12px] text-gisviz-ink-soft px-1">
-          <a href="#" className="hover:text-gisviz-accent transition-colors">Terms of Service</a>
-          <a href="#" className="hover:text-gisviz-accent transition-colors">Privacy Policy</a>
-          <a href="#" className="hover:text-gisviz-accent transition-colors">Cookie Policy</a>
-          <a href="#" className="hover:text-gisviz-accent transition-colors">Accessibility</a>
-          <span className="w-full mt-1">© 2026 gisviz Corp.</span>
+          <Link href="/terms"         className="hover:text-gisviz-accent transition-colors">Terms</Link>
+          <Link href="/privacy"       className="hover:text-gisviz-accent transition-colors">Privacy</Link>
+          <Link href="/cookies"       className="hover:text-gisviz-accent transition-colors">Cookies</Link>
+          <Link href="/accessibility" className="hover:text-gisviz-accent transition-colors">Accessibility</Link>
+          <Link href="/contact"       className="hover:text-gisviz-accent transition-colors">Contact</Link>
+          <span className="w-full mt-1 font-mono">© {new Date().getFullYear()} gisviz.</span>
         </div>
       </div>
 

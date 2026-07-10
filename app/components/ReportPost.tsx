@@ -54,7 +54,7 @@ export default function ReportModal({ isOpen, onClose, publicationId }: ReportMo
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
       {/* Backdrop */}
       <div 
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
+        className="absolute inset-0 bg-gisviz-black/10 backdrop-blur-sm transition-opacity"
         onClick={onClose}
       ></div>
 
@@ -93,7 +93,7 @@ export default function ReportModal({ isOpen, onClose, publicationId }: ReportMo
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-900/50 p-3 rounded-md flex items-start gap-3">
               <AlertTriangle className="text-orange-500 shrink-0 mt-0.5" size={16} />
-              <p className="text-[12px] font-mono text-orange-800 dark:text-orange-300">
+              <p className="text-[12px] font-mono">
                 Reports are monitored by enterprise administrators. False reporting may result in restricted access.
               </p>
             </div>
@@ -140,7 +140,7 @@ export default function ReportModal({ isOpen, onClose, publicationId }: ReportMo
               <button 
                 type="submit"
                 disabled={isSubmitting || !reason}
-                className="flex items-center justify-center gap-2 bg-gisviz-alert text-white px-5 py-2 rounded-md hover:bg-gisviz-alert transition-all font-mono text-[12px] shadow-sm disabled:opacity-50"
+                className="flex items-center justify-center gap-2 bg-gisviz-alert text-gisviz-white px-5 py-2 rounded-md hover:bg-gisviz-alert transition-all font-mono text-[12px] shadow-sm disabled:opacity-50"
               >
                 {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Flag size={16} />}
                 Submit Report

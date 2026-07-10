@@ -43,7 +43,7 @@ Browser
            │  HTTP/HTTPS
            ▼
   FastAPI backend  :8001
-  (or https://api.yourdomain.com in prod)
+  (or https://api.gisviz.com in prod)
 ```
 
 ### Data flow on the Feed page
@@ -183,7 +183,7 @@ nano .env.local
 
 # URL the browser uses to reach the FastAPI backend
 # Dev: http://
-# Prod: https://api.yourdomain.com
+# Prod: https://api.gisviz.com
 NEXT_PUBLIC_API_URL=http://
 ```
 
@@ -372,7 +372,7 @@ cd gisviz/gisviz-frontend
 
 ```bash
 cat > .env.local << 'EOF'
-NEXT_PUBLIC_API_URL=https://api.yourdomain.com
+NEXT_PUBLIC_API_URL=https://api.gisviz.com
 EOF
 ```
 
@@ -410,7 +410,7 @@ sudo nano /etc/caddy/Caddyfile
 Add the frontend block:
 
 ```caddy
-gisviz.yourdomain.com {
+gisviz.gisviz.com {
     reverse_proxy localhost:3000
 
     # Cache static Next.js assets aggressively
@@ -432,7 +432,7 @@ gisviz.yourdomain.com {
 sudo systemctl restart caddy
 ```
 
-Caddy handles TLS automatically. The frontend is now live at `https://gisviz.yourdomain.com`.
+Caddy handles TLS automatically. The frontend is now live at `https://gisviz.gisviz.com`.
 
 ### Step 8 — Deploying updates
 
@@ -508,7 +508,7 @@ frontend:
   build:
     context: ../gisviz-frontend
     args:
-      NEXT_PUBLIC_API_URL: "https://api.yourdomain.com"
+      NEXT_PUBLIC_API_URL: "https://api.gisviz.com"
   container_name: gisviz-frontend
   restart: always
   ports:
@@ -517,7 +517,7 @@ frontend:
     - gisviz-network
 ```
 
-Then Caddy proxies `gisviz.yourdomain.com` → `localhost:3000` as normal.
+Then Caddy proxies `gisviz.gisviz.com` → `localhost:3000` as normal.
 
 ---
 
@@ -555,7 +555,7 @@ npm run type-check
 to see all errors at once without building.
 
 ### Images not loading in production
-`NEXT_PUBLIC_API_URL` in `.env.local` points to `localhost` in dev. In production it must point to your real API domain (`https://api.yourdomain.com`). Rebuild after changing:
+`NEXT_PUBLIC_API_URL` in `.env.local` points to `localhost` in dev. In production it must point to your real API domain (`https://api.gisviz.com`). Rebuild after changing:
 ```bash
 nano .env.local
 npm run build

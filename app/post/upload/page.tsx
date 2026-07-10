@@ -181,7 +181,7 @@ export default function UploadPage() {
       </div>
 
       {errorMsg && (
-        <div className="p-4 mb-6 rounded-md text-[12px] font-mono border bg-red-50 text-gisviz-alert/90 border-gisviz-alert/60 flex items-center justify-between">
+        <div className="p-4 mb-6 rounded-md text-[12px] font-mono border bg-gisviz-alert/10 text-gisviz-alert/90 border-gisviz-alert/60 flex items-center justify-between">
           <span>{errorMsg}</span>
           <button onClick={() => setErrorMsg('')}><X size={16}/></button>
         </div>
@@ -207,7 +207,7 @@ export default function UploadPage() {
             {previewUrl ? (
               <>
                 <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
-                <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white">
+                <div className="absolute inset-0 bg-gisviz-black/10 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white">
                   <UploadCloud size={32} className="mb-2" />
                   <span className="font-mono text-[12px] font-bold text-sentence-camelcase tracking-wider">Change Visual</span>
                 </div>
@@ -316,7 +316,7 @@ export default function UploadPage() {
                   {selectedCategoryIds.map(id => {
                     const cat = availableCategories.find(c => c.category_id === id)
                     return cat ? (
-                      <span key={id} className="flex items-center gap-1.5 px-3 py-1 bg-gisviz-accent text-white rounded-md font-mono text-xs shadow-sm text-camelcase tracking-wider">
+                      <span key={id} className="flex items-center gap-1.5 px-3 py-1 bg-gisviz-accent text-gisviz-white rounded-md font-mono text-xs shadow-sm text-camelcase tracking-wider">
                         {cat.label}
                         <button type="button" onClick={() => removeCategory(id)} className="hover:text-gisviz-alert/60"><X size={12}/></button>
                       </span>
@@ -373,7 +373,7 @@ export default function UploadPage() {
               <div className="flex flex-col gap-3">
                 <div className="flex flex-wrap gap-2">
                   {keywords.map(kw => (
-                    <span key={kw} className="flex items-center gap-1.5 px-3 py-1 bg-gisviz-accent text-white rounded-md font-mono text-xs shadow-sm text-camelcase tracking-wider">
+                    <span key={kw} className="flex items-center gap-1.5 px-3 py-1 bg-gisviz-accent text-gisviz-white rounded-md font-mono text-xs shadow-sm text-camelcase tracking-wider">
                       {kw}
                       <button type="button" onClick={() => removeKeyword(kw)} className="hover:text-gisviz-alert/60"><X size={12}/></button>
                     </span>
@@ -398,7 +398,7 @@ export default function UploadPage() {
               <button type="button" onClick={() => router.back()} disabled={isLoading} className="px-6 py-2.5 rounded-md font-mono text-[12px] border border-gisviz-border text-gisviz-ink-soft hover:bg-gisviz-rail transition-colors">
                 Cancel
               </button>
-              <button type="submit" disabled={isLoading} className="flex items-center gap-2 bg-gisviz-accent text-white py-2.5 px-8 rounded-md hover:bg-opacity-90 transition-all font-mono text-[12px] font-bold shadow-md disabled:opacity-70">
+              <button type="submit" disabled={isLoading} className="flex items-center gap-2 bg-gisviz-accent text-gisviz-white py-2.5 px-8 rounded-md hover:bg-opacity-90 transition-all font-mono text-[12px] font-bold shadow-md disabled:opacity-70">
                 {isLoading ? <Loader2 size={18} className="animate-spin" /> : <UploadCloud size={18} />}
                 {isLoading ? 'Publishing...' : 'Publish to Feed'}
               </button>
