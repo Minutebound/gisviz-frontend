@@ -16,36 +16,35 @@ export default function Sidebar() {
   const { user, isAuthenticated } = useAuth() as any;
 
   const RAW_API_URL = process.env.NEXT_PUBLIC_API_URL ;
-  // Strip '/api/v1' explicitly to target the base mount where '/post/uploads' lives
-  const API_BASE_URL = `${RAW_API_URL}`.replace('/api/v1', '');
+  // Strip '/api/v0' explicitly to target the base mount where '/post/uploads' lives
+  const API_BASE_URL = `${RAW_API_URL}`.replace('/api/v0', '');
 
-  useEffect(() => {
-    // 1. Fetch Categories and sort by real usage_count
-    gisvizApi
-      .listCategories()
-      .then((data: Category[]) => {
-        const sorted = data.sort((a, b) => b.usage_count - a.usage_count)
-        setTrending(sorted.slice(0, 5))
-      })
-      .catch(() => setTrending([]))
-  }, []);
+useEffect(() => {
+  gisvizApi
+    .listCategories()
+    .then((data: Category[]) => {
+      const sorted = data
+        .filter((c) => c.usage_count > 0)
+        .sort((a, b) => b.usage_count - a.usage_count)
+      setTrending(sorted.slice(0, 5))
+    })
+    .catch(() => setTrending([]))
+}, [])
 
-  useEffect(() => {
-    // 2. Fetch popular publishers dynamically based on logged in state
-    const loadPublishers = async () => {
-      try {
-        const currentUserId = isAuthenticated && user ? user.user_id : undefined;
-        // Fetch up to 50 publishers
-        const popularData = await gisvizApi.getPopularPublishers(50, currentUserId);
-        setPublishers(popularData);
-      } catch (err) {
-        console.error("Failed to load publishers", err);
-        setPublishers([]);
-      }
-    };
-    
-    loadPublishers();
-  }, [isAuthenticated, user]);
+useEffect(() => {
+  const loadPublishers = async () => {
+    try {
+      const currentUserId = isAuthenticated && user ? user.user_id : undefined
+      const popularData = await gisvizApi.getPopularPublishers(50, currentUserId)
+      setPublishers(popularData.filter((p: any) => p.follower_count >= 1))
+    } catch (err) {
+      console.error('Failed to load publishers', err)
+      setPublishers([])
+    }
+  }
+
+  loadPublishers()
+}, [isAuthenticated, user])
 
   // Handle follow/unfollow with instant UI update + DB Sync
   const handleFollowToggle = async (e: React.MouseEvent, targetUserId: string, currentlyFollowing: boolean) => {
@@ -143,7 +142,7 @@ export default function Sidebar() {
         {/* This div applies the max-height and custom scrollbar for up to 50 users */}
         <div className="p-4 space-y-4 max-h-[350px] overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-gisviz-border [&::-webkit-scrollbar-thumb]:rounded-full pr-2">
           {publishers.length === 0 ? (
-            <p className="text-[12px] text-gisviz-ink-soft">No publishers found.</p>
+            <p className="text-[12px] text-gisviz-ink-soft">Popular publishers coming soon.</p>
           ) : (
             publishers.map((pub) => {
               // Check if the current publisher is the logged-in user
@@ -243,10 +242,10 @@ export default function Sidebar() {
      {/* Footer */}
       <div className="mt-auto flex flex-col gap-4 pt-4">
         <div className="flex flex-wrap gap-x-3 gap-y-2 text-[12px] text-gisviz-ink-soft px-1">
-          <Link href="/terms"         className="hover:text-gisviz-accent transition-colors">Terms</Link>
-          <Link href="/privacy"       className="hover:text-gisviz-accent transition-colors">Privacy</Link>
-          <Link href="/cookies"       className="hover:text-gisviz-accent transition-colors">Cookies</Link>
-          <Link href="/accessibility" className="hover:text-gisviz-accent transition-colors">Accessibility</Link>
+          <Link href="/legal/terms"         className="hover:text-gisviz-accent transition-colors">Terms</Link>
+          <Link href="/legal/privacy"       className="hover:text-gisviz-accent transition-colors">Privacy</Link>
+          <Link href="/legal/cookies"       className="hover:text-gisviz-accent transition-colors">Cookies</Link>
+          <Link href="/legal/accessibility" className="hover:text-gisviz-accent transition-colors">Accessibility</Link>
           <Link href="/contact"       className="hover:text-gisviz-accent transition-colors">Contact</Link>
           <span className="w-full mt-1 font-mono">© {new Date().getFullYear()} gisviz.</span>
         </div>

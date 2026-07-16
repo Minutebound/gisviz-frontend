@@ -11,39 +11,33 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 
   <url>
-    <loc>https://gisviz.com/</loc>
-    <changefreq>hourly</changefreq>
-    <priority>1.0</priority>
-  </url>
+  <loc>https://gisviz.com/legal/privacy</loc>
+  <changefreq>monthly</changefreq>
+  <priority>0.4</priority>
+</url>
 
-  <url>
-    <loc>https://gisviz.com/privacy</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
+<url>
+  <loc>https://gisviz.com/legal/terms</loc>
+  <changefreq>monthly</changefreq>
+  <priority>0.4</priority>
+</url>
 
-  <url>
-    <loc>https://gisviz.com/terms</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
+<url>
+  <loc>https://gisviz.com/legal/cookies</loc>
+  <changefreq>monthly</changefreq>
+  <priority>0.3</priority>
+</url>
 
-  <url>
-    <loc>https://gisviz.com/cookies</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.3</priority>
-  </url>
+<url>
+  <loc>https://gisviz.com/legal/accessibility</loc>
+  <changefreq>monthly</changefreq>
+  <priority>0.3</priority>
+</url>
 
-  <url>
-    <loc>https://gisviz.com/accessibility</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.3</priority>
-  </url>
-
-  <url>
-    <loc>https://gisviz.com/contact</loc>
-    <changefreq>yearly</changefreq>
-    <priority>0.5</priority>
-  </url>
+<url>
+  <loc>https://gisviz.com/contact</loc>
+  <changefreq>yearly</changefreq>
+  <priority>0.5</priority>
+</url>
 
 </urlset>

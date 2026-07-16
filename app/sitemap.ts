@@ -4,7 +4,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = 'https://gisviz.com'
 
   // Fetch all public post slugs and user handles from FastAPI
-  // You will need to create a lightweight endpoint like GET /api/v1/seo/sitemap-data
+  // You will need to create a lightweight endpoint like GET /api/v0/seo/sitemap-data
   const req = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/seo/sitemap-data`)
   const { posts, users } = await req.json()
 

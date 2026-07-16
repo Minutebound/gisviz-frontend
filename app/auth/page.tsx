@@ -218,7 +218,7 @@ function AuthContent() {
               </div>
             </div>
             <div>
-              <label className="block text-[12px] font-mono text-gisviz-ink-soft mb-1 uppercase tracking-wider">Security Key</label>
+              <label className="block text-[12px] font-mono text-gisviz-ink-soft mb-1 uppercase tracking-wider">Password</label>
               <div className="relative">
                 <Lock className="absolute left-3 top-2.5 text-gisviz-ink-soft" size={16} />
                 <input required type="password" name="password" onChange={handleChange}
@@ -277,7 +277,7 @@ function AuthContent() {
             {/* ── Email + Password ── */}
             {[
               { name: 'email_address', label: 'Email Address', icon: Mail, type: 'email' },
-              { name: 'password',      label: 'Security Key',  icon: Lock, type: 'password' },
+              { name: 'password',      label: 'Password',  icon: Lock, type: 'password' },
             ].map(({ name, label, icon: Icon, type }) => (
               <div key={name}>
                 <label className="block text-[12px] font-mono text-gisviz-ink-soft mb-1 uppercase tracking-wider">

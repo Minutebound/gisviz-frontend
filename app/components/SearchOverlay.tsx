@@ -21,7 +21,7 @@ import { gisvizApi } from '../../services/api'
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL?.replace('/api/v1', '') ?? ''
+const API_BASE = process.env.NEXT_PUBLIC_API_URL?.replace('/api/v0', '') ?? ''
 
 function resolveUrl(path: string | null | undefined): string | null {
   if (!path) return null

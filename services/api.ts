@@ -6,14 +6,14 @@ import axios from 'axios'
 // https://api.gisviz.com in prod). The browser hits the backend directly;
 // Docker exposes port 8001 to the host so this works in every environment.
 //
-// Do NOT use a relative '/api/v1' base — that only works when the Next.js
+// Do NOT use a relative '/api/v0' base — that only works when the Next.js
 // rewrite proxy can resolve the Docker-internal hostname (gisviz-api), which
 // it cannot when the frontend dev server runs outside the Docker network.
 //
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL
 
 const axiosInstance = axios.create({
-  baseURL: `${API_BASE_URL}/api/v1`,
+  baseURL: `${API_BASE_URL}/api/v0`,
 })
 
 axiosInstance.interceptors.request.use((config) => {

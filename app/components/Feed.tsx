@@ -358,7 +358,7 @@ export default function Feed() {
                     </div>
 
                     {(post.source_name || post.note) && (
-                      <div className="flex flex-col items-end text-[12px] font-mono text-gisviz-ink-soft text-right max-w-[50%] gap-0.5">
+                      <div className="flex flex-col items-end text-[12px] text-gisviz-ink-soft text-right max-w-[50%] gap-0.5">
                         {post.source_name && (
                           <span className="truncate w-full">
                             Source:{' '}
@@ -372,7 +372,7 @@ export default function Feed() {
                           </span>
                         )}
                         {post.note && (
-                          <span className="truncate w-full opacity-80" title={post.note}>
+                          <span className="truncate w-full" title={post.note}>
                             Note: {post.note}
                           </span>
                         )}

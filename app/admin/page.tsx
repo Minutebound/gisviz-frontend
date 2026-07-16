@@ -4,63 +4,105 @@ import React, { useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
-  ShieldCheck, BarChart2, Tag, Users, Hash, FileText, Flag,
+  ShieldCheck, BarChart2, Tag, Users, FileText, Flag,
   MessageSquare, UserX, KeyRound, ArrowRight, Activity, Loader2,
-  Cpu, Database, HeadphonesIcon,
+  Cpu, Database, LifeBuoy, BookOpen,
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import AccessRestricted from '../components/AccessRestricted'
 
-// ── Main area cards (top section) ────────────────────────────────────────────
-const AREAS = [
-  {
-    href: '/admin/analytics',
-    icon: <BarChart2 size={22} />,
-    title: 'Analytics Dashboard',
-    desc: 'Platform metrics, top posts & users, growth trends.',
-  },
-  {
-    href: '/admin/control',
-    icon: <ShieldCheck size={22} />,
-    title: 'Control Panel',
-    desc: 'Full moderation workspace — users, posts, reports, roles.',
-  },
-  {
-    href: '/admin/activity',
-    icon: <Activity size={22} />,
-    title: 'Admin Activity',
-    desc: 'Permanent audit trail — who did what, and when.',
-  },
-  {
-    href: '/admin/architecture',
-    icon: <Cpu size={22} />,
-    title: 'System Architecture',
-    desc: 'AI-generated diagram of services, layers, and tech stack — from actual code.',
-  },
-  {
-    href: '/admin/erd',
-    icon: <Database size={22} />,
-    title: 'ERD',
-    desc: 'AI-generated entity-relationship diagram across all 4 databases — from models.py.',
-  },
+// ── Main area cards ───────────────────────────────────────────────────────────
+// href  → rendered as <Link>
+// onClick → rendered as <button> (needs client-side token read)
+type AreaCard = {
+  key:   string
+  icon:  React.ReactNode
+  title: string
+  desc:  string
+  href?: string
+  onClick?: () => void
+}
+
+function buildAreas(API: string): AreaCard[] {
+  return [
+    {
+      key:   'analytics',
+      href:  '/admin/analytics',
+      icon:  <BarChart2 size={22} />,
+      title: 'Analytics Dashboard',
+      desc:  'Platform metrics, top posts & users, growth trends.',
+    },
+    {
+      key:   'control',
+      href:  '/admin/control',
+      icon:  <ShieldCheck size={22} />,
+      title: 'Control Panel',
+      desc:  'Full moderation workspace — users, posts, reports, roles.',
+    },
+    {
+      key:   'activity',
+      href:  '/admin/activity',
+      icon:  <Activity size={22} />,
+      title: 'Admin Activity',
+      desc:  'Permanent audit trail — who did what, and when.',
+    },
+    {
+      key:   'architecture',
+      href:  '/admin/architecture',
+      icon:  <Cpu size={22} />,
+      title: 'System Architecture',
+      desc:  'Live diagram of routers, routes, and infrastructure — read from /openapi.json.',
+    },
+    {
+      key:   'erd',
+      href:  '/admin/erd',
+      icon:  <Database size={22} />,
+      title: 'ERD',
+      desc:  'Entity-relationship diagram across all 4 databases.',
+    },
+    {
+      key:     'swagger',
+      icon:    <BookOpen size={22} />,
+      title:   'Swagger UI',
+      desc:    'Interactive API reference — every endpoint, testable. Admin only.',
+      onClick: () => {
+        const token = localStorage.getItem('gisviz_token')
+        window.open(`${API}/docs?token=${token}`, '_blank')
+      },
+    },
+  ]
+}
+
+// ── Control-panel tab deep links ──────────────────────────────────────────────
+const CONTROL_TABS = [
+  { tab: 'categories', icon: <Tag size={16} />,           label: 'Categories',      desc: 'Approve / edit category tags' },
+  { tab: 'users',      icon: <Users size={16} />,         label: 'Users',           desc: 'Roles, status, deletion' },
+  { tab: 'posts',      icon: <FileText size={16} />,      label: 'Posts',           desc: 'Moderate publications' },
+  { tab: 'reports',    icon: <Flag size={16} />,          label: 'Reports',         desc: 'Resolve content reports' },
+  { tab: 'comments',   icon: <MessageSquare size={16} />, label: 'Comments',        desc: 'Moderate comments' },
+  { tab: 'unverified', icon: <UserX size={16} />,         label: 'Unverified',      desc: 'Verify / purge accounts' },
+  { tab: 'roles',      icon: <KeyRound size={16} />,      label: 'Access & Roles',  desc: 'Roles, permissions, page access' },
+  { tab: 'tickets',    icon: <LifeBuoy size={16} />,      label: 'Support Tickets', desc: 'View and resolve user support requests' },
 ]
 
-// ── Control-panel tab deep links (lower grid) ─────────────────────────────────
-const CONTROL_TABS = [
-  { tab: 'categories', icon: <Tag size={16} />,             label: 'Categories',      desc: 'Approve / edit category tags' },
-  { tab: 'users',      icon: <Users size={16} />,           label: 'Users',           desc: 'Roles, status, deletion' },
-  { tab: 'keywords',   icon: <Hash size={16} />,            label: 'Keywords',        desc: 'Manage keyword tags' },
-  { tab: 'posts',      icon: <FileText size={16} />,        label: 'Posts',           desc: 'Moderate publications' },
-  { tab: 'reports',    icon: <Flag size={16} />,            label: 'Reports',         desc: 'Resolve content reports' },
-  { tab: 'comments',   icon: <MessageSquare size={16} />,   label: 'Comments',        desc: 'Moderate comments' },
-  { tab: 'unverified', icon: <UserX size={16} />,           label: 'Unverified',      desc: 'Verify / purge accounts' },
-  { tab: 'roles',      icon: <KeyRound size={16} />,        label: 'Access & Roles',  desc: 'Roles, permissions, page access' },
-  { tab: 'tickets',    icon: <HeadphonesIcon size={16} />,  label: 'Support Tickets', desc: 'View and resolve user support requests' },
-]
+// ── Shared card classes ───────────────────────────────────────────────────────
+const CARD_BASE =
+  'group bg-gisviz-card border border-gisviz-border rounded-sm p-6 shadow-sm ' +
+  'hover:border-gisviz-accent transition-colors flex flex-col gap-3 text-left w-full'
 
 export default function AdminHomePage() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth() as any
   const router = useRouter()
+
+  // Strip /api/v0 so we get the bare backend URL for docs
+  const API =
+    typeof window !== 'undefined'
+      ? (process.env.NEXT_PUBLIC_API_URL ?? '')
+          .replace('/api/v0', '')
+          .replace(/\/$/, '')
+      : ''
+
+  const areas = buildAreas(API)
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) router.push('/auth')
@@ -73,7 +115,14 @@ export default function AdminHomePage() {
   )
 
   if (!user || user.role_name !== 'admin') {
-    return <AccessRestricted requiredRoles={['admin']} currentRole={user?.role_name} backHref="/" backLabel="Return to Feed" />
+    return (
+      <AccessRestricted
+        requiredRoles={['admin']}
+        currentRole={user?.role_name}
+        backHref="/"
+        backLabel="Return to Feed"
+      />
+    )
   }
 
   return (
@@ -85,23 +134,41 @@ export default function AdminHomePage() {
           <ShieldCheck className="text-gisviz-accent" size={28} /> Admin Home
         </h1>
         <p className="text-gisviz-ink-soft font-mono text-[12px] mt-1">
-          Signed in as <span className="text-gisviz-ink font-bold">@{user.user_handle}</span> · admin
+          Signed in as{' '}
+          <span className="text-gisviz-ink font-bold">@{user.user_handle}</span> · admin
         </p>
       </div>
 
-      {/* Main area cards */}
+      {/* Main area cards — Link for navigation, button for token-bearing opens */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-10">
-        {AREAS.map(a => (
-          <Link key={a.href} href={a.href}
-            className="group bg-gisviz-card border border-gisviz-border rounded-sm p-6 shadow-sm hover:border-gisviz-accent transition-colors flex flex-col gap-3">
-            <div className="flex items-center justify-between">
-              <span className="text-gisviz-accent">{a.icon}</span>
-              <ArrowRight size={18} className="text-gisviz-border group-hover:text-gisviz-accent group-hover:translate-x-0.5 transition-all" />
-            </div>
-            <h2 className="text-[16px] font-display font-bold text-gisviz-ink">{a.title}</h2>
-            <p className="text-[12px] font-mono text-gisviz-ink-soft leading-relaxed">{a.desc}</p>
-          </Link>
-        ))}
+        {areas.map(a =>
+          a.href ? (
+            <Link key={a.key} href={a.href} className={CARD_BASE}>
+              <div className="flex items-center justify-between">
+                <span className="text-gisviz-accent">{a.icon}</span>
+                <ArrowRight
+                  size={18}
+                  className="text-gisviz-border group-hover:text-gisviz-accent group-hover:translate-x-0.5 transition-all"
+                />
+              </div>
+              <h2 className="text-[16px] font-display font-bold text-gisviz-ink">{a.title}</h2>
+              <p className="text-[12px] font-mono text-gisviz-ink-soft leading-relaxed">{a.desc}</p>
+            </Link>
+          ) : (
+            <button key={a.key} onClick={a.onClick} className={CARD_BASE}>
+              <div className="flex items-center justify-between">
+                <span className="text-gisviz-accent">{a.icon}</span>
+                {/* External-link cue instead of arrow */}
+                <ArrowRight
+                  size={16}
+                  className="text-gisviz-border group-hover:text-gisviz-accent transition-colors"
+                />
+              </div>
+              <h2 className="text-[16px] font-display font-bold text-gisviz-ink">{a.title}</h2>
+              <p className="text-[12px] font-mono text-gisviz-ink-soft leading-relaxed">{a.desc}</p>
+            </button>
+          )
+        )}
       </div>
 
       {/* Control panel sections */}
@@ -113,10 +180,15 @@ export default function AdminHomePage() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {CONTROL_TABS.map(t => (
-          <Link key={t.tab} href={`/admin/control?tab=${t.tab}`}
-            className="group bg-gisviz-card border border-gisviz-border rounded-sm p-4 shadow-sm hover:border-gisviz-accent transition-colors flex flex-col gap-2">
+          <Link
+            key={t.tab}
+            href={`/admin/control?tab=${t.tab}`}
+            className="group bg-gisviz-card border border-gisviz-border rounded-sm p-4 shadow-sm hover:border-gisviz-accent transition-colors flex flex-col gap-2"
+          >
             <div className="flex items-center gap-2 text-gisviz-ink">
-              <span className="text-gisviz-ink-soft group-hover:text-gisviz-accent transition-colors">{t.icon}</span>
+              <span className="text-gisviz-ink-soft group-hover:text-gisviz-accent transition-colors">
+                {t.icon}
+              </span>
               <span className="text-[12px] font-mono font-bold">{t.label}</span>
             </div>
             <p className="text-[11px] font-mono text-gisviz-ink-soft leading-snug">{t.desc}</p>

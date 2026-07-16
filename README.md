@@ -54,14 +54,14 @@ User opens /
      ▼
 Feed.tsx mounts
      │
-     ├── gisvizApi.fetchGlobalStream()  →  GET /api/v1/publications
+     ├── gisvizApi.fetchGlobalStream()  →  GET /api/v0/publications
      │        │
      │        ▼
      │   FastAPI → PostGIS query → JSON response
      │
      ├── Posts rendered with like/save/comment buttons
      │
-     ├── handleLike()  →  POST /api/v1/publications/{id}/like
+     ├── handleLike()  →  POST /api/v0/publications/{id}/like
      │   (optimistic update → server reconciliation)
      │
      └── handleSave()  →  localStorage (useSavedPosts hook)
@@ -90,11 +90,11 @@ validateImageQuality()   ← lib/imageValidation.ts
                │
                ▼
          gisvizApi.uploadVisual(file)
-         →  POST /api/v1/publications/post/upload-visual
+         →  POST /api/v0/publications/post/upload-visual
                │
                ▼
          gisvizApi.createPost({...})
-         →  POST /api/v1/publications
+         →  POST /api/v0/publications
                │
                ▼
          router.push(`/post/${postRes.post_id}`)

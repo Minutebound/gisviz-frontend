@@ -11,7 +11,7 @@ import { useAuth } from '../../context/AuthContext'
 import { gisvizApi } from '../../services/api'
 
 const RAW_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://'
-const API_BASE_URL = RAW_API_URL.replace('/api/v1', '').replace(/\/$/, '')
+const API_BASE_URL = RAW_API_URL.replace('/api/v0', '').replace(/\/$/, '')
 
 // Known URL prefixes — only the username portion is editable
 const LINKEDIN_PREFIX = 'https://linkedin.com/in/'

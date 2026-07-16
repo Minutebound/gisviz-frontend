@@ -13,7 +13,7 @@ import { gisvizApi } from '../../../services/api'
 import ShareModal from '../../components/SharePost'
 
 const RAW_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://'
-const API_BASE_URL = RAW_API_URL.replace('/api/v1', '').replace(/\/$/, '')
+const API_BASE_URL = RAW_API_URL.replace('/api/v0', '').replace(/\/$/, '')
 
 interface CommentData {
   comment_id: string

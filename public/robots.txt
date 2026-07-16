@@ -27,6 +27,7 @@ Allow: /terms/
 Allow: /cookies/
 Allow: /accessibility/
 Allow: /contact/
+Allow: /legal/
 
 # ── Crawl delay — be polite to the server ────────────────────────────
 Crawl-delay: 2

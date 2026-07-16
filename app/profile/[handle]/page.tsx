@@ -41,7 +41,7 @@ export default function ProfileHandlePage() {
   const isOwnProfile = isAuthenticated && user?.user_handle === handle
 
   const RAW_API_URL  = process.env.NEXT_PUBLIC_API_URL
-  const API_BASE_URL = `${RAW_API_URL}`.replace('/api/v1', '')
+  const API_BASE_URL = `${RAW_API_URL}`.replace('/api/v0', '')
 
   const getAvatarUrl = (path: string | null) => {
     if (!path) return null

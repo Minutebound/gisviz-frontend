@@ -66,7 +66,7 @@ export function SupportPopup({
         onClose()
       }, 2000)
     } catch {
-      alert('Failed to send ticket. Please try again.')
+      alert('Failed to Send Request. Please try again.')
     } finally {
       setSubmitting(false)
     }
@@ -298,7 +298,7 @@ export function SupportPopup({
               ) : (
                 <>
                   <Send size={15} />
-                  Send Ticket
+                  Send Request
                 </>
               )}
             </button>

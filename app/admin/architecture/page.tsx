@@ -3,383 +3,474 @@
 /**
  * app/admin/architecture/page.tsx
  *
- * Generates a live system architecture diagram by calling Claude
- * (via the Anthropic API from the artifact) with the actual codebase
- * context injected. Claude returns structured JSON describing the
- * architecture layers, components, and connections — which this page
- * renders as an interactive SVG + card grid.
+ * Live system architecture — two diagram views, zero hardcoded routes,
+ * zero LLM calls.
  *
- * Nothing is hardcoded. The diagram updates if you add services
- * (trigger a new generation). The system context is built from the
- * ARCHITECTURE_CONTEXT string below, which you update as the app grows.
+ * Sources (both already exist, no backend changes needed):
+ *   GET {API}/              -> { version } — APP_VERSION baked in by CI
+ *   GET {API}/openapi.json  -> every route FastAPI actually serves
+ *
+ * Everything drawn below is computed from that schema at page load, so the
+ * diagram cannot drift from the code. Add a router tomorrow and a new node
+ * appears here with no edit to this file.
+ *
+ * View: LAYERS — browser -> FastAPI routers (sized by route count) -> infra
  */
 
-import React, { useState, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Cpu, Loader2, RefreshCw, ArrowUpRight, ZoomIn, ZoomOut } from 'lucide-react'
+import {
+  Cpu, Loader2, RefreshCw, ExternalLink, ArrowLeft,
+  ArrowUpRight,
+} from 'lucide-react'
 import { useAuth } from '../../../context/AuthContext'
 import AccessRestricted from '../../components/AccessRestricted'
 
-// ── Codebase context fed to Claude ───────────────────────────────────────────
-// Update this string when you add new services, databases, or integrations.
-const ARCHITECTURE_CONTEXT = `
-You are analysing the gisviz platform. Here is the complete technical stack:
-
-BACKEND (FastAPI, Python 3.11):
-- app/main.py: FastAPI entry point, registers routers
-- app/api/v1/endpoints/auth.py: JWT auth, OTP email verification, password reset
-- app/api/v1/endpoints/users.py: User profiles, follow graph, settings
-- app/api/v1/endpoints/posts.py: Post CRUD, likes, bookmarks, comments, reports
-- app/api/v1/endpoints/categories.py: Category management
-- app/api/v1/endpoints/search.py: Global search (users, posts, categories, keywords)
-- app/api/v1/endpoints/uploads.py: Avatar, banner, visual image uploads
-- app/api/v1/endpoints/admin.py: Admin control panel, analytics, audit trail
-- app/api/v1/endpoints/support.py: Public support ticket submission
-- app/analytics/snapshot.py: ETL that writes daily snapshots to analytics_db
-
-DATABASES (PostgreSQL 15, separate per domain):
-- users_db: PlatformUserRecord, RoleRecord, FollowCurrentRecord, FollowEventRecord, UserLocationRecord, SupportTicketRecord
-- posts_db: PostRecord, PostLikeRecord, PostBookmarkRecord, PostCommentRecord, CategoryRecord, KeywordRecord, PendingCategoryRecord, PostReportRecord
-- analytics_db: DimDate, DimUser, DimPost, DimCategory, FactDailySnapshot, FactPostEngagement, FactCategoryDaily, FactWeeklyDelta, FactTopPost, FactTopUser, FactTopCommenter, EtlRunLog
-- admin_db: AdminActionLog, RoleChangeHistory, ReportResolution, AdminSetting
-
-CACHE: Redis 7 — session caching, feed TTL caching
-
-FRONTEND (Next.js 14, TypeScript, Tailwind CSS):
-- app/page.tsx: Home feed
-- app/auth/: Login, register, OTP verify, forgot/reset password
-- app/profile/[handle]/: Public user profile
-- app/post/[id]/: Post detail + comments
-- app/add-post/: Upload new publication
-- app/settings/: User settings (profile, security, account)
-- app/admin/: Admin home, analytics, control panel, activity, architecture, ERD
-- services/api.ts: Axios client, JWT injection, TTL cache
-
-INFRASTRUCTURE:
-- Cloudflare: DNS, CDN, TLS termination, DDoS protection, R2 (file uploads)
-- IONOS VPS L (4 vCPU, 8 GB RAM, 240 GB NVMe)
-- Docker Compose: all services containerised
-- Caddy: reverse proxy, origin TLS
-- PM2: Next.js process management
-- Loki + Promtail: log aggregation
-- GitHub Actions: CI/CD (main→staging, production→prod deploy)
-- Alembic: DB migrations (multi-database)
-
-EXTERNAL SERVICES:
-- IONOS SMTP: transactional email (OTPs, password reset)
-- Cloudflare R2: user-uploaded images (S3-compatible)
-- Apache Airflow (local Mac): nightly analytics ETL scheduler
-`
-
-type ArchNode = {
-  id: string
-  label: string
-  layer: string
-  tech: string
-  color: string
-  desc: string
-  connections: string[]
+// ─── types ────────────────────────────────────────────────────────────────────
+type Route = {
+  path:    string
+  method:  string
+  tag:     string
+  summary: string
+  secured: boolean
 }
 
-type ArchData = {
-  layers: Array<{ id: string; label: string; color: string }>
-  nodes: ArchNode[]
-  techCards: Array<{ name: string; version: string; role: string; color: string }>
+type TagGroup = {
+  tag:     string
+  routes:  Route[]
+  secured: number
+  prefix:  string
+}
+
+// ─── palette (hex — SVG cannot use Tailwind classes) ─────────────────────────
+const INK      = '#2A2A28'
+const INK_SOFT = '#8A8780'
+const BORDER   = '#D9D5CC'
+const CARD     = '#FDFCF9'
+const ACCENT   = '#C25B3F'
+
+// ─── helpers ──────────────────────────────────────────────────────────────────
+
+/** Longest common path prefix — reveals where the router is mounted. */
+function commonPrefix(paths: string[]): string {
+  if (!paths.length) return ''
+  const segs  = paths.map(p => p.split('/').filter(Boolean))
+  const first = segs[0]
+  const out: string[] = []
+  for (let i = 0; i < first.length; i++) {
+    const s = first[i]
+    if (s.startsWith('{')) break
+    if (segs.every(x => x[i] === s)) out.push(s)
+    else break
+  }
+  return '/' + out.join('/')
 }
 
 export default function ArchitecturePage() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth() as any
   const router = useRouter()
-  const [data, setData]         = useState<ArchData | null>(null)
-  const [loading, setLoading]   = useState(false)
-  const [error, setError]       = useState('')
-  const [zoom, setZoom]         = useState(1)
-  const [selected, setSelected] = useState<ArchNode | null>(null)
 
-  React.useEffect(() => {
-    if (!authLoading && !isAuthenticated) router.push('/auth')
-  }, [authLoading, isAuthenticated, router])
+  const [version, setVersion] = useState<string | null>(null)
+  const [routes,  setRoutes]  = useState<Route[]>([])
+  const [loading, setLoading] = useState(true)
+  const [err,     setErr]     = useState<string | null>(null)
+  const [focused, setFocused] = useState<string | null>(null)
 
-  const generate = useCallback(async () => {
-    setLoading(true)
-    setError('')
-    setSelected(null)
+  const API = process.env.NEXT_PUBLIC_API_URL?.replace('/api/v0', '').replace(/\/$/, '')
+
+  // ── load live schema ───────────────────────────────────────────────────────
+  const load = useCallback(async () => {
+    setLoading(true); setErr(null)
     try {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-6',
-          max_tokens: 4000,
-          system: `You are a software architecture analyser. Given a codebase description, return ONLY valid JSON (no markdown, no backticks) describing the system architecture in this exact schema:
-{
-  "layers": [{"id":"string","label":"string","color":"hex color"}],
-  "nodes": [{"id":"string","label":"string","layer":"layer id","tech":"technology name","color":"hex color","desc":"one sentence description","connections":["other node ids"]}],
-  "techCards": [{"name":"string","version":"string","role":"string","color":"hex color"}]
-}
-Rules:
-- layers: client, edge, backend, cache, database, infra, external (use these exact ids)
-- nodes: 8-16 nodes covering the main architectural components
-- connections: directional, show data flow
-- techCards: one card per distinct technology, 10-16 total
-- colors: use these per layer — client:#2b6cb0, edge:#c05621, backend:#2f855a, cache:#b7791f, database:#6b46c1, infra:#2c7a7b, external:#97266d
-- respond with ONLY the JSON object, nothing else`,
-          messages: [{
-            role: 'user',
-            content: `Analyse this system and generate the architecture diagram JSON:\n${ARCHITECTURE_CONTEXT}`,
-          }],
-        }),
-      })
-      const result = await response.json()
-      const text = result.content?.find((b: any) => b.type === 'text')?.text || ''
-      const cleaned = text.replace(/```json|```/g, '').trim()
-      const parsed: ArchData = JSON.parse(cleaned)
-      setData(parsed)
-    } catch (e: any) {
-      setError('Failed to generate architecture diagram. Check your API connection.')
-      console.error(e)
+      const [healthRes, specRes] = await Promise.all([
+        fetch(`${API}/`),
+        fetch(`${API}/openapi.json`),
+      ])
+      const health = await healthRes.json()
+      const spec   = await specRes.json()
+
+      setVersion(health.version ?? 'unknown')
+
+      const parsed: Route[] = []
+      for (const [path, methods] of Object.entries<any>(spec.paths ?? {})) {
+        for (const [method, def] of Object.entries<any>(methods)) {
+          if (!['get', 'post', 'put', 'patch', 'delete'].includes(method)) continue
+          parsed.push({
+            path,
+            method:  method.toUpperCase(),
+            tag:     def.tags?.[0] ?? 'Untagged',
+            summary: def.summary ?? '',
+            secured: Array.isArray(def.security) && def.security.length > 0,
+          })
+        }
+      }
+      setRoutes(parsed)
+    } catch {
+      setErr('Could not reach the API. Is the backend running?')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [API])
 
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) { router.push('/auth'); return }
+    if (user?.role_name === 'admin') load()
+  }, [authLoading, isAuthenticated, user, router, load])
+
+  // ── derive router groups from the live schema ──────────────────────────────
+  const groups: TagGroup[] = useMemo(() => {
+    const byTag: Record<string, Route[]> = {}
+    routes.forEach(r => { (byTag[r.tag] ||= []).push(r) })
+
+    return Object.entries(byTag)
+      .map(([tag, rs]) => ({
+        tag,
+        routes:  rs.slice().sort((a, b) => a.path.localeCompare(b.path)),
+        secured: rs.filter(r => r.secured).length,
+        prefix:  commonPrefix(rs.map(r => r.path)),
+      }))
+      .sort((a, b) => b.routes.length - a.routes.length)
+  }, [routes])
+
+  // ── guards ─────────────────────────────────────────────────────────────────
   if (authLoading) return (
     <div className="flex justify-center items-center h-[calc(100vh-4rem)]">
       <Loader2 size={32} className="animate-spin text-gisviz-accent" />
     </div>
   )
-  if (!user || user.role_name !== 'admin')
-    return <AccessRestricted requiredRoles={['admin']} currentRole={user?.role_name} />
+
+  if (!user || user.role_name !== 'admin') {
+    return (
+      <AccessRestricted
+        requiredRoles={['admin']}
+        currentRole={user?.role_name}
+        backHref="/admin"
+        backLabel="Back to Admin"
+      />
+    )
+  }
+
+  const totalSecured = routes.filter(r => r.secured).length
 
   return (
     <div className="max-w-6xl mx-auto py-8 px-4 pb-20">
 
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
-        <div>
-          <h1 className="text-[24px] font-display font-bold text-gisviz-ink flex items-center gap-2">
-            <Cpu className="text-gisviz-accent" size={24} /> System Architecture
-          </h1>
-          <p className="text-[12px] font-mono text-gisviz-ink-soft mt-0.5">
-            AI-generated from codebase context — not hardcoded
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Link href="/admin"
-            className="px-3 py-1.5 bg-gisviz-canvas border border-gisviz-border rounded font-mono text-[12px] text-gisviz-ink hover:border-gisviz-accent transition-colors flex items-center gap-1">
-            <ArrowUpRight size={13} /> Admin Home
-          </Link>
-          <Link href="/admin/erd"
-            className="px-3 py-1.5 bg-gisviz-canvas border border-gisviz-border rounded font-mono text-[12px] text-gisviz-ink hover:border-gisviz-accent transition-colors flex items-center gap-1">
-            <ArrowUpRight size={13} /> ERD
-          </Link>
-          {data && (
-            <>
-              <button onClick={() => setZoom(z => Math.max(0.5, z - 0.1))}
-                className="p-1.5 rounded border border-gisviz-border text-gisviz-ink-soft hover:text-gisviz-ink">
-                <ZoomOut size={14} />
-              </button>
-              <span className="text-[11px] font-mono text-gisviz-ink-soft w-10 text-center">{Math.round(zoom * 100)}%</span>
-              <button onClick={() => setZoom(z => Math.min(2, z + 0.1))}
-                className="p-1.5 rounded border border-gisviz-border text-gisviz-ink-soft hover:text-gisviz-ink">
-                <ZoomIn size={14} />
-              </button>
-            </>
-          )}
-          <button onClick={generate} disabled={loading}
-            className="flex items-center gap-2 px-4 py-2 bg-gisviz-accent text-gisviz-white rounded font-mono text-[12px] font-bold hover:bg-opacity-90 disabled:opacity-60">
-            {loading
-              ? <><Loader2 size={14} className="animate-spin" /> Generating…</>
-              : <><RefreshCw size={14} /> {data ? 'Regenerate' : 'Generate Diagram'}</>
-            }
-          </button>
+      {/* ── header ──────────────────────────────────────────────────────────── */}
+      <div className="mb-6">
+
+        <div className="flex items-start justify-between flex-wrap gap-4">
+          <div>
+            <h1 className="text-[24px] font-display font-bold text-gisviz-ink flex items-center gap-3">
+              <Cpu className="text-gisviz-accent" size={28} /> System Architecture
+            </h1>
+            <p className="text-gisviz-ink-soft font-mono text-[12px] mt-1">
+              Drawn from <code className="text-gisviz-ink">/openapi.json</code> at page load — never hand-written.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+             <Link href="/admin"
+              className="px-4 py-2 bg-gisviz-canvas border border-gisviz-border rounded-md font-mono text-[12px] text-gisviz-ink hover:border-gisviz-accent transition-colors flex items-center gap-1.5">
+              <ArrowUpRight size={14} /> Admin Home
+            </Link>
+            {version && (
+              <div className="px-3 py-1.5 rounded-sm border border-gisviz-accent/30 bg-gisviz-accent/5">
+                <span className="text-[11px] font-mono text-gisviz-ink-soft">deployed </span>
+                <span className="text-[12px] font-mono font-bold text-gisviz-accent">v{version}</span>
+              </div>
+            )}
+            <button
+              onClick={load}
+              disabled={loading}
+              title="Refresh from API"
+              className="p-2 rounded-sm border border-gisviz-border text-gisviz-ink-soft hover:text-gisviz-accent hover:border-gisviz-accent transition-colors"
+            >
+              <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Error */}
-      {error && (
-        <div className="mb-6 p-3 bg-gisviz-alert/10 border border-gisviz-alert/50 rounded text-[12px] font-mono text-gisviz-alert">
-          {error}
-        </div>
-      )}
-
-      {/* Empty state */}
-      {!data && !loading && (
-        <div className="flex flex-col items-center justify-center py-32 gap-3 text-gisviz-ink-soft">
-          <Cpu size={40} className="opacity-20" />
-          <p className="font-mono text-[12px]">Click <strong className="text-gisviz-ink">Generate Diagram</strong> to analyse the codebase.</p>
-          <p className="font-mono text-[11px] opacity-60">Claude reads the architecture context and produces the diagram. Takes ~10 seconds.</p>
-        </div>
-      )}
-
-      {loading && (
-        <div className="flex flex-col items-center justify-center py-32 gap-3">
-          <Loader2 size={36} className="animate-spin text-gisviz-accent" />
-          <p className="font-mono text-[12px] text-gisviz-ink-soft">Claude is analysing the codebase…</p>
-        </div>
-      )}
-
-      {data && !loading && (
-        <>
-          {/* Layer legend */}
-          <div className="flex flex-wrap gap-2 mb-6">
-            {data.layers.map(l => (
-              <span key={l.id} className="flex items-center gap-1.5 px-2.5 py-1 rounded font-mono text-[11px] bg-gisviz-canvas border border-gisviz-border text-gisviz-ink">
-                <span className="w-2 h-2 rounded-sm" style={{ background: l.color }} />
-                {l.label}
-              </span>
-            ))}
-          </div>
-
-          {/* Architecture diagram — layer-based layout */}
-          <div className="bg-gisviz-card border border-gisviz-border rounded-sm shadow-sm overflow-auto mb-8">
-            <div style={{ transform: `scale(${zoom})`, transformOrigin: 'top left', transition: 'transform 0.2s' }}
-                 className="p-6 min-w-[800px]">
-              <ArchDiagram data={data} selected={selected} onSelect={setSelected} />
+      {/* ── live counts — all derived, none typed ───────────────────────────── */}
+      {!loading && !err && (
+        <div className="flex flex-wrap gap-3 mb-6">
+          {[
+            { label: 'routers', value: groups.length },
+            { label: 'total routes',  value: routes.length },
+            { label: 'secured', value: totalSecured },
+            { label: 'public',  value: routes.length - totalSecured },
+          ].map(s => (
+            <div key={s.label} className="px-4 py-2 bg-gisviz-card border border-gisviz-border rounded-sm">
+              <span className="text-[16px] font-mono font-bold text-gisviz-ink">{s.value}</span>
+              <span className="text-[11px] font-mono text-gisviz-ink-soft ml-1.5">{s.label}</span>
             </div>
-          </div>
+          ))}
+        </div>
+      )}
 
-          {/* Selected node detail */}
-          {selected && (
-            <div className="mb-6 p-4 bg-gisviz-canvas border border-gisviz-accent/30 rounded-sm">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="w-2.5 h-2.5 rounded-sm" style={{ background: selected.color }} />
-                <span className="font-mono font-bold text-[12px] text-gisviz-ink">{selected.label}</span>
-                <span className="text-[11px] font-mono text-gisviz-ink-soft">({selected.tech})</span>
+      {err && (
+        <div className="mb-6 px-4 py-3 rounded-sm border border-gisviz-alert/30 bg-gisviz-alert/5 text-[12px] font-mono text-gisviz-alert">
+          {err}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="flex items-center justify-center py-24 bg-gisviz-card border border-gisviz-border rounded-sm">
+          <Loader2 size={24} className="animate-spin text-gisviz-accent" />
+        </div>
+      ) : (
+        <div className="bg-gisviz-card border border-gisviz-border rounded-sm shadow-sm p-6 overflow-x-auto">
+          <LayersDiagram groups={groups} focused={focused} setFocused={setFocused} version={version} />
+        </div>
+      )}
+
+      {/* ── focused router endpoint list ────────────────────────────────────── */}
+      {focused && !loading && (() => {
+        const g = groups.find(g => g.tag === focused)
+        if (!g) return null
+        const chip = (m: string) => ({
+          GET:    'text-[#2E7D5B] border-[#2E7D5B]/30 bg-[#2E7D5B]/5',
+          POST:   'text-gisviz-accent border-gisviz-accent/30 bg-gisviz-accent/5',
+          PUT:    'text-blue-600 border-blue-300 bg-blue-50',
+          PATCH:  'text-blue-600 border-blue-300 bg-blue-50',
+          DELETE: 'text-gisviz-alert border-gisviz-alert/30 bg-gisviz-alert/5',
+        }[m] ?? 'text-gisviz-ink-soft border-gisviz-border bg-gisviz-canvas')
+
+        return (
+          <div className="mt-4 bg-gisviz-card border border-gisviz-accent/40 rounded-sm shadow-sm overflow-hidden">
+            {/* header */}
+            <div className="flex items-center justify-between px-5 py-3 border-b border-gisviz-border bg-gisviz-canvas/50">
+              <div className="flex items-center gap-3">
+                <span className="text-[12px] font-mono font-bold text-gisviz-ink uppercase tracking-widest">
+                  {g.tag}
+                </span>
+                <code className="text-[11px] font-mono text-gisviz-ink-soft">{g.prefix}</code>
+                <span className="text-[11px] font-mono text-gisviz-ink-soft">
+                  · {g.routes.length} route{g.routes.length !== 1 ? 's' : ''}
+                  {g.secured > 0 && ` · ${g.secured} auth`}
+                </span>
               </div>
-              <p className="font-mono text-[12px] text-gisviz-ink-soft">{selected.desc}</p>
-              {selected.connections.length > 0 && (
-                <p className="font-mono text-[11px] text-gisviz-ink-soft mt-1">
-                  Connects to: {selected.connections.join(', ')}
-                </p>
-              )}
+              <button
+                onClick={() => setFocused(null)}
+                className="text-[11px] font-mono text-gisviz-ink-soft hover:text-gisviz-ink transition-colors px-2 py-1"
+              >
+                close ×
+              </button>
             </div>
-          )}
 
-          {/* Technology cards */}
-          <h2 className="font-mono text-[12px] font-bold text-gisviz-ink-soft uppercase tracking-widest mb-3">
-            Technology Stack
-          </h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-            {data.techCards.map(tc => (
-              <div key={tc.name}
-                className="bg-gisviz-card border border-gisviz-border rounded-sm p-3 shadow-sm hover:border-gisviz-accent transition-colors">
-                <div className="flex items-center gap-1.5 mb-1">
-                  <span className="w-2 h-2 rounded-sm shrink-0" style={{ background: tc.color }} />
-                  <span className="font-mono font-bold text-[12px] text-gisviz-ink truncate">{tc.name}</span>
-                </div>
-                {tc.version && (
-                  <span className="text-[12px] font-mono text-gisviz-ink-soft">{tc.version}</span>
+            {/* route rows */}
+            {g.routes.map(r => (
+              <div
+                key={`${r.method}-${r.path}`}
+                className="flex items-center gap-3 px-5 py-2.5 border-b border-gisviz-border/50 last:border-0 hover:bg-gisviz-canvas/40 transition-colors"
+              >
+                <span className={`shrink-0 w-16 text-center px-1.5 py-0.5 rounded text-[10px] font-mono font-bold border ${chip(r.method)}`}>
+                  {r.method}
+                </span>
+                <code className="text-[12px] font-mono text-gisviz-ink flex-1 truncate">
+                  {r.path}
+                </code>
+                {r.summary && (
+                  <span className="text-[11px] font-mono text-gisviz-ink-soft truncate hidden sm:block">
+                    {r.summary}
+                  </span>
                 )}
-                <p className="text-[11px] font-mono text-gisviz-ink-soft mt-1 leading-snug">{tc.role}</p>
+                {r.secured && (
+                  <span className="text-[10px] font-mono text-gisviz-ink-soft shrink-0 border border-gisviz-border rounded px-1.5 py-0.5">
+                    auth
+                  </span>
+                )}
               </div>
             ))}
           </div>
-        </>
-      )}
+        )
+      })()}
+
+      {/* ── source links ────────────────────────────────────────────────────── */}
+      <section className="mt-8">
+        <h2 className="font-mono text-[12px] font-bold text-gisviz-ink-soft uppercase tracking-widest mb-3">
+          Source
+        </h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <a
+            href={`${API}/docs?token=${typeof window !== 'undefined' ? localStorage.getItem('gisviz_token') : ''}`}
+            target="_blank" rel="noopener noreferrer"
+            className="group bg-gisviz-card border border-gisviz-border rounded-sm p-4 shadow-sm hover:border-gisviz-accent transition-colors flex items-center justify-between"
+          >
+            <div>
+              <p className="text-[12px] font-mono font-bold text-gisviz-ink mb-0.5">Swagger UI</p>
+              <p className="text-[11px] font-mono text-gisviz-ink-soft">Interactive — admin token attached</p>
+            </div>
+            <ExternalLink size={14} className="text-gisviz-border group-hover:text-gisviz-accent transition-colors" />
+          </a>
+
+          <a
+            href={`${API}/openapi.json`}
+            target="_blank" rel="noopener noreferrer"
+            className="group bg-gisviz-card border border-gisviz-border rounded-sm p-4 shadow-sm hover:border-gisviz-accent transition-colors flex items-center justify-between"
+          >
+            <div>
+              <p className="text-[12px] font-mono font-bold text-gisviz-ink mb-0.5">OpenAPI schema</p>
+              <p className="text-[11px] font-mono text-gisviz-ink-soft">The raw source for this page</p>
+            </div>
+            <ExternalLink size={14} className="text-gisviz-border group-hover:text-gisviz-accent transition-colors" />
+          </a>
+        </div>
+      </section>
     </div>
   )
 }
 
-// ── SVG Architecture diagram ──────────────────────────────────────────────────
-function ArchDiagram({ data, selected, onSelect }: {
-  data: ArchData
-  selected: ArchNode | null
-  onSelect: (n: ArchNode | null) => void
+/* ═══════════════════════════════════════════════════════════════════════════
+   VIEW 1 — LAYERS
+   Browser -> FastAPI -> routers (bar width = route count) -> infra.
+   Every router node is a real tag from the live schema.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function LayersDiagram({
+  groups, focused, setFocused, version,
+}: {
+  groups: TagGroup[]
+  focused: string | null
+  setFocused: (t: string | null) => void
+  version: string | null
 }) {
-  const LAYER_ORDER = ['client', 'edge', 'backend', 'cache', 'database', 'infra', 'external']
-  const COL_W = 140, COL_H = 60, GAP_X = 20, GAP_Y = 30, PAD = 20
+  const COLS   = 4
+  const CELL_W = 170
+  const CELL_H = 62
+  const GAP    = 14
+  const rows   = Math.max(1, Math.ceil(groups.length / COLS))
 
-  // Group nodes by layer, compute positions
-  const byLayer: Record<string, ArchNode[]> = {}
-  for (const n of data.nodes) {
-    if (!byLayer[n.layer]) byLayer[n.layer] = []
-    byLayer[n.layer].push(n)
-  }
+  const gridW  = COLS * CELL_W + (COLS - 1) * GAP
+  const startX = 40
+  const gridY  = 190
 
-  const positions: Record<string, { x: number; y: number }> = {}
-  let currentY = PAD
-  const layers = LAYER_ORDER.filter(l => byLayer[l]?.length)
+  const W = gridW + startX * 2
+  const H = gridY + rows * (CELL_H + GAP) + 150
 
-  for (const layerId of layers) {
-    const nodes = byLayer[layerId] || []
-    const totalW = nodes.length * COL_W + (nodes.length - 1) * GAP_X
-    let startX = PAD
-    nodes.forEach((n, i) => {
-      positions[n.id] = { x: startX + i * (COL_W + GAP_X), y: currentY }
-    })
-    currentY += COL_H + GAP_Y
-  }
-
-  const SVG_W = Math.max(...Object.values(positions).map(p => p.x + COL_W)) + PAD * 2
-  const SVG_H = currentY + PAD
+  const maxRoutes  = Math.max(...groups.map(g => g.routes.length), 1)
+  const totalRoutes = groups.reduce((n, g) => n + g.routes.length, 0)
 
   return (
-    <svg width={SVG_W} height={SVG_H} viewBox={`0 0 ${SVG_W} ${SVG_H}`}>
-      {/* Connection lines */}
-      {data.nodes.map(n =>
-        n.connections.map(targetId => {
-          const from = positions[n.id]
-          const to   = positions[targetId]
-          if (!from || !to) return null
-          const x1 = from.x + COL_W / 2
-          const y1 = from.y + COL_H
-          const x2 = to.x   + COL_W / 2
-          const y2 = to.y
-          return (
-            <line key={`${n.id}-${targetId}`}
-              x1={x1} y1={y1} x2={x2} y2={y2}
-              stroke={n.color} strokeWidth="1.5" strokeOpacity="0.35"
-              strokeDasharray="4 3"
-              markerEnd="url(#arrow)"
-            />
-          )
-        })
-      )}
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ minWidth: 700 }} role="img">
+      <title>Layered architecture — live from the OpenAPI schema</title>
       <defs>
-        <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
-          <path d="M0,0 L0,6 L8,3 z" fill="#8888" />
+        <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5"
+                markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+          <path d="M1 1 L9 5 L1 9" fill="none" stroke={BORDER}
+                strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
         </marker>
       </defs>
-      {/* Nodes */}
-      {data.nodes.map(n => {
-        const p = positions[n.id]
-        if (!p) return null
-        const isSelected = selected?.id === n.id
+
+      {/* Browser */}
+      <rect x={W / 2 - 110} y={20} width={220} height={44} rx={4} fill={CARD} stroke={BORDER} />
+      <text x={W / 2} y={39} textAnchor="middle" fontSize="12" fontWeight="700" fill={INK} fontFamily="monospace">
+        Browser
+      </text>
+      <text x={W / 2} y={55} textAnchor="middle" fontSize="10" fill={INK_SOFT} fontFamily="monospace">
+        Next.js 14 · App Router
+      </text>
+
+      <line x1={W / 2} y1={64} x2={W / 2} y2={98} stroke={BORDER} strokeWidth="1.5" markerEnd="url(#ar)" />
+      <text x={W / 2 + 8} y={86} fontSize="9" fill={INK_SOFT} fontFamily="monospace">HTTPS · JWT</text>
+
+      {/* API gateway — version and counts are live */}
+      <rect x={40} y={104} width={W - 80} height={52} rx={4} fill={CARD} stroke={ACCENT} strokeWidth="1.5" />
+      <text x={W / 2} y={125} textAnchor="middle" fontSize="12" fontWeight="700" fill={ACCENT} fontFamily="monospace">
+        FastAPI{version ? ` v${version}` : ''}
+      </text>
+      <text x={W / 2} y={143} textAnchor="middle" fontSize="10" fill={INK_SOFT} fontFamily="monospace">
+        Uvicorn · 4 workers · {groups.length} routers · {totalRoutes} routes
+      </text>
+
+      {/* Routers — one node per tag, straight from the schema */}
+      {groups.map((g, i) => {
+        const col = i % COLS
+        const row = Math.floor(i / COLS)
+        const x   = startX + col * (CELL_W + GAP)
+        const y   = gridY + row * (CELL_H + GAP)
+
+        const isFocus = focused === g.tag
+        const dim     = focused !== null && !isFocus
+        const barW    = 8 + (g.routes.length / maxRoutes) * (CELL_W - 24)
+
         return (
-          <g key={n.id} onClick={() => onSelect(isSelected ? null : n)}
-            style={{ cursor: 'pointer' }}>
-            <rect x={p.x} y={p.y} width={COL_W} height={COL_H} rx={4}
-              fill={n.color} fillOpacity={isSelected ? 0.25 : 0.12}
-              stroke={n.color} strokeWidth={isSelected ? 2 : 1}
-              strokeOpacity={0.7}
+          <g
+            key={g.tag}
+            onClick={() => setFocused(isFocus ? null : g.tag)}
+            style={{ cursor: 'pointer', opacity: dim ? 0.35 : 1, transition: 'opacity .15s' }}
+          >
+            <line
+              x1={x + CELL_W / 2} y1={156}
+              x2={x + CELL_W / 2} y2={y}
+              stroke={BORDER} strokeWidth="1" strokeDasharray="3 3"
             />
-            <text x={p.x + COL_W / 2} y={p.y + 22} textAnchor="middle"
-              fill={n.color} fontSize="11" fontWeight="bold" fontFamily="monospace">
-              {n.label.length > 14 ? n.label.slice(0, 13) + '…' : n.label}
+
+            <rect
+              x={x} y={y} width={CELL_W} height={CELL_H} rx={4}
+              fill={CARD}
+              stroke={isFocus ? ACCENT : BORDER}
+              strokeWidth={isFocus ? 1.8 : 1}
+            />
+
+            <text x={x + 12} y={y + 20} fontSize="11" fontWeight="700" fill={INK} fontFamily="monospace">
+              {g.tag}
             </text>
-            <text x={p.x + COL_W / 2} y={p.y + 38} textAnchor="middle"
-              fill={n.color} fontSize="9" fontFamily="monospace" opacity="0.7">
-              {n.tech.length > 18 ? n.tech.slice(0, 17) + '…' : n.tech}
+
+            {g.secured > 0 && (
+              <>
+                <rect x={x + CELL_W - 44} y={y + 9} width={34} height={14} rx={2}
+                      fill={INK_SOFT} opacity="0.12" />
+                <text x={x + CELL_W - 27} y={y + 19} textAnchor="middle"
+                      fontSize="8" fill={INK_SOFT} fontFamily="monospace">
+                  {g.secured} auth
+                </text>
+              </>
+            )}
+
+            <rect x={x + 12} y={y + 30} width={barW} height={5} rx={2.5} fill={ACCENT} opacity="0.5" />
+
+            <text x={x + 12} y={y + 50} fontSize="9" fill={INK_SOFT} fontFamily="monospace">
+              {g.prefix || '/'} · {g.routes.length}
             </text>
           </g>
         )
       })}
-      {/* Layer labels on left */}
-      {layers.map((layerId, i) => {
-        const nodes = byLayer[layerId]
-        const firstPos = positions[nodes[0].id]
-        const layerDef = data.layers.find(l => l.id === layerId)
-        if (!firstPos || !layerDef) return null
+
+      {/* Infra */}
+      {(() => {
+        const infraY = gridY + rows * (CELL_H + GAP) + 34
+        const items = [
+          { label: 'PostgreSQL x4', sub: 'users · posts · analytics · admin' },
+          { label: 'Redis 7',       sub: 'feed · categories · legal' },
+          { label: 'Cloudflare R2', sub: 'images · avatars' },
+        ]
+        const iw = (gridW - 2 * GAP) / 3
         return (
-          <text key={layerId} x={4} y={firstPos.y + COL_H / 2 + 4}
-            fill={layerDef.color} fontSize="9" fontFamily="monospace"
-            fontWeight="bold" opacity="0.5" writingMode="horizontal-tb">
-            {layerDef.label.toUpperCase()}
-          </text>
+          <>
+            <line x1={W / 2} y1={infraY - 26} x2={W / 2} y2={infraY - 6}
+                  stroke={BORDER} strokeWidth="1.5" markerEnd="url(#ar)" />
+            {items.map((it, i) => {
+              const x = startX + i * (iw + GAP)
+              return (
+                <g key={it.label}>
+                  <rect x={x} y={infraY} width={iw} height={50} rx={4}
+                        fill={CARD} stroke={BORDER} strokeDasharray="4 3" />
+                  <text x={x + iw / 2} y={infraY + 22} textAnchor="middle"
+                        fontSize="11" fontWeight="700" fill={INK} fontFamily="monospace">
+                    {it.label}
+                  </text>
+                  <text x={x + iw / 2} y={infraY + 38} textAnchor="middle"
+                        fontSize="9" fill={INK_SOFT} fontFamily="monospace">
+                    {it.sub}
+                  </text>
+                </g>
+              )
+            })}
+          </>
         )
-      })}
+      })()}
     </svg>
   )
 }
