@@ -23,4 +23,5 @@ jobs:
             git reset --hard origin/deploy
             
             # Rebuild and restart the container
+            docker compose down
             docker-compose up -d --build
