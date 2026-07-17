@@ -246,7 +246,7 @@ useEffect(() => {
           <Link href="/legal/cookies"       className="hover:text-gisviz-accent transition-colors">Cookies</Link>
           <Link href="/legal/accessibility" className="hover:text-gisviz-accent transition-colors">Accessibility</Link>
           <Link href="/contact"       className="hover:text-gisviz-accent transition-colors">Contact</Link>
-          <span className="w-full mt-1 font-mono">© {new Date().getFullYear()} gisviz(Beta 0.0.0)</span>
+          <span className="w-full mt-1 font-mono">© {new Date().getFullYear()} gisviz (Beta V 0.0)</span>
         </div>
       </div>
 

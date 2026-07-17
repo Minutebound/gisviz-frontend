@@ -10,7 +10,23 @@ import axios from 'axios'
 // rewrite proxy can resolve the Docker-internal hostname (gisviz-api), which
 // it cannot when the frontend dev server runs outside the Docker network.
 //
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL
+// ── URL helpers — defensive stripping of accidental /api/v0 suffix ──────────
+// CORRECT env: NEXT_PUBLIC_API_URL=https://api.gisviz.com
+// If someone sets it to https://api.gisviz.com/api/v0 by mistake,
+// these helpers strip the suffix so all URLs are still correct.
+function _apiOrigin(): string {
+  const raw = process.env.NEXT_PUBLIC_API_URL ?? ''
+  return raw.replace(/\/api\/v0\/?$/, '').replace(/\/$/, '')
+}
+
+// Bare backend origin — used for image URLs served by StaticFiles
+// (avatars, banners, visuals live at /uploads/... NOT under /api/v0)
+export const UPLOAD_BASE = _apiOrigin()
+
+// Same bare origin — used for Swagger / admin doc links
+export const API_ORIGIN = _apiOrigin()
+
+const API_BASE_URL = _apiOrigin()
 
 const axiosInstance = axios.create({
   baseURL: `${API_BASE_URL}/api/v0`,
@@ -19,6 +35,12 @@ const axiosInstance = axios.create({
 axiosInstance.interceptors.request.use((config) => {
   const token = typeof window !== 'undefined' ? localStorage.getItem('gisviz_token') : null
   if (token) config.headers.Authorization = `Bearer ${token}`
+
+  //Globally defeat browser caching for ALL GET requests ──
+  if (config.method?.toLowerCase() === 'get') {
+    config.params = { ...config.params, _t: Date.now() }
+  }
+
   return config
 })
 
@@ -93,6 +115,12 @@ export const gisvizApi = {
       headers: { 'Content-Type': 'multipart/form-data' },
     })).data
   },
+
+  deleteVisual: async (imagePath: string) => 
+    (await axiosInstance.delete('/uploads/visual', { data: { path: imagePath } })).data,
+  
+  reportMissingVisual: async (postId: string) =>
+    (await axiosInstance.post(`/posts/${postId}/missing-visual`)).data,
 
   uploadBanner: async (file: File) => {
     const fd = new FormData(); fd.append('file', file)
@@ -182,11 +210,12 @@ export const gisvizApi = {
     })).data,
 
   // ── Categories ────────────────────────────────────────────────────────────
+  // ── Categories ────────────────────────────────────────────────────────────
   listCategories: async () =>
-    (await axiosInstance.get('/categories')).data,
+    (await axiosInstance.get('/categories', { params: { _t: Date.now() } })).data,
 
   getTrendingCategories: async (limit = 5) =>
-    (await axiosInstance.get('/categories/trending', { params: { limit } })).data,
+    (await axiosInstance.get('/categories/trending', { params: { limit, _t: Date.now() } })).data,
 
   suggestCategory: async (label: string) =>
     (await axiosInstance.post('/categories/suggest', { label })).data,
@@ -247,7 +276,7 @@ export const gisvizApi = {
 
   // ── Admin — Categories ────────────────────────────────────────────────────
   createCategory: async (label: string, slug: string) =>
-    (await axiosInstance.post('/categories/', { label, slug })).data,
+    (await axiosInstance.post('/categories', { label, slug })).data,
 
   updateCategory: async (categoryId: number, label: string, slug: string) =>
     (await axiosInstance.put(`/categories/${categoryId}`, { label, slug })).data,

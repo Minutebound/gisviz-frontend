@@ -130,41 +130,58 @@ export default function UploadPage() {
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!file)          { setErrorMsg('Please upload a visual file before publishing.'); return }
-    if (!title.trim())  { setErrorMsg('A title is required.'); return }
-    // ── New required field validations ───────────────────────────────────────
-    if (!sourceName.trim())          { setErrorMsg('Data Source Name is required.'); return }
-    if (selectedCategoryIds.length < 1) { setErrorMsg('Please select at least one category.'); return }
-    if (keywords.length < 1)            { setErrorMsg('Please add at least one keyword.'); return }
-    // ────────────────────────────────────────────────────────────────────────
-    if (keywords.length > 3)        { setErrorMsg('You can only add up to 3 keywords.'); return }
+  e.preventDefault()
 
-    setIsLoading(true)
-    setErrorMsg('')
+  // ── 1. Strict Pre-flight Validation ──────────────────────────────────────
+  if (!file)                          { setErrorMsg('Please upload a visual file before publishing.'); return }
+  if (!title.trim())                  { setErrorMsg('A title is required.'); return }
+  if (!sourceName.trim())             { setErrorMsg('Data Source Name is required.'); return }
+  if (selectedCategoryIds.length < 1) { setErrorMsg('Please select at least one category.'); return }
+  if (keywords.length < 1)            { setErrorMsg('Please add at least one keyword.'); return }
+  if (keywords.length > 3)            { setErrorMsg('You can only add up to 3 keywords.'); return }
 
-    try {
-      const uploadRes = await gisvizApi.uploadVisual(file)
+  setIsLoading(true)
+  setErrorMsg('')
 
-      const postRes = await gisvizApi.createPost({
-        title,
-        description: description || null,
-        note: note || null,
-        source_name: sourceName || null,
-        source_url: sourceUrl || null,
-        visual_image_path: uploadRes.visual_path,
-        category_ids: selectedCategoryIds,
-        keywords
-      })
+  // Declare this outside so we can access it in the catch block if needed
+  let uploadedVisualPath: string | null = null
 
-      router.push(`/post/${postRes.post_id}`)
-    } catch (err: any) {
-      const detail = err.response?.data?.detail
-      setErrorMsg(typeof detail === 'string' ? detail : 'Failed to publish the post. Please try again.')
-    } finally {
-      setIsLoading(false)
-    }
+  try {
+    // ── 2. Upload the Visual (Only happens if validation passes) ───────────
+    const uploadRes = await gisvizApi.uploadVisual(file)
+    uploadedVisualPath = uploadRes.visual_path
+
+    // ── 3. Create the Post ─────────────────────────────────────────────────
+    const postRes = await gisvizApi.createPost({
+      title: title.trim(),
+      description: description?.trim() || null,
+      note: note?.trim() || null,
+      source_name: sourceName.trim(),
+      source_url: sourceUrl?.trim() || null,
+      visual_image_path: uploadedVisualPath,
+      category_ids: selectedCategoryIds,
+      keywords: keywords
+    })
+
+    // ── 4. Success Redirect ────────────────────────────────────────────────
+    router.push(`/post/${postRes.post_id}`)
+
+  } catch (err: any) {
+    // ── 5. Error Handling & Potential Cleanup ──────────────────────────────
+    
+    // BONUS: If you ever add a delete endpoint to your API, you can wipe 
+    // the orphaned file right here because we saved `uploadedVisualPath`.
+    // if (uploadedVisualPath) {
+    //   await gisvizApi.deleteVisual(uploadedVisualPath).catch(console.error)
+    // }
+
+    const detail = err.response?.data?.detail
+    setErrorMsg(typeof detail === 'string' ? detail : 'Failed to publish the post. Please try again.')
+    
+  } finally {
+    setIsLoading(false)
   }
+}
 
   if (authLoading || !user) return <div className="flex justify-center items-center h-64"><Loader2 size={32} className="animate-spin text-gisviz-accent" /></div>
 

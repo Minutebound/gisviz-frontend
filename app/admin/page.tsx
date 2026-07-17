@@ -9,6 +9,7 @@ import {
   Cpu, Database, LifeBuoy, BookOpen,
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
+import { API_ORIGIN } from '../../services/api'
 import AccessRestricted from '../components/AccessRestricted'
 
 // ── Main area cards ───────────────────────────────────────────────────────────
@@ -67,8 +68,7 @@ function buildAreas(): AreaCard[] {
       desc:    'Interactive API reference — every endpoint, testable. Admin only.',
       onClick: () => {
         const token = localStorage.getItem('gisviz_token')
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL 
-        window.open(`${apiUrl}/docs?token=${token}`, '_blank')
+        window.open(`${API_ORIGIN}/docs?token=${token}`, '_blank')
       },
     },
   ]
