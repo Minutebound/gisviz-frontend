@@ -23,7 +23,7 @@ type AreaCard = {
   onClick?: () => void
 }
 
-function buildAreas(API: string): AreaCard[] {
+function buildAreas(): AreaCard[] {
   return [
     {
       key:   'analytics',
@@ -67,7 +67,8 @@ function buildAreas(API: string): AreaCard[] {
       desc:    'Interactive API reference — every endpoint, testable. Admin only.',
       onClick: () => {
         const token = localStorage.getItem('gisviz_token')
-        window.open(`${API}/docs?token=${token}`, '_blank')
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL 
+        window.open(`${apiUrl}/docs?token=${token}`, '_blank')
       },
     },
   ]
@@ -81,7 +82,7 @@ const CONTROL_TABS = [
   { tab: 'reports',    icon: <Flag size={16} />,          label: 'Reports',         desc: 'Resolve content reports' },
   { tab: 'comments',   icon: <MessageSquare size={16} />, label: 'Comments',        desc: 'Moderate comments' },
   { tab: 'unverified', icon: <UserX size={16} />,         label: 'Unverified',      desc: 'Verify / purge accounts' },
-  { tab: 'roles',      icon: <KeyRound size={16} />,      label: 'Roles',  desc: 'Roles, permissions, page access' },
+  { tab: 'roles',      icon: <KeyRound size={16} />,      label: 'Roles',           desc: 'Roles, permissions, page access' },
   { tab: 'tickets',    icon: <LifeBuoy size={16} />,      label: 'Support Tickets', desc: 'View and resolve user support requests' },
 ]
 
@@ -94,15 +95,7 @@ export default function AdminHomePage() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth() as any
   const router = useRouter()
 
-  // Strip /api/v0 so we get the bare backend URL for docs
-  const API =
-    typeof window !== 'undefined'
-      ? (process.env.NEXT_PUBLIC_API_URL ?? '')
-          .replace('/api/v0', '')
-          .replace(/\/$/, '')
-      : ''
-
-  const areas = buildAreas(API)
+  const areas = buildAreas()
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) router.push('/auth')
