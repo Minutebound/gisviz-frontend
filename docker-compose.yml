@@ -5,8 +5,8 @@ services:
       dockerfile: Dockerfile
       target: prod
       args:
-        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
-        - NEXT_PUBLIC_GA_ID=${NEXT_PUBLIC_GA_ID}
+        - https://api.gisviz.com
+        - G-2MY97W2CKX
     env_file:
       - .env.frontend
     container_name: gisviz-frontend

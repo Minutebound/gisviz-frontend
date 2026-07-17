@@ -66,7 +66,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // Dynamic pages — fetched from backend at runtime
   try {
     const res = await fetch(
-      `${BACKEND_URL}/api/v1/seo/sitemap-data`,
+      `${BACKEND_URL}/api/v0/seo/sitemap-data`,
       {
         next: { revalidate: 3600 },
         signal: AbortSignal.timeout(5000), // 5s timeout — don't block sitemap
