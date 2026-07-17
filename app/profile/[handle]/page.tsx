@@ -107,7 +107,14 @@ export default function ProfileHandlePage() {
     if (!isAuthenticated) { router.push('/auth'); return }
     setFollowLoading(true)
     const wasFollowing = isFollowing
+ 
+    // Optimistic update — flip button AND counter instantly
     setIsFollowing(!wasFollowing)
+    setProfile((prev: any) => ({
+      ...prev,
+      follower_count: (prev.follower_count || 0) + (wasFollowing ? -1 : 1),
+    }))
+ 
     try {
       if (wasFollowing) {
         await gisvizApi.unfollowUser(profile.user_id)
@@ -115,7 +122,12 @@ export default function ProfileHandlePage() {
         await gisvizApi.followUser(profile.user_id)
       }
     } catch (err) {
+      // Revert both on failure
       setIsFollowing(wasFollowing)
+      setProfile((prev: any) => ({
+        ...prev,
+        follower_count: (prev.follower_count || 0) + (wasFollowing ? 1 : -1),
+      }))
     } finally {
       setFollowLoading(false)
     }

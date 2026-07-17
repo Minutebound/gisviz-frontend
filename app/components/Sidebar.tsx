@@ -19,15 +19,13 @@ export default function Sidebar() {
   // Strip '/api/v0' explicitly to target the base mount where '/post/uploads' lives
   const API_BASE_URL = `${RAW_API_URL}`.replace('/api/v0', '');
 
+// Trending categories — calls GET /categories/trending which is backed by
+// Redis (gisviz-cache:categories:trending, 1 h TTL, busted on every mutation).
+// No frontend cache: the backend serves fresh data from Redis on every request.
 useEffect(() => {
   gisvizApi
-    .listCategories()
-    .then((data: Category[]) => {
-      const sorted = data
-        .filter((c) => c.usage_count > 0)
-        .sort((a, b) => b.usage_count - a.usage_count)
-      setTrending(sorted.slice(0, 5))
-    })
+    .getTrendingCategories(5)
+    .then((data: Category[]) => setTrending(data))
     .catch(() => setTrending([]))
 }, [])
 
@@ -248,7 +246,7 @@ useEffect(() => {
           <Link href="/legal/cookies"       className="hover:text-gisviz-accent transition-colors">Cookies</Link>
           <Link href="/legal/accessibility" className="hover:text-gisviz-accent transition-colors">Accessibility</Link>
           <Link href="/contact"       className="hover:text-gisviz-accent transition-colors">Contact</Link>
-          <span className="w-full mt-1 font-mono">© {new Date().getFullYear()} gisviz(Beta RUN)</span>
+          <span className="w-full mt-1 font-mono">© {new Date().getFullYear()} gisviz(Beta 0.0.0)</span>
         </div>
       </div>
 

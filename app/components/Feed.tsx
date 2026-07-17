@@ -193,29 +193,17 @@ export default function Feed() {
   }
 
   return (
-    // ── Single unified scroll container ───────────────────────────────────────
-    // On mobile: full-height, snap-y mandatory, single scroll axis.
-    // On desktop (md+): natural document flow, no snapping.
-    // The header is the FIRST snap child — scrolling back to top always
-    // brings it into view. Posts snap individually below it.
     <div className="
       h-[calc(100vh-4rem)] md:h-auto
-      overflow-y-scroll md:overflow-visible
-      snap-y snap-mandatory md:snap-none
+      overflow-y-auto md:overflow-visible
       scroll-smooth
       [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]
       pb-24 pt-4 md:pt-0
       relative
     ">
 
-      {/* ── HEADER — first snap child ─────────────────────────────────────────
-          On mobile this is a snap point: scrolling back to top reveals it.
-          min-h forces the snap container to give it a full viewport-height
-          slot on mobile so it doesn't get partially swallowed.
-          On desktop it's just normal block flow with no min-height.        */}
+      {/* ── HEADER ── */}
       <div className="
-        snap-start snap-always md:snap-align-none
-        min-h-[calc(100vh-4rem)] md:min-h-0
         flex flex-col justify-start
         pt-2 pb-4 md:py-0
       ">
@@ -255,13 +243,13 @@ export default function Feed() {
         </div>
       </div>
 
-      {/* ── FEED CONTENT ─────────────────────────────────────────────────────── */}
+      {/* ── FEED CONTENT ── */}
       {isLoading ? (
-        <div className="snap-start snap-always md:snap-align-none flex justify-center items-center h-64">
+        <div className="flex justify-center items-center h-64">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gisviz-accent" />
         </div>
       ) : posts.length === 0 ? (
-        <div className="snap-start snap-always md:snap-align-none flex flex-col items-center justify-center h-64 text-center gap-3">
+        <div className="flex flex-col items-center justify-center h-64 text-center gap-3">
           <p className="text-gisviz-ink-soft">No posts found in {activeTab === 'stream' ? 'Stream' : 'Trending'}.</p>
         </div>
       ) : (
@@ -275,10 +263,7 @@ export default function Feed() {
             return (
               <div
                 key={post.post_id}
-                className="
-                  snap-start snap-always md:snap-align-none
-                  w-full pb-8
-                "
+                className="w-full pb-8"
               >
                 <article className="bg-gisviz-card border border-gisviz-border rounded-xl p-5 shadow-sm transition-shadow hover:shadow-md relative">
                   
@@ -454,7 +439,7 @@ export default function Feed() {
           })}
 
           {hasMore ? (
-            <div className="flex justify-center mt-4 mb-8 snap-start md:snap-align-none">
+            <div className="flex justify-center mt-4 mb-8">
               <button 
                 onClick={() => fetchPosts(offset)}
                 disabled={isLoadingMore}

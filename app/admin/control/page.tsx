@@ -121,19 +121,46 @@ export default function AdminControlPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  const [activeTab, setActiveTab] = useState<Tab>('categories')
+  const _cookieTab = (): Tab => {
+    if (typeof document === 'undefined') return 'categories'
+    const row = document.cookie.split('; ').find(r => r.startsWith('gisviz_control_tab='))
+    const val = row ? row.split('=')[1] : ''
+    return (VALID_TABS.includes(val as Tab) ? val : 'categories') as Tab
+  }
+ 
+  const [activeTab, setActiveTab] = useState<Tab>(_cookieTab)
   const [ddOpen, setDdOpen]       = useState(false)
   const [globalErr, setGlobalErr] = useState('')
-
+  const ddRef                     = React.useRef<HTMLDivElement>(null)
+ 
+  // Write cookie whenever the active tab changes
+  const switchTab = (tab: Tab) => {
+    setActiveTab(tab)
+    document.cookie = `gisviz_control_tab=${tab}; path=/; SameSite=Lax`
+  }
+ 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) router.push('/auth')
   }, [authLoading, isAuthenticated, router])
-
+ 
+  // URL ?tab= param overrides cookie (deep-link / external navigation)
   useEffect(() => {
     const t = searchParams.get('tab') as Tab | null
-    if (t && VALID_TABS.includes(t)) setActiveTab(t)
+    if (t && VALID_TABS.includes(t)) switchTab(t)
   }, [searchParams])
-
+ 
+  // Close dropdown when the user clicks anywhere outside it
+  useEffect(() => {
+    if (!ddOpen) return
+    const handler = (e: MouseEvent) => {
+      if (ddRef.current && !ddRef.current.contains(e.target as Node)) {
+        setDdOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [ddOpen])
+ 
   if (authLoading) return (
     <div className="flex justify-center items-center h-[calc(100vh-4rem)]">
       <Loader2 size={32} className="animate-spin text-gisviz-accent" />
@@ -174,7 +201,7 @@ export default function AdminControlPage() {
           </Link>
 
           {/* ── Tab dropdown ── */}
-          <div className="relative">
+          <div className="relative" ref={ddRef}>
             <button onClick={() => setDdOpen(p => !p)}
               className="flex items-center gap-2 bg-gisviz-card border border-gisviz-border px-4 py-2 rounded-md font-mono text-[12px] text-gisviz-ink shadow-sm hover:border-gisviz-accent transition-colors min-w-[160px] justify-between">
               <span className="flex items-center gap-2">{meta.icon} {meta.label}</span>
@@ -183,7 +210,7 @@ export default function AdminControlPage() {
             {ddOpen && (
               <div className="absolute right-0 top-full mt-1 w-52 bg-gisviz-card border border-gisviz-border rounded-md shadow-lg z-30 py-1 overflow-hidden">
                 {TABS.map(tab => (
-                  <button key={tab.id} onClick={() => { setActiveTab(tab.id); setDdOpen(false) }}
+                  <button key={tab.id} onClick={() => { switchTab(tab.id); setDdOpen(false) }}
                     className={`w-full flex items-center gap-2 px-4 py-2 text-[12px] font-mono transition-colors ${
                       activeTab === tab.id
                         ? 'bg-gisviz-accent/10 text-gisviz-accent font-bold'

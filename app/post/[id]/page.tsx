@@ -415,7 +415,7 @@ export default function PostDetail() {
       {/* Fullscreen overlay */}
       {isImageFullscreen && visualUrl && (
         <div
-          className="fixed inset-0 bg-gisviz-black/10 z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-gisviz-black/10 z-50 backdrop-blur flex items-center justify-center p-4"
           onClick={() => setIsImageFullscreen(false)}
         >
           <button className="absolute top-4 right-4 text-gisviz-white hover:text-gisviz-accent transition-colors">
