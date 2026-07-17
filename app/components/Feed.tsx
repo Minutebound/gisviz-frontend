@@ -71,6 +71,9 @@ export default function Feed() {
 
   const [likedPosts, setLikedPosts]           = useState<Record<string, boolean>>({})
   const [bookmarkedPosts, setBookmarkedPosts] = useState<Record<string, boolean>>({})
+  
+  // ── NEW: State to track posts that should be hidden due to missing visuals ──
+  const [hiddenPosts, setHiddenPosts]         = useState<Record<string, boolean>>({})
 
   const [openDropdownId, setOpenDropdownId]   = useState<string | null>(null)
   const [shareModalPost, setShareModalPost]   = useState<Post | null>(null)
@@ -192,6 +195,23 @@ export default function Feed() {
     setOpenDropdownId(openDropdownId === id ? null : id)
   }
 
+  // ── NEW: Handler for broken images ──
+  const handleImageError = async (postId: string) => {
+    // 1. Instantly hide the post from the UI so it doesn't look broken
+    setHiddenPosts(prev => ({ ...prev, [postId]: true }))
+    
+    // 2. Silently tell the backend to verify and deactivate it
+    try {
+      if (gisvizApi.reportMissingVisual) {
+        await gisvizApi.reportMissingVisual(postId)
+      } else {
+        console.warn("gisvizApi.reportMissingVisual is not implemented in api.ts yet.")
+      }
+    } catch (err) {
+      console.error("Failed to report missing visual to backend:", err)
+    }
+  }
+
   return (
     <div className="
       h-[calc(100vh-4rem)] md:h-auto
@@ -255,6 +275,9 @@ export default function Feed() {
       ) : (
         <>
           {posts.map((post) => {
+            // ── NEW: Skip rendering entirely if the post is flagged as hidden ──
+            if (hiddenPosts[post.post_id]) return null
+
             const isPostLiked      = likedPosts[post.post_id]      ?? false
             const isPostBookmarked = bookmarkedPosts[post.post_id] ?? false
             const isOwnPost        = isAuthenticated && user?.user_id === post.publisher_user_id
@@ -322,7 +345,8 @@ export default function Feed() {
                       {post.visual_image_path ? (
                         <img 
                           src={`${API_BASE_URL}${post.visual_image_path}`} 
-                          alt={post.title} 
+                          alt={post.title}
+                          onError={() => handleImageError(post.post_id)} // ── NEW: Trigger self-healing if broken ──
                           className="w-full h-auto object-cover"
                         />
                       ) : (

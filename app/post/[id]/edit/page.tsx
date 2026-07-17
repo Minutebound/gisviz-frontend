@@ -4,9 +4,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { Edit2, Image as ImageIcon, Loader2, Map as MapIcon, X, Tag, Info, Link as LinkIcon, Send, Bookmark } from 'lucide-react'
 import { useAuth } from '../../../../context/AuthContext'
-import { gisvizApi } from '../../../../services/api'
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL
+import { API_ORIGIN, gisvizApi } from '../../../../services/api'
 
 export default function EditPostPage() {
   const params = useParams()
@@ -74,7 +72,7 @@ export default function EditPostPage() {
 
         setExistingImagePath(postData.visual_image_path)
         if (postData.visual_image_path) {
-          setPreviewUrl(`${API_BASE_URL}${postData.visual_image_path}`)
+          setPreviewUrl(`${API_ORIGIN}${postData.visual_image_path}`)
         }
       } catch {
         setErrorMsg('Failed to load post data.')
@@ -151,42 +149,66 @@ export default function EditPostPage() {
     setKeywords(prev => prev.filter(k => k !== kw))
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!title.trim())                  { setErrorMsg('A title is required.'); return }
-    if (!sourceName.trim())             { setErrorMsg('Data Source Name is required.'); return }
-    if (selectedCategoryIds.length < 1) { setErrorMsg('Please select at least one category.'); return }
-    if (keywords.length < 1)            { setErrorMsg('Please add at least one keyword.'); return }
-    if (keywords.length > 3)            { setErrorMsg('You can only add up to 3 keywords.'); return }
+  e.preventDefault()
 
-    setIsSaving(true)
-    setErrorMsg('')
+  // ── 1. Strict Pre-flight Validation ──────────────────────────────────────
+  if (!title.trim())                  { setErrorMsg('A title is required.'); return }
+  if (!sourceName.trim())             { setErrorMsg('Data Source Name is required.'); return }
+  if (selectedCategoryIds.length < 1) { setErrorMsg('Please select at least one category.'); return }
+  if (keywords.length < 1)            { setErrorMsg('Please add at least one keyword.'); return }
+  if (keywords.length > 3)            { setErrorMsg('You can only add up to 3 keywords.'); return }
 
-    try {
-      let finalImagePath = existingImagePath
-      if (file) {
-        const uploadRes = await gisvizApi.uploadVisual(file)
-        finalImagePath = uploadRes.visual_path
-      }
+  setIsSaving(true)
+  setErrorMsg('')
 
-      await gisvizApi.updatePost(postId, {
-        title,
-        description: description || null,
-        note: note || null,
-        source_name: sourceName || null,
-        source_url: sourceUrl || null,
-        visual_image_path: finalImagePath,
-        category_ids: selectedCategoryIds,
-        keywords,
-      })
+  // Track the newly uploaded file specifically for rollbacks
+  let uploadedVisualPath: string | null = null
 
-      router.push(`/post/${postId}`)
-    } catch (err: any) {
-      const detail = err.response?.data?.detail
-      setErrorMsg(typeof detail === 'string' ? detail : 'Failed to update the post. Please try again.')
-    } finally {
-      setIsSaving(false)
+  try {
+    let finalImagePath = existingImagePath
+
+    // ── 2. Upload the New Visual (Only if the user selected one) ───────────
+    if (file) {
+      const uploadRes = await gisvizApi.uploadVisual(file)
+      uploadedVisualPath = uploadRes.visual_path
+      finalImagePath = uploadedVisualPath
     }
+
+    // ── 3. Update the Post ─────────────────────────────────────────────────
+    await gisvizApi.updatePost(postId, {
+      title: title.trim(),
+      description: description?.trim() || null,
+      note: note?.trim() || null,
+      source_name: sourceName.trim(),
+      source_url: sourceUrl?.trim() || null,
+      visual_image_path: finalImagePath,
+      category_ids: selectedCategoryIds,
+      keywords,
+    })
+
+    // ── 4. Cleanup Old Visual (Success Scenario) ───────────────────────────
+    // If a new file was uploaded AND the update succeeded, delete the old file.
+    // We use .catch(console.error) so a deletion failure doesn't block the redirect.
+    if (file && existingImagePath && existingImagePath !== finalImagePath) {
+      gisvizApi.deleteVisual(existingImagePath).catch(console.error)
+    }
+
+    // ── 5. Success Redirect ────────────────────────────────────────────────
+    router.push(`/post/${postId}`)
+
+  } catch (err: any) {
+    // ── 6. Rollback Orphaned New Visual (Failure Scenario) ─────────────────
+    // If the post update failed, but we already uploaded a NEW image, delete it.
+    if (uploadedVisualPath) {
+      gisvizApi.deleteVisual(uploadedVisualPath).catch(console.error)
+    }
+
+    const detail = err.response?.data?.detail
+    setErrorMsg(typeof detail === 'string' ? detail : 'Failed to update the post. Please try again.')
+  } finally {
+    setIsSaving(false)
   }
+}
 
   if (isLoading) return (
     <div className="flex justify-center items-center h-[calc(100vh-4rem)]">
