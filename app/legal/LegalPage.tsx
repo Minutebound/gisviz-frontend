@@ -10,6 +10,7 @@ interface LegalContent {
 }
 
 const LEGAL_PAGES = [
+  { slug: 'about',         label: 'About'},
   { slug: 'privacy',       label: 'Privacy Policy' },
   { slug: 'terms',         label: 'Terms of Service' },
   { slug: 'cookies',       label: 'Cookie Policy' },
@@ -41,7 +42,7 @@ export default function LegalPage({ slug }: { slug: string }) {
             key={p.slug}
             // Add /legal/ right here 👇
             href={`/legal/${p.slug}`}
-            className={`text-[12px] font-mono transition-colors ${
+            className={`text-[16px] font-mono transition-colors ${
               p.slug === slug
                 ? 'text-gisviz-accent font-bold'
                 : 'text-gisviz-ink-soft hover:text-gisviz-ink'
@@ -53,22 +54,22 @@ export default function LegalPage({ slug }: { slug: string }) {
       </nav>
 
       {loading && (
-        <div className="text-gisviz-ink-soft text-[14px] font-mono animate-pulse">Loading…</div>
+        <div className="text-gisviz-ink-soft text-[16px]  font-mono animate-pulse">Loading…</div>
       )}
 
       {error && (
-        <p className="text-gisviz-alert text-[14px] font-mono">Failed to load. Please try again.</p>
+        <p className="text-gisviz-alert text-[16px]  font-mono">Failed to load. Please try again.</p>
       )}
 
       {data && !loading && (
         <>
-          <p className="text-[11px] font-mono text-gisviz-ink-soft uppercase tracking-widest mb-3">
+          <p className="text-[12px]  font-mono text-gisviz-ink-soft uppercase tracking-widest mb-3">
             Last updated {data.last_updated}
           </p>
           <h1 className="text-[28px] font-bold text-gisviz-ink mb-8 font-display">
             {data.title}
           </h1>
-          <div className="prose prose-sm max-w-none text-gisviz-ink leading-relaxed whitespace-pre-wrap font-sans text-[15px]">
+          <div className="prose prose-sm max-w-none text-gisviz-ink leading-relaxed whitespace-pre-wrap font-sans text-[16px] ">
             {data.content}
           </div>
         </>

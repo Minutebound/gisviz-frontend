@@ -113,7 +113,7 @@ export default function ERDPage() {
         <div className="mb-4 max-w-6xl mx-auto flex flex-wrap items-center gap-3">
           <div className="flex gap-1.5 flex-wrap">
             <button onClick={() => setFilterDb(null)}
-              className={`px-3 py-1 rounded-sm text-[11px] font-mono border transition-colors ${!filterDb ? 'bg-gisviz-ink text-gisviz-canvas border-gisviz-ink' : 'bg-gisviz-card border-gisviz-border text-gisviz-ink-soft hover:text-gisviz-ink'}`}>
+              className={`px-3 py-1 rounded-sm text-[12px]  font-mono border transition-colors ${!filterDb ? 'bg-gisviz-ink text-gisviz-canvas border-gisviz-ink' : 'bg-gisviz-card border-gisviz-border text-gisviz-ink-soft hover:text-gisviz-ink'}`}>
               All ({data.tables.length})
             </button>
             {dbs.map(db => {
@@ -121,7 +121,7 @@ export default function ERDPage() {
               const count = data.tables.filter(t => t.database === db).length
               return (
                 <button key={db} onClick={() => setFilterDb(filterDb === db ? null : db)}
-                  className={`px-3 py-1 rounded-sm text-[11px] font-mono border transition-colors ${filterDb === db ? 'text-white border-transparent' : 'bg-gisviz-card border-gisviz-border text-gisviz-ink-soft hover:text-gisviz-ink'}`}
+                  className={`px-3 py-1 rounded-sm text-[12px]  font-mono border transition-colors ${filterDb === db ? 'text-white border-transparent' : 'bg-gisviz-card border-gisviz-border text-gisviz-ink-soft hover:text-gisviz-ink'}`}
                   style={filterDb === db ? { backgroundColor: color, borderColor: color } : {}}>
                   {DB_LABEL[db] ?? db} ({count})
                 </button>
@@ -130,7 +130,7 @@ export default function ERDPage() {
           </div>
 
           <button onClick={() => setShowCross(v => !v)}
-            className={`flex items-center gap-1.5 px-3 py-1 rounded-sm text-[11px] font-mono border transition-colors ${showCross ? 'bg-gisviz-accent text-white border-gisviz-accent' : 'bg-gisviz-card border-gisviz-border text-gisviz-ink-soft hover:text-gisviz-ink'}`}>
+            className={`flex items-center gap-1.5 px-3 py-1 rounded-sm text-[12px]  font-mono border transition-colors ${showCross ? 'bg-gisviz-accent text-white border-gisviz-accent' : 'bg-gisviz-card border-gisviz-border text-gisviz-ink-soft hover:text-gisviz-ink'}`}>
             <Link2 size={11} /> Cross-DB refs
           </button>
 
@@ -139,7 +139,7 @@ export default function ERDPage() {
               className="p-1.5 rounded-sm border border-gisviz-border text-gisviz-ink-soft hover:text-gisviz-ink transition-colors">
               <ZoomOut size={13} />
             </button>
-            <span className="text-[11px] font-mono text-gisviz-ink-soft w-10 text-center">
+            <span className="text-[12px]  font-mono text-gisviz-ink-soft w-10 text-center">
               {Math.round(zoom * 100)}%
             </span>
             <button onClick={() => setZoom(z => Math.min(1.5, z + 0.1))}
@@ -151,8 +151,8 @@ export default function ERDPage() {
           <div className="flex gap-3 ml-2">
             {[{label:'tables',value:visibleTables.length},{label:'relations',value:visibleRels.length+visibleCross.length}].map(s => (
               <div key={s.label} className="px-3 py-1 bg-gisviz-card border border-gisviz-border rounded-sm">
-                <span className="text-[14px] font-mono font-bold text-gisviz-ink">{s.value}</span>
-                <span className="text-[10px] font-mono text-gisviz-ink-soft ml-1">{s.label}</span>
+                <span className="text-[16px]  font-mono font-bold text-gisviz-ink">{s.value}</span>
+                <span className=" text-[12px] font-mono text-gisviz-ink-soft ml-1">{s.label}</span>
               </div>
             ))}
           </div>
@@ -191,12 +191,12 @@ export default function ERDPage() {
             <div className="flex items-center gap-3">
               <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: selected.dbColor }} />
               <span className="text-[12px] font-mono font-bold text-gisviz-ink uppercase tracking-widest">{selected.id}</span>
-              <span className="text-[11px] font-mono text-gisviz-ink-soft">
+              <span className="text-[12px]  font-mono text-gisviz-ink-soft">
                 {DB_LABEL[selected.database] ?? selected.database} · {selected.columns.length} columns
               </span>
             </div>
             <button onClick={() => setSelected(null)}
-              className="text-[11px] font-mono text-gisviz-ink-soft hover:text-gisviz-ink transition-colors px-2 py-1">
+              className="text-[12px]  font-mono text-gisviz-ink-soft hover:text-gisviz-ink transition-colors px-2 py-1">
               close ×
             </button>
           </div>

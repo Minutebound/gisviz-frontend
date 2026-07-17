@@ -197,36 +197,41 @@ export const gisvizApi = {
     return (await axiosInstance.get('/posts/stream', { params: { skip, limit } })).data
   },
 
+  fetchTrending: async (n = 50) =>
+  cached(`trending:${n}`, TTL.TRENDING, async () =>
+    (await axiosInstance.get('/posts/trending', { params: { n } })).data
+  ),
+
+// Full PostResponse[] version — used by Feed.tsx trending tab
+// Per-user cache key so is_liked/is_bookmarked don't leak between users
+  fetchTrendingFull: async (n = 20) => {
+    const key = `trending-full:${n}:${_uid()}`
+    return cached(key, TTL.TRENDING, async () =>
+      (await axiosInstance.get('/posts/trending-full', { params: { n } })).data
+    )
+  },
+
   searchPosts: async (q: string, skip = 0, limit = 25) =>
     cached(`search:${q}:${_uid()}`, TTL.SEARCH, async () =>
       (await axiosInstance.get('/posts/search', { params: { q, skip, limit } })).data
     ),
 
-  fetchTrending: async (n = 50) =>
-    cached(`trending:${n}`, TTL.TRENDING, async () =>
-      (await axiosInstance.get('/posts/trending', { params: { n } })).data
-    ),
+  createPost: async (payload) => {
+  const res = (await axiosInstance.post('/posts', payload)).data
+  _cache.delPrefix('stream:')
+  _cache.delPrefix('trending')
+  _cache.del('categories')      
+  _cache.delPrefix('popular:')   
+  return res
+},
 
-  createPost: async (payload: {
-    title: string; description: string | null; visual_image_path: string | null
-    category_ids: number[]; keywords: string[]
-    note?: string | null; source_name?: string | null; source_url?: string | null
-  }) => {
-    const res = (await axiosInstance.post('/posts', payload)).data
-    _cache.delPrefix('stream:')
-    return res
-  },
-
-  updatePost: async (postId: string, payload: {
-    title: string; description: string | null; visual_image_path: string | null
-    category_ids: number[]; keywords: string[]
-    note?: string | null; source_name?: string | null; source_url?: string | null
-  }) => {
-    const res = (await axiosInstance.put(`/posts/${postId}`, payload)).data
-    _cache.del(`post:${postId}:${_uid()}`)
-    _cache.delPrefix('stream:')
-    return res
-  },
+updatePost: async (postId, payload) => {
+  const res = (await axiosInstance.put(`/posts/${postId}`, payload)).data
+  _cache.del(`post:${postId}:${_uid()}`)
+  _cache.delPrefix('stream:')
+  _cache.del('categories')        
+  return res
+},
 
   deletePost: async (postId: string) => {
     const res = (await axiosInstance.delete(`/posts/${postId}`)).data
@@ -368,16 +373,29 @@ export const gisvizApi = {
   fetchAllPosts: async (skip = 0, limit = 50, q?: string) => {
     const params: any = { skip, limit }
     if (q) params.q = q
-    return (await axiosInstance.get('/posts/stream', { params })).data
+    return (await axiosInstance.get('/admin/posts', { params })).data
   },
  
-  adminDeletePost: async (postId: string) => {
-    const res = (await axiosInstance.delete(`/posts/${postId}`)).data
+  adminDeletePost: async (postId) => {
+  const res = (await axiosInstance.delete(`/posts/${postId}`)).data
+  _cache.del(`post:${postId}:${_uid()}`)
+  _cache.delPrefix('stream:')
+  _cache.delPrefix('trending')
+  _cache.del('categories')        
+  _cache.delPrefix('popular:')    
+  return res
+},
+ 
+  adminSetPostStatus: async (postId: string, isActive: boolean) => {
+    const res = (await axiosInstance.put(`/posts/${postId}/status`, null, {
+      params: { is_active: isActive },
+    })).data
     _cache.del(`post:${postId}:${_uid()}`)
     _cache.delPrefix('stream:')
+    _cache.delPrefix('trending')
     return res
   },
- 
+
   // ── Admin — Reports ──────────────────────────────────────────────────────
   fetchReports: async () =>
     (await axiosInstance.get('/posts/reports/all')).data,

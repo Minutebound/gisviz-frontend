@@ -40,7 +40,6 @@ interface Post {
   source_name: string | null
   source_url: string | null
   updated_timestamp?: string
-  // Returned by backend when JWT is present; null when not authenticated
   is_liked: boolean | null
   is_bookmarked: boolean | null
 }
@@ -70,7 +69,6 @@ export default function Feed() {
   const [likeBusy, setLikeBusy] = useState<string | null>(null)
   const [bookmarkBusy, setBookmarkBusy] = useState<string | null>(null)
 
-  // Keyed by post_id — seeded from server flags on every fetch
   const [likedPosts, setLikedPosts]           = useState<Record<string, boolean>>({})
   const [bookmarkedPosts, setBookmarkedPosts] = useState<Record<string, boolean>>({})
 
@@ -81,16 +79,12 @@ export default function Feed() {
   const [offset, setOffset] = useState(0)
   const [hasMore, setHasMore] = useState(true)
 
-  // Wait until AuthContext has finished its initial token check before fetching.
-  // This means we fire exactly once on cold load (with the correct auth state),
-  // and once more only if the user explicitly logs in/out during the session.
   useEffect(() => {
-    if (authLoading) return          // auth still resolving — don't fetch yet
+    if (authLoading) return
     fetchPosts(0, true, 'stream')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, isAuthenticated])
 
-  // Close dropdown on outside click
   useEffect(() => {
     const handleClickOutside = () => setOpenDropdownId(null)
     if (openDropdownId) window.addEventListener('click', handleClickOutside)
@@ -99,22 +93,17 @@ export default function Feed() {
 
   const fetchPosts = async (currentOffset: number, isInitial = false, tab = activeTab) => {
     if (!isInitial) setIsLoadingMore(true)
-    
     try {
       let data: Post[] = []
-      
       if (tab === 'stream') {
         data = await gisvizApi.fetchGlobalStream(currentOffset, POSTS_PER_PAGE)
       } else {
-        const streamData = await gisvizApi.fetchGlobalStream(currentOffset, POSTS_PER_PAGE)
-        data = [...streamData].sort((a, b) => b.total_likes_count - a.total_likes_count)
+        data = await gisvizApi.fetchTrendingFull(POSTS_PER_PAGE)
       }
 
-      if (data.length < POSTS_PER_PAGE) setHasMore(false)
+      if (tab === 'trending' || data.length < POSTS_PER_PAGE) setHasMore(false)
       else setHasMore(true)
 
-      // Seed liked / bookmarked maps from server-returned flags.
-      // is_liked / is_bookmarked are non-null only when authenticated.
       const newLiked: Record<string, boolean>      = {}
       const newBookmarked: Record<string, boolean> = {}
       data.forEach((p) => {
@@ -131,7 +120,6 @@ export default function Feed() {
         setLikedPosts((prev) => ({ ...prev, ...newLiked }))
         setBookmarkedPosts((prev) => ({ ...prev, ...newBookmarked }))
       }
-
       setOffset(currentOffset + POSTS_PER_PAGE)
     } catch (error) {
       console.error(`Failed to load ${tab} feed:`, error)
@@ -152,7 +140,6 @@ export default function Feed() {
     fetchPosts(0, true, tab)
   }
 
-  // ── Like — optimistic, reconciled from server ──────────────────────────
   const handleLike = async (postId: string) => {
     if (!isAuthenticated) { router.push('/auth'); return }
     if (likeBusy) return
@@ -171,7 +158,6 @@ export default function Feed() {
         p.post_id === postId ? { ...p, total_likes_count: res.total_likes_count } : p
       ))
     } catch (error) {
-      // Revert on failure
       setLikedPosts((prev) => ({ ...prev, [postId]: wasLiked }))
       setPosts((prev) => prev.map((p) =>
         p.post_id === postId
@@ -184,7 +170,6 @@ export default function Feed() {
     }
   }
 
-  // ── Bookmark — real API, optimistic, reconciled; no localStorage ────────
   const handleBookmark = async (postId: string) => {
     if (!isAuthenticated) { router.push('/auth'); return }
     if (bookmarkBusy) return
@@ -208,50 +193,75 @@ export default function Feed() {
   }
 
   return (
-    <div className="h-[calc(100vh-4rem)] md:h-auto overflow-y-scroll md:overflow-visible snap-y snap-mandatory md:snap-none scroll-smooth [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] pb-24 pt-4 md:pt-0 relative">
+    // ── Single unified scroll container ───────────────────────────────────────
+    // On mobile: full-height, snap-y mandatory, single scroll axis.
+    // On desktop (md+): natural document flow, no snapping.
+    // The header is the FIRST snap child — scrolling back to top always
+    // brings it into view. Posts snap individually below it.
+    <div className="
+      h-[calc(100vh-4rem)] md:h-auto
+      overflow-y-scroll md:overflow-visible
+      snap-y snap-mandatory md:snap-none
+      scroll-smooth
+      [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]
+      pb-24 pt-4 md:pt-0
+      relative
+    ">
 
-      {/* HEADER: Tabs & Publish Button */}
-      <div className="flex justify-between items-center mb-6 snap-start w-full">
-        
-        {/* Animated Segmented Control */}
-        <div className="flex bg-gisviz-canvas border border-gisviz-border rounded-full p-1 relative shadow-sm w-56 shrink-0">
-          <div
-            className={`absolute top-1 bottom-1 left-1 w-[calc(50%-4px)] bg-gisviz-card shadow-sm border border-gisviz-border rounded-full transition-transform duration-300 ease-out ${
-              activeTab === 'stream' ? 'translate-x-0' : 'translate-x-full'
-            }`}
-          />
-          <button
-            onClick={() => handleTabSwitch('stream')}
-            className={`relative z-10 flex-1 py-1.5 text-[12px] font-bold rounded-full transition-colors duration-300 ${
-              activeTab === 'stream' ? 'text-gisviz-ink' : 'text-gisviz-ink-soft'
-            }`}
+      {/* ── HEADER — first snap child ─────────────────────────────────────────
+          On mobile this is a snap point: scrolling back to top reveals it.
+          min-h forces the snap container to give it a full viewport-height
+          slot on mobile so it doesn't get partially swallowed.
+          On desktop it's just normal block flow with no min-height.        */}
+      <div className="
+        snap-start snap-always md:snap-align-none
+        min-h-[calc(100vh-4rem)] md:min-h-0
+        flex flex-col justify-start
+        pt-2 pb-4 md:py-0
+      ">
+        <div className="flex justify-between items-center mb-6">
+
+          {/* Animated Segmented Control */}
+          <div className="flex bg-gisviz-canvas border border-gisviz-border rounded-full p-1 relative shadow-sm w-56 shrink-0">
+            <div
+              className={`absolute top-1 bottom-1 left-1 w-[calc(50%-4px)] bg-gisviz-card shadow-sm border border-gisviz-border rounded-full transition-transform duration-300 ease-out ${
+                activeTab === 'stream' ? 'translate-x-0' : 'translate-x-full'
+              }`}
+            />
+            <button
+              onClick={() => handleTabSwitch('stream')}
+              className={`relative z-10 flex-1 py-1.5 text-[12px] font-bold rounded-full transition-colors duration-300 ${
+                activeTab === 'stream' ? 'text-gisviz-ink' : 'text-gisviz-ink-soft'
+              }`}
+            >
+              Stream
+            </button>
+            <button
+              onClick={() => handleTabSwitch('trending')}
+              className={`relative z-10 flex-1 py-1.5 text-[12px] font-bold rounded-full transition-colors duration-300 ${
+                activeTab === 'trending' ? 'text-gisviz-ink' : 'text-gisviz-ink-soft'
+              }`}
+            >
+              Trending
+            </button>
+          </div>
+
+          <Link
+            href="/post/upload"
+            className="flex items-center gap-2 bg-gisviz-accent text-gisviz-white px-4 py-2 rounded-full text-[12px] font-bold hover:bg-opacity-90 transition-all shadow-sm"
           >
-            Stream
-          </button>
-          <button
-            onClick={() => handleTabSwitch('trending')}
-            className={`relative z-10 flex-1 py-1.5 text-[12px] font-bold rounded-full transition-colors duration-300 ${
-              activeTab === 'trending' ? 'text-gisviz-ink' : 'text-gisviz-ink-soft'
-            }`}
-          >
-            Trending
-          </button>
+            <Plus size={16} /> Publish
+          </Link>
         </div>
-
-        <Link
-          href="/post/upload"
-          className="flex items-center gap-2 bg-gisviz-accent text-gisviz-white px-4 py-2 rounded-full text-[12px] font-bold hover:bg-opacity-90 transition-all shadow-sm"
-        >
-          <Plus size={16} /> Publish
-        </Link>
       </div>
 
+      {/* ── FEED CONTENT ─────────────────────────────────────────────────────── */}
       {isLoading ? (
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gisviz-accent"></div>
+        <div className="snap-start snap-always md:snap-align-none flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gisviz-accent" />
         </div>
       ) : posts.length === 0 ? (
-        <div className="flex flex-col items-center justify-center h-64 text-center gap-3">
+        <div className="snap-start snap-always md:snap-align-none flex flex-col items-center justify-center h-64 text-center gap-3">
           <p className="text-gisviz-ink-soft">No posts found in {activeTab === 'stream' ? 'Stream' : 'Trending'}.</p>
         </div>
       ) : (
@@ -263,7 +273,13 @@ export default function Feed() {
             const allTags = [...post.categories.map(c => c.label), ...post.keywords.map(k => k.word)]
 
             return (
-              <div key={post.post_id} className="snap-start snap-always md:snap-align-none w-full pb-8">
+              <div
+                key={post.post_id}
+                className="
+                  snap-start snap-always md:snap-align-none
+                  w-full pb-8
+                "
+              >
                 <article className="bg-gisviz-card border border-gisviz-border rounded-xl p-5 shadow-sm transition-shadow hover:shadow-md relative">
                   
                   {/* Title & Dropdown */}
@@ -292,7 +308,7 @@ export default function Feed() {
                           >
                             <Share2 size={16} /> Share Post
                           </button>
-                          <div className="border-t border-gisviz-border my-1"></div>
+                          <div className="border-t border-gisviz-border my-1" />
                           <button 
                             onClick={() => { setReportModalId(post.post_id); setOpenDropdownId(null) }}
                             className="w-full flex items-center gap-3 px-4 py-2 text-[12px] text-gisviz-alert hover:bg-gisviz-alert/10 dark:hover:bg-red-950/30 transition-colors"
@@ -344,9 +360,9 @@ export default function Feed() {
                             className="w-10 h-10 rounded-full object-cover border border-gisviz-border flex-shrink-0" 
                           />
                         ) : (
-                          <div className="w-10 h-10 rounded-full border border-gisviz-border bg-gradient-to-tr from-gisviz-accent to-gisviz-safe 0 flex items-center justify-center text-gisviz-white text-[16px] font-bold uppercase font-mono shadow-inner flex-shrink-0">
-                        {post.publisher_handle.charAt(0)}
-                      </div>
+                          <div className="w-10 h-10 rounded-full border border-gisviz-border bg-gradient-to-tr from-gisviz-accent to-gisviz-safe flex items-center justify-center text-gisviz-white text-[16px] font-bold uppercase font-mono shadow-inner flex-shrink-0">
+                            {post.publisher_handle.charAt(0)}
+                          </div>
                         )}
                       </Link>
                       <div className="min-w-0">
@@ -394,16 +410,28 @@ export default function Feed() {
                           ? <Loader2 size={20} className="animate-spin" />
                           : <ThumbsUp size={20} className={isPostLiked ? 'fill-current' : ''} />
                         }
-                        <span>{post.total_likes_count > 0 ? (post.total_likes_count >= 1000 ? (post.total_likes_count/1000).toFixed(1) + 'K' : post.total_likes_count) : ''} </span>
+                        <span>
+                          {post.total_likes_count > 0
+                            ? post.total_likes_count >= 1000
+                              ? (post.total_likes_count / 1000).toFixed(1) + 'K'
+                              : post.total_likes_count
+                            : ''}
+                        </span>
                       </button>
                       
                       <Link href={`/post/${post.post_id}`} className="flex items-center gap-2 hover:text-gisviz-accent text-gisviz-ink-soft transition-colors">
                         <MessageSquare size={20} />
-                        <span>{post.total_comments_count > 0 ? (post.total_comments_count >= 1000 ? (post.total_comments_count/1000).toFixed(1) + 'K' : post.total_comments_count) : ''} {post.total_comments_count>1 ? 'Comments' : 'Comment'}</span>
+                        <span>
+                          {post.total_comments_count > 0
+                            ? post.total_comments_count >= 1000
+                              ? (post.total_comments_count / 1000).toFixed(1) + 'K'
+                              : post.total_comments_count
+                            : ''}{' '}
+                          {post.total_comments_count > 1 ? 'Comments' : 'Comment'}
+                        </span>
                       </Link>
                     </div>
 
-                    {/* Bookmark — hidden on own posts, real API, seeded from DB */}
                     {!isOwnPost && (
                       <button
                         onClick={() => handleBookmark(post.post_id)}
@@ -426,7 +454,7 @@ export default function Feed() {
           })}
 
           {hasMore ? (
-            <div className="flex justify-center mt-4 mb-8 snap-start">
+            <div className="flex justify-center mt-4 mb-8 snap-start md:snap-align-none">
               <button 
                 onClick={() => fetchPosts(offset)}
                 disabled={isLoadingMore}
@@ -444,13 +472,13 @@ export default function Feed() {
       )}
 
       {shareModalPost && (
-  <ShareModal 
-    isOpen={!!shareModalPost} 
-    onClose={() => setShareModalPost(null)}
-    url={`${typeof window !== 'undefined' ? window.location.origin : ''}/post/${shareModalPost.post_id}`}
-    title={shareModalPost.title}
-  />
-)}
+        <ShareModal 
+          isOpen={!!shareModalPost} 
+          onClose={() => setShareModalPost(null)}
+          url={`${typeof window !== 'undefined' ? window.location.origin : ''}/post/${shareModalPost.post_id}`}
+          title={shareModalPost.title}
+        />
+      )}
 
       {reportModalId && (
         <ReportModal 

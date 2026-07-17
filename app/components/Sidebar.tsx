@@ -211,7 +211,7 @@ useEffect(() => {
         </div>
       </div>
 
-      {/* MINI NATIVE ADVERTISEMENT */}
+      {/* MINI NATIVE ADVERTISEMENT
       <div className="flex-shrink-0 relative bg-gisviz-rail border border-gisviz-border p-5 overflow-hidden flex flex-col group cursor-pointer shadow-sm mt-4">
         <i className="absolute w-[8px] h-[8px] border-[1.5px] border-gisviz-accent/50 z-10 top-0 left-0 border-r-0 border-b-0 " />
         <i className="absolute w-[8px] h-[8px] border-[1.5px] border-gisviz-accent/50 z-10 bottom-0 right-0 border-l-0 border-t-0" />
@@ -237,17 +237,18 @@ useEffect(() => {
         </div>
         
         <div className="absolute top-0 right-0 w-full h-full bg-[url('https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=400&fit=crop')] bg-cover bg-center opacity-[0.08] mix-blend-overlay pointer-events-none"></div>
-      </div>
+      </div> */}
 
      {/* Footer */}
       <div className="mt-auto flex flex-col gap-4 pt-4">
         <div className="flex flex-wrap gap-x-3 gap-y-2 text-[12px] text-gisviz-ink-soft px-1">
+          <Link href="/legal/about"         className="hover:text-gisviz-accent transition-colors">About</Link>
           <Link href="/legal/terms"         className="hover:text-gisviz-accent transition-colors">Terms</Link>
           <Link href="/legal/privacy"       className="hover:text-gisviz-accent transition-colors">Privacy</Link>
           <Link href="/legal/cookies"       className="hover:text-gisviz-accent transition-colors">Cookies</Link>
           <Link href="/legal/accessibility" className="hover:text-gisviz-accent transition-colors">Accessibility</Link>
           <Link href="/contact"       className="hover:text-gisviz-accent transition-colors">Contact</Link>
-          <span className="w-full mt-1 font-mono">© {new Date().getFullYear()} gisviz.</span>
+          <span className="w-full mt-1 font-mono">© {new Date().getFullYear()} gisviz(Beta RUN)</span>
         </div>
       </div>
 

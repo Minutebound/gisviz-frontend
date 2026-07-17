@@ -1,13 +1,11 @@
 # ==========================================
-# 1. BASE STAGE (Switched to Debian Slim)
+# 1. BASE STAGE (Debian Slim)
 # ==========================================
 FROM node:20-slim AS base
 WORKDIR /app
 
-# Copy package files to leverage Docker layer caching
 COPY package*.json ./
 
-# Network-resilient npm install
 RUN npm cache clean --force && \
     npm config set fetch-retries 5 && \
     npm config set fetch-retry-mintimeout 20000 && \
@@ -20,7 +18,7 @@ RUN npm cache clean --force && \
 FROM base AS dev
 WORKDIR /app
 COPY . .
-EXPOSE 3000
+EXPOSE 3001
 CMD ["npm", "run", "dev"]
 
 # ==========================================
@@ -28,21 +26,38 @@ CMD ["npm", "run", "dev"]
 # ==========================================
 FROM base AS builder
 WORKDIR /app
+
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+
+ARG NEXT_PUBLIC_GA_ID
+ENV NEXT_PUBLIC_GA_ID=$NEXT_PUBLIC_GA_ID
+
+ENV NEXT_TELEMETRY_DISABLED=1
+
 COPY . .
 RUN npm run build
-
 # ==========================================
 # 4. PROD STAGE (Ionos VPS - Debian Slim)
 # ==========================================
 FROM node:20-slim AS prod
 WORKDIR /app
-ENV NODE_ENV=production
 
-# Copy ONLY the necessary compiled files from the builder stage
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/package.json ./package.json
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV PORT=3001
+ENV HOSTNAME="0.0.0.0"
+
+# Non-root user for security
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 --gid 1001 nextjs
+
+# Standalone output only — no node_modules needed, image stays ~200MB
 COPY --from=builder /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+USER nextjs
 
 EXPOSE 3001
-CMD ["npm", "start"]
+CMD ["node", "server.js"]

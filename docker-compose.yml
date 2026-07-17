@@ -1,15 +1,18 @@
 services:
-  web:
+  frontend:
     build:
       context: .
       dockerfile: Dockerfile
       target: prod
-    container_name: gisviz-frontend
-    restart: always
+      args:
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+        - NEXT_PUBLIC_GA_ID=${NEXT_PUBLIC_GA_ID}
     env_file:
       - .env.frontend
+    container_name: gisviz-frontend
+    restart: always
     ports:
-      - "3001:3000"      # Prevent Next.js build cache crashes
+      - "3001:3000"
     networks:
       - gisviz-network
 

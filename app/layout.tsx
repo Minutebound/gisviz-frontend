@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Inter, Sora, IBM_Plex_Mono, Barlow_Condensed } from 'next/font/google'
 import { Suspense } from 'react'
+import Script from 'next/script'
 import './globals.css'
 import { AuthProvider } from '../context/AuthContext'
 import { Providers } from './providers'
@@ -18,13 +19,20 @@ const barlowCondensed = Barlow_Condensed({
   display: 'swap',
 })
 
+// Only defined in production build — undefined in dev so scripts never load
+const GA_ID = process.env.NODE_ENV === 'production'
+  ? process.env.NEXT_PUBLIC_GA_ID
+  : undefined
 
 export const metadata: Metadata = {
   title: {
-    template: '%s | GisViz', // Automatically formats child titles (e.g., "Settings | GisViz")
-    default: 'GisViz - Your Global Data Visualizer', // Fallback title
+    template: '%s | GisViz',
+    default: 'GisViz - geospatial data visualizations',
   },
   description: 'A platform for mapping and analytics.',
+  verification: {
+    google:'XaiPiIy38S31EcNs9g7IKqEflLpW1uorT1U3jlL9jL0',
+  },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -34,19 +42,32 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         className={`${inter.variable} ${sora.variable} ${plexMono.variable} ${barlowCondensed.variable} font-sans antialiased`}
         suppressHydrationWarning
       >
+        {/* GA4 — production only, never loads in local dev */}
+        {GA_ID && (
+          <>
+            <Script
+              src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`}
+              strategy="afterInteractive"
+            />
+            <Script id="google-analytics" strategy="afterInteractive">
+              {`
+                window.dataLayer = window.dataLayer || [];
+                function gtag(){dataLayer.push(arguments);}
+                gtag('js', new Date());
+                gtag('config', '${GA_ID}', {
+                  page_path: window.location.pathname,
+                  send_page_view: true
+                });
+              `}
+            </Script>
+          </>
+        )}
+
         <Providers>
           <AuthProvider>
-            {/*
-              NavigationProgress uses useSearchParams() which requires Suspense.
-              It renders a 2px accent bar at the very top of the viewport that
-              fires on any link click, giving instant feedback before the new
-              page loads. The Suspense fallback is null — the bar itself is the
-              loading indicator so no fallback is needed.
-            */}
             <Suspense fallback={null}>
               <NavigationProgress />
             </Suspense>
-
             <div className="min-h-screen bg-gisviz-canvas/50 font-sans flex flex-col">
               <Navbar />
               <SubNavbar />

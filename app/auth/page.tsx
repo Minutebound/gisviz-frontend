@@ -230,7 +230,7 @@ function AuthContent() {
               {isLoading ? <Loader2 size={16} className="animate-spin" /> : <ArrowRight size={16} />}
               {isLoading ? 'Authenticating...' : 'Access Platform'}
             </button>
-            <div className="flex justify-between text-[11px] font-mono text-gisviz-ink-soft mt-4">
+            <div className="flex justify-between text-[12px]  font-mono text-gisviz-ink-soft mt-4">
               <button type="button" onClick={() => { clearMessages(); setView('register') }}
                 className="hover:text-gisviz-accent transition-colors flex items-center gap-1">
                 <UserPlus size={12} /> Register
@@ -309,7 +309,7 @@ function AuthContent() {
             <button
               type="button"
               onClick={() => { clearMessages(); setView('login') }}
-              className="w-full text-center text-[11px] font-mono text-gisviz-ink-soft hover:text-gisviz-accent mt-2"
+              className="w-full text-center text-[12px]  font-mono text-gisviz-ink-soft hover:text-gisviz-accent mt-2"
             >
               Already have an account?
             </button>
@@ -348,7 +348,7 @@ function AuthContent() {
                 type="button" 
                 onClick={handleResendOtp}
                 disabled={resendCooldown > 0 || isLoading}
-                className="w-full text-center text-[11px] font-mono text-gisviz-ink-soft hover:text-gisviz-ink disabled:opacity-50 disabled:hover:text-gisviz-ink-soft transition-colors"
+                className="w-full text-center text-[12px]  font-mono text-gisviz-ink-soft hover:text-gisviz-ink disabled:opacity-50 disabled:hover:text-gisviz-ink-soft transition-colors"
               >
                 {resendCooldown > 0 
                   ? `Resend code in ${resendCooldown}s` 
@@ -356,7 +356,7 @@ function AuthContent() {
               </button>
 
               <button type="button" onClick={() => { clearMessages(); setView('login') }}
-                className="w-full text-center text-[11px] font-mono text-gisviz-ink-soft hover:text-gisviz-accent">
+                className="w-full text-center text-[12px]  font-mono text-gisviz-ink-soft hover:text-gisviz-accent">
                 ← Back to login
               </button>
             </div>
@@ -380,7 +380,7 @@ function AuthContent() {
               {isLoading ? 'Sending...' : 'Send Reset Link'}
             </button>
             <button type="button" onClick={() => { clearMessages(); setView('login') }}
-              className="w-full text-center text-[11px] font-mono text-gisviz-ink-soft hover:text-gisviz-accent mt-2">
+              className="w-full text-center text-[12px]  font-mono text-gisviz-ink-soft hover:text-gisviz-accent mt-2">
               ← Back to login
             </button>
           </form>

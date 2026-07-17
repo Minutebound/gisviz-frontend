@@ -376,44 +376,101 @@ export default function ProfileHandlePage() {
       {activeTab === 'publications' && (
         sortedPosts.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {sortedPosts.map((post) => (
-              <Link href={`/post/${post.post_id}`} key={post.post_id} className="bg-gisviz-card border border-gisviz-border p-5 rounded-sm hover:border-gisviz-accent transition-colors group cursor-pointer shadow-sm flex flex-col justify-between min-h-[192px] plate-enter relative">
-                <div>
-                  <div className="flex justify-between items-start mb-2">
-                    <MapIcon className="text-gisviz-ink-soft group-hover:text-gisviz-accent transition-colors" size={20} />
-                    {isOwnProfile ? (
-                      <button
-                        onClick={(e) => {
-                          e.preventDefault()
-                          router.push(`/post/${post.post_id}/edit`)
-                        }}
-                        className="text-gisviz-ink-soft hover:text-gisviz-accent transition-colors z-10 p-1 bg-gisviz-canvas rounded-md border border-transparent hover:border-gisviz-accent/30"
-                        title="Edit Publication"
-                      >
-                        <Edit2 size={16} />
-                      </button>
-                    ) : (
-                      <ExternalLink className="text-gisviz-border group-hover:text-gisviz-ink-soft transition-colors opacity-0 group-hover:opacity-100" size={16} />
-                    )}
+            {sortedPosts.map((post) => {
+              const isInactive = post.is_active === 0
+
+              // Inactive posts: wrap in div (no public page). Active: wrap in Link as before.
+              const CardWrapper = ({ children }: { children: React.ReactNode }) =>
+                isInactive ? (
+                  <div className="bg-gisviz-card border border-amber-200 p-5 rounded-sm shadow-sm flex flex-col justify-between min-h-[192px] plate-enter relative opacity-60">
+                    {children}
                   </div>
-                  <h3 className="font-bold text-[16px] camelcase text-gisviz-ink leading-tight line-clamp-2">{post.title}</h3>
-                  <div className="flex gap-2 mt-3 flex-wrap">
-                    {post.categories.map((cat: any) => (
-                      <span key={cat.category_id} className="text-[12px] uppercase font-mono bg-gisviz-canvas border border-gisviz-border px-2 py-0.5 rounded-md text-gisviz-ink-soft">
-                        {cat.label}
+                ) : (
+                  <Link
+                    href={`/post/${post.post_id}`}
+                    className="bg-gisviz-card border border-gisviz-border p-5 rounded-sm hover:border-gisviz-accent transition-colors group cursor-pointer shadow-sm flex flex-col justify-between min-h-[192px] plate-enter relative"
+                  >
+                    {children}
+                  </Link>
+                )
+
+              return (
+                <div key={post.post_id} className="flex flex-col gap-0">
+
+                  {/* Inactive banner — only visible on own profile when is_active = 0 */}
+                  {isInactive && isOwnProfile && (
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 border border-b-0 border-amber-200 rounded-t-sm">
+                      <span className="text-amber-600 text-[11px] font-mono font-semibold uppercase tracking-wide">
+                        ⚠ Inactive — not visible to others
                       </span>
-                    ))}
-                  </div>
+                      <button
+                        type="button"
+                        onClick={() => router.push(`/post/${post.post_id}/edit`)}
+                        className="ml-auto text-[11px] font-mono text-gisviz-accent underline hover:opacity-70 transition-opacity"
+                      >
+                        Edit
+                      </button>
+                    </div>
+                  )}
+
+                  <CardWrapper>
+                    <div>
+                      <div className="flex justify-between items-start mb-2">
+                        <MapIcon
+                          className="text-gisviz-ink-soft group-hover:text-gisviz-accent transition-colors"
+                          size={20}
+                        />
+                        {isOwnProfile ? (
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault()
+                              router.push(`/post/${post.post_id}/edit`)
+                            }}
+                            className="text-gisviz-ink-soft hover:text-gisviz-accent transition-colors z-10 p-1 bg-gisviz-canvas rounded-md border border-transparent hover:border-gisviz-accent/30"
+                            title="Edit Publication"
+                          >
+                            <Edit2 size={16} />
+                          </button>
+                        ) : (
+                          <ExternalLink
+                            className="text-gisviz-border group-hover:text-gisviz-ink-soft transition-colors opacity-0 group-hover:opacity-100"
+                            size={16}
+                          />
+                        )}
+                      </div>
+
+                      <h3 className="font-bold text-[16px] camelcase text-gisviz-ink leading-tight line-clamp-2">
+                        {post.title}
+                      </h3>
+
+                      <div className="flex gap-2 mt-3 flex-wrap">
+                        {post.categories.map((cat: any) => (
+                          <span
+                            key={cat.category_id}
+                            className="text-[12px] uppercase font-mono bg-gisviz-canvas border border-gisviz-border px-2 py-0.5 rounded-md text-gisviz-ink-soft"
+                          >
+                            {cat.label}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between items-center border-t border-gisviz-border pt-3 mt-4 text-[16px] font-mono text-gisviz-ink-soft">
+                      <span>
+                        {new Date(post.created_timestamp).toLocaleDateString(undefined, {
+                          month: 'short', day: 'numeric', year: 'numeric',
+                        })}
+                      </span>
+                      <div className="flex gap-3">
+                        <span>{post.total_likes_count || 0} Likes</span>
+                        <span>{post.total_comments_count || 0} Com</span>
+                      </div>
+                    </div>
+                  </CardWrapper>
+
                 </div>
-                <div className="flex justify-between items-center border-t border-gisviz-border pt-3 mt-4 text-[16px] font-mono text-gisviz-ink-soft">
-                  <span>{new Date(post.created_timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
-                  <div className="flex gap-3">
-                    <span>{post.total_likes_count || 0} Likes</span>
-                    <span>{post.total_comments_count || 0} Com</span>
-                  </div>
-                </div>
-              </Link>
-            ))}
+              )
+            })}
           </div>
         ) : (
           <div className="text-center py-16 bg-gisviz-rail border border-gisviz-border border-dashed rounded-sm">

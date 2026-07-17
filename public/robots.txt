@@ -1,36 +1,26 @@
 # robots.txt — gisviz
 # https://gisviz.com/robots.txt
-#
-# Industry standard for a social content platform:
-# - Public feed and profiles: crawlable (drives SEO and discovery)
-# - Auth, settings, admin, API: blocked entirely
-# - Dynamic user-generated URLs with tracking params: noindex
 
 User-agent: *
 
-# ── Block all admin and auth paths ────────────────────────────────────
+# ── Block private paths ───────────────────────────────────────────
 Disallow: /admin/
 Disallow: /auth/
 Disallow: /settings/
-Disallow: /api/
-
-# ── Block functional/UI paths that add no SEO value ──────────────────
 Disallow: /add-post/
+Disallow: /api/
 Disallow: /search?
 
-# ── Allow public content ──────────────────────────────────────────────
+# ── Allow public content ──────────────────────────────────────────
 Allow: /
+Allow: /about/
 Allow: /post/
 Allow: /profile/
-Allow: /privacy/
-Allow: /terms/
-Allow: /cookies/
-Allow: /accessibility/
-Allow: /contact/
 Allow: /legal/
+Allow: /contact/
 
-# ── Crawl delay — be polite to the server ────────────────────────────
+# ── Crawl delay ───────────────────────────────────────────────────
 Crawl-delay: 2
 
-# ── Sitemap location ──────────────────────────────────────────────────
+# ── Sitemap ───────────────────────────────────────────────────────
 Sitemap: https://gisviz.com/sitemap.xml

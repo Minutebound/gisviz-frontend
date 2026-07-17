@@ -107,7 +107,7 @@ export function SupportPopup({
                 Contact Support
               </h2>
 
-              <span className="text-[11px] font-mono text-gisviz-ink-soft">
+              <span className="text-[12px]  font-mono text-gisviz-ink-soft">
                 Submit a support request
               </span>
 
@@ -155,7 +155,7 @@ export function SupportPopup({
 
             <div className="flex flex-col gap-2">
 
-              <label className="text-[11px] font-mono uppercase tracking-wide text-gisviz-ink-soft">
+              <label className="text-[12px]  font-mono uppercase tracking-wide text-gisviz-ink-soft">
                 Category
               </label>
 
@@ -196,7 +196,7 @@ export function SupportPopup({
 
             <div className="flex flex-col gap-2">
 
-              <label className="text-[11px] font-mono uppercase tracking-wide text-gisviz-ink-soft">
+              <label className="text-[12px]  font-mono uppercase tracking-wide text-gisviz-ink-soft">
                 Subject
               </label>
 
@@ -230,7 +230,7 @@ export function SupportPopup({
 
             <div className="flex flex-col gap-2">
 
-              <label className="text-[11px] font-mono uppercase tracking-wide text-gisviz-ink-soft">
+              <label className="text-[12px]  font-mono uppercase tracking-wide text-gisviz-ink-soft">
                 Description
               </label>
 

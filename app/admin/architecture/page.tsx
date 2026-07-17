@@ -176,7 +176,7 @@ export default function ArchitecturePage() {
             </Link>
             {version && (
               <div className="px-3 py-1.5 rounded-sm border border-gisviz-accent/30 bg-gisviz-accent/5">
-                <span className="text-[11px] font-mono text-gisviz-ink-soft">deployed </span>
+                <span className="text-[12px]  font-mono text-gisviz-ink-soft">deployed </span>
                 <span className="text-[12px] font-mono font-bold text-gisviz-accent">v{version}</span>
               </div>
             )}
@@ -203,7 +203,7 @@ export default function ArchitecturePage() {
           ].map(s => (
             <div key={s.label} className="px-4 py-2 bg-gisviz-card border border-gisviz-border rounded-sm">
               <span className="text-[16px] font-mono font-bold text-gisviz-ink">{s.value}</span>
-              <span className="text-[11px] font-mono text-gisviz-ink-soft ml-1.5">{s.label}</span>
+              <span className="text-[12px]  font-mono text-gisviz-ink-soft ml-1.5">{s.label}</span>
             </div>
           ))}
         </div>
@@ -245,15 +245,15 @@ export default function ArchitecturePage() {
                 <span className="text-[12px] font-mono font-bold text-gisviz-ink uppercase tracking-widest">
                   {g.tag}
                 </span>
-                <code className="text-[11px] font-mono text-gisviz-ink-soft">{g.prefix}</code>
-                <span className="text-[11px] font-mono text-gisviz-ink-soft">
+                <code className="text-[12px]  font-mono text-gisviz-ink-soft">{g.prefix}</code>
+                <span className="text-[12px]  font-mono text-gisviz-ink-soft">
                   · {g.routes.length} route{g.routes.length !== 1 ? 's' : ''}
                   {g.secured > 0 && ` · ${g.secured} auth`}
                 </span>
               </div>
               <button
                 onClick={() => setFocused(null)}
-                className="text-[11px] font-mono text-gisviz-ink-soft hover:text-gisviz-ink transition-colors px-2 py-1"
+                className="text-[12px]  font-mono text-gisviz-ink-soft hover:text-gisviz-ink transition-colors px-2 py-1"
               >
                 close ×
               </button>
@@ -265,19 +265,19 @@ export default function ArchitecturePage() {
                 key={`${r.method}-${r.path}`}
                 className="flex items-center gap-3 px-5 py-2.5 border-b border-gisviz-border/50 last:border-0 hover:bg-gisviz-canvas/40 transition-colors"
               >
-                <span className={`shrink-0 w-16 text-center px-1.5 py-0.5 rounded text-[10px] font-mono font-bold border ${chip(r.method)}`}>
+                <span className={`shrink-0 w-16 text-center px-1.5 py-0.5 rounded  text-[12px] font-mono font-bold border ${chip(r.method)}`}>
                   {r.method}
                 </span>
                 <code className="text-[12px] font-mono text-gisviz-ink flex-1 truncate">
                   {r.path}
                 </code>
                 {r.summary && (
-                  <span className="text-[11px] font-mono text-gisviz-ink-soft truncate hidden sm:block">
+                  <span className="text-[12px]  font-mono text-gisviz-ink-soft truncate hidden sm:block">
                     {r.summary}
                   </span>
                 )}
                 {r.secured && (
-                  <span className="text-[10px] font-mono text-gisviz-ink-soft shrink-0 border border-gisviz-border rounded px-1.5 py-0.5">
+                  <span className=" text-[12px] font-mono text-gisviz-ink-soft shrink-0 border border-gisviz-border rounded px-1.5 py-0.5">
                     auth
                   </span>
                 )}
@@ -300,7 +300,7 @@ export default function ArchitecturePage() {
           >
             <div>
               <p className="text-[12px] font-mono font-bold text-gisviz-ink mb-0.5">Swagger UI</p>
-              <p className="text-[11px] font-mono text-gisviz-ink-soft">Interactive — admin token attached</p>
+              <p className="text-[12px]  font-mono text-gisviz-ink-soft">Interactive — admin token attached</p>
             </div>
             <ExternalLink size={14} className="text-gisviz-border group-hover:text-gisviz-accent transition-colors" />
           </a>
@@ -312,7 +312,7 @@ export default function ArchitecturePage() {
           >
             <div>
               <p className="text-[12px] font-mono font-bold text-gisviz-ink mb-0.5">OpenAPI schema</p>
-              <p className="text-[11px] font-mono text-gisviz-ink-soft">The raw source for this page</p>
+              <p className="text-[12px]  font-mono text-gisviz-ink-soft">The raw source for this page</p>
             </div>
             <ExternalLink size={14} className="text-gisviz-border group-hover:text-gisviz-accent transition-colors" />
           </a>

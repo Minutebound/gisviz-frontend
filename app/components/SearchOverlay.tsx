@@ -198,8 +198,7 @@ export default function SearchOverlay({
     if (item.kind === 'user') {
       router.push(`/profile/${item.data.user_handle}`)
     } else {
-      // Changed from item.data.post_id to item.data.share_slug, utilizing the /p/ prefix
-      router.push(`/p/${item.data.share_slug}`)
+      router.push(`/post/${item.data.post_id}`)  // ← was /p/${share_slug}
     }
   }
 
@@ -274,7 +273,17 @@ export default function SearchOverlay({
   )
 
   const ShortcutsFooter = (
-    <div key="shortcuts" className={`px-4 py-2.5 bg-gisviz-canvas/40 shrink-0 flex items-center gap-4 ${popDirection === 'up' ? 'border-b border-gisviz-border/30' : 'border-t border-gisviz-border/30'}`}>
+    <div
+      key="shortcuts"
+      className={`
+        hidden sm:flex                          
+        px-4 py-2.5 bg-gisviz-canvas/40 shrink-0 items-center gap-4
+        ${popDirection === 'up'
+          ? 'border-b border-gisviz-border/30'
+          : 'border-t border-gisviz-border/30'
+        }
+      `}
+    >
       <span className="text-[12px] font-mono text-gisviz-ink-soft/40 flex items-center gap-1">
         <kbd className="px-1.5 py-0.5 rounded bg-gisviz-border/30 text-[12px] font-mono">↑↓</kbd> navigate
       </span>

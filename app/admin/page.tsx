@@ -81,7 +81,7 @@ const CONTROL_TABS = [
   { tab: 'reports',    icon: <Flag size={16} />,          label: 'Reports',         desc: 'Resolve content reports' },
   { tab: 'comments',   icon: <MessageSquare size={16} />, label: 'Comments',        desc: 'Moderate comments' },
   { tab: 'unverified', icon: <UserX size={16} />,         label: 'Unverified',      desc: 'Verify / purge accounts' },
-  { tab: 'roles',      icon: <KeyRound size={16} />,      label: 'Access & Roles',  desc: 'Roles, permissions, page access' },
+  { tab: 'roles',      icon: <KeyRound size={16} />,      label: 'Roles',  desc: 'Roles, permissions, page access' },
   { tab: 'tickets',    icon: <LifeBuoy size={16} />,      label: 'Support Tickets', desc: 'View and resolve user support requests' },
 ]
 
@@ -191,7 +191,7 @@ export default function AdminHomePage() {
               </span>
               <span className="text-[12px] font-mono font-bold">{t.label}</span>
             </div>
-            <p className="text-[11px] font-mono text-gisviz-ink-soft leading-snug">{t.desc}</p>
+            <p className="text-[12px]  font-mono text-gisviz-ink-soft leading-snug">{t.desc}</p>
           </Link>
         ))}
       </div>

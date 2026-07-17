@@ -245,7 +245,7 @@ export default function SettingsPage() {
 
   // Profile Save button shows if any profile field is editing OR avatar is staged OR handle is editing
   const hasActiveProfileEdits =
-    Object.keys(editingFields).some(k => !['password', 'email', 'delete'].includes(k) && editingFields[k]) ||
+    Object.keys(editingFields).some(k => !['password', 'email', 'delete','deactivate'].includes(k) && editingFields[k]) ||
     avatarFile !== null
 
   // ---------------------------------------------------------------
@@ -290,7 +290,7 @@ export default function SettingsPage() {
       // Clear all editing flags except security / delete
       setEditingFields(p => {
         const n = { ...p }
-        Object.keys(n).forEach(k => { if (!['password', 'email', 'delete'].includes(k)) delete n[k] })
+        Object.keys(n).forEach(k => { if (!['password', 'email', 'delete','deactivate'].includes(k)) delete n[k] })
         return n
       })
       setMsg('profile', { type: 'success', text: 'Profile updated successfully.' })
