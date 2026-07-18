@@ -5,10 +5,13 @@ services:
       dockerfile: Dockerfile
       target: prod
       args:
-        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
-        - NEXT_PUBLIC_GA_ID=${NEXT_PUBLIC_GA_ID}
+        # Hardcoded — not ${VAR} — because Docker Compose only auto-resolves
+        # ${VAR} from a file named exactly ".env", not .env.frontend.
+        # NEXT_PUBLIC_* are baked into the JS bundle at build time.
+        - NEXT_PUBLIC_API_URL=https://api.gisviz.com
+        - NEXT_PUBLIC_GA_ID=G-2MY97W2CKX
     env_file:
-      - .env.frontend
+      - .env.frontend             # runtime env for the running container
     container_name: gisviz-frontend
     restart: always
     ports:
