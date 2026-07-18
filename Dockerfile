@@ -18,7 +18,7 @@ RUN npm cache clean --force && \
 FROM base AS dev
 WORKDIR /app
 COPY . .
-EXPOSE 3001
+EXPOSE 3000
 CMD ["npm", "run", "dev"]
 
 # ==========================================
