@@ -183,7 +183,7 @@ export const gisvizApi = {
 
   // ── Categories ────────────────────────────────────────────────────────────
   listCategories: async () =>
-    (await axiosInstance.get('/categories/')).data,
+    (await axiosInstance.get('/categories')).data,
 
   getTrendingCategories: async (limit = 5) =>
     (await axiosInstance.get('/categories/trending', { params: { limit } })).data,
