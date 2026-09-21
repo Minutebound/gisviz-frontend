@@ -1361,7 +1361,7 @@ function TicketRow({ ticket: t, busy, onStatusChange, onDelete }: {
 // ─────────────────────────────────────────────────────────────────────────────
 const PERM_KEYS: { key: string; label: string; desc: string }[] = [
   { key: 'admin',        label: 'Admin Panel',      desc: '/admin/* pages' },
-  { key: 'publish',      label: 'Publish Posts',     desc: 'Create & edit own posts' },
+  { key: 'publish',      label: 'Publish',     desc: 'Create & edit own posts' },
   { key: 'moderate',     label: 'Moderate Content',  desc: 'Delete comments, resolve reports' },
   { key: 'manage_tags',  label: 'Manage Categories', desc: 'Approve / reject suggestions' },
   { key: 'view_reports', label: 'View Reports',      desc: 'Read access to reports tab' },

@@ -4,54 +4,158 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
-  Map as MapIcon, ExternalLink, ArrowUpDown,
-  Loader2, UserCheck, UserPlus, UserMinus, MapPin, Edit2, Image as ImageIcon,
-  Plus
+  ArrowUpDown, Loader2, UserCheck, UserPlus, UserMinus, 
+  MapPin, Edit2, Image as ImageIcon, Plus, Grid, Inbox, 
+  Link as LinkIcon, Share2, MessageSquare, Bookmark, BarChart2, Heart, Database
 } from 'lucide-react'
 import { useAuth } from '../../../context/AuthContext'
 import { gisvizApi } from '../../../services/api'
+import { Post } from '../../../types/gisviz'
+import FeedCard, { FeedCardSkeleton } from '../../components/feed/FeedCard'
+import ShareModal from '../../components/SharePost'
+
+// ── Compact Analytical Post Card (For Published Posts) ──
+function ProfilePostCard({ post, onLike, onBookmark, onShare, busy, isOwnProfile, isBookmarkView, onEdit }: any) {
+  const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || '').replace('/api/v0', '').replace(/\/$/, '')
+  const getMediaUrl = (path: string | null | undefined) => {
+    if (!path) return null
+    if (/^https?:\/\//.test(path)) return path
+    const safe = path.startsWith('/') ? path : `/${path}`
+    return `${API_BASE_URL}${safe}`
+  }
+
+  const isInactive = post.is_active === 0
+  const thumbPath = post.thumbnail_url || post.map_preview?.thumbnail_path || post.visual_image_path
+  const thumbUrl = getMediaUrl(thumbPath)
+
+  return (
+    <div className={`group flex flex-col h-full bg-gisviz-card border rounded-[14px] overflow-hidden shadow-sm hover:shadow-md transition-all ${isInactive ? 'opacity-75 grayscale-[20%] border-amber-200/80 border-dashed' : 'border-gisviz-border hover:border-gisviz-accent/40'}`}>
+       
+       {/* 1. Visual Header with Overlays */}
+       <div className="relative w-full h-[150px] sm:h-[180px] bg-gisviz-canvas shrink-0 overflow-hidden border-b border-gisviz-border/50">
+         {thumbUrl ? (
+           <img src={thumbUrl} alt={post.title} className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500" />
+         ) : (
+           <div className="w-full h-full flex items-center justify-center bg-gisviz-rail-soft text-gisviz-ink-soft font-mono text-[11px]">No visual</div>
+         )}
+         
+         {/* Top Left Badges */}
+         <div className="absolute top-2.5 left-2.5 flex flex-col gap-1.5 items-start">
+           {isInactive && (
+             <span className="bg-amber-100/95 backdrop-blur-sm border border-amber-200 text-amber-800 px-2 py-0.5 rounded-[6px] text-[10px] font-bold uppercase tracking-wider shadow-sm">
+               Draft
+             </span>
+           )}
+           {post.categories?.[0] && (
+             <span className="bg-gisviz-card/95 backdrop-blur-sm border border-gisviz-border/50 text-gisviz-ink px-2 py-0.5 rounded-[6px] text-[10px] font-bold uppercase tracking-wider shadow-sm">
+               {post.categories[0].label}
+             </span>
+           )}
+         </div>
+
+         {/* Top Right Actions */}
+         {!isBookmarkView && isOwnProfile && onEdit && (
+           <button onClick={onEdit} className="absolute top-2.5 right-2.5 w-8 h-8 rounded-[8px] bg-gisviz-card/90 backdrop-blur-sm border border-gisviz-border/50 flex items-center justify-center text-gisviz-ink hover:text-gisviz-accent shadow-sm opacity-0 group-hover:opacity-100 transition-all hover:scale-105" title="Edit Post">
+             <Edit2 size={14} />
+           </button>
+         )}
+       </div>
+
+       {/* 2. Content Body */}
+       <div className="p-4 sm:p-5 flex flex-col flex-1">
+         <Link href={`/post/${post.post_id}`} className="mb-2 block">
+           <h3 className="font-display text-[16px] sm:text-[18px] font-bold text-gisviz-ink leading-tight line-clamp-2 group-hover:text-gisviz-accent transition-colors">
+             {post.title}
+           </h3>
+         </Link>
+
+         {/* Keywords & Technical Data */}
+         <div className="flex flex-wrap items-center gap-1.5 mt-auto mb-4">
+           {post.keywords?.slice(0, 3).map((kw: any) => (
+             <span key={kw.keyword_id || kw} className="px-1.5 py-0.5 bg-gisviz-paper border border-gisviz-border rounded-[6px] text-[10.5px] font-mono text-gisviz-ink-soft">
+               #{typeof kw === 'string' ? kw.replace(/\s+/g, '') : kw.word.replace(/\s+/g, '')}
+             </span>
+           ))}
+           {(post.map_preview?.layer_count > 0 || post.chart_type) && (
+             <span className="px-1.5 py-0.5 bg-gisviz-accent/10 border border-gisviz-accent/20 rounded-[6px] text-[10.5px] font-mono font-medium text-gisviz-accent flex items-center gap-1">
+               <Database size={10} /> {post.map_preview?.layer_count ? `${post.map_preview.layer_count} Layers` : post.chart_type}
+             </span>
+           )}
+         </div>
+
+         {/* 3. Performance Analytics Footer */}
+         <div className="flex items-center justify-between pt-3 border-t border-gisviz-border/60 mt-auto">
+            <div className="flex items-center gap-3">
+               <div className="flex items-center gap-1.5 text-gisviz-ink-soft text-[12px] font-medium" title="Views">
+                 <BarChart2 size={13} /> 
+                 <span>{post.views_count || 0}</span>
+               </div>
+               <button disabled={busy} onClick={() => onLike(post)} className={`flex items-center gap-1.5 text-[12px] font-medium transition-colors ${post.is_liked ? 'text-gisviz-accent' : 'text-gisviz-ink-soft hover:text-gisviz-ink'}`} title="Likes">
+                 <Heart size={13} className={post.is_liked ? 'fill-current' : ''} /> 
+                 <span>{post.total_likes_count || 0}</span>
+               </button>
+               <div className="flex items-center gap-1.5 text-gisviz-ink-soft text-[12px] font-medium" title="Comments">
+                 <MessageSquare size={13} /> 
+                 <span>{(post as any).total_comments_count || 0}</span>
+               </div>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              {!isOwnProfile && (
+                <button disabled={busy} onClick={() => onBookmark(post)} className={`p-1 transition-colors ${post.is_bookmarked ? 'text-gisviz-accent' : 'text-gisviz-ink-soft hover:text-gisviz-ink'}`} title="Bookmark">
+                  <Bookmark size={14} className={post.is_bookmarked ? 'fill-current' : ''} />
+                </button>
+              )}
+              <button onClick={() => onShare(post)} className="text-gisviz-ink-soft hover:text-gisviz-ink transition-colors p-1" title="Share">
+                 <Share2 size={14} />
+              </button>
+            </div>
+         </div>
+       </div>
+    </div>
+  )
+}
 
 export default function ProfileHandlePage() {
   const params = useParams()
   const router = useRouter()
   const handle = params.handle as string
-  const { user, isAuthenticated, refreshProfile } = useAuth() as any
+  const { user, isAuthenticated } = useAuth() as any
 
-  const [activeTab, setActiveTab]     = useState<'publications' | 'saved'>('publications')
-  const [sortOption, setSortOption]   = useState<'latest' | 'alphabetical'>('latest')
-  const [profile, setProfile]         = useState<any>(null)
-  const [posts, setPosts]             = useState<any[]>([])
+  const [activeTab, setActiveTab] = useState<'publications' | 'saved'>('publications')
+  const [sortOption, setSortOption] = useState<'latest' | 'alphabetical'>('latest')
+  const [profile, setProfile] = useState<any>(null)
+  const [posts, setPosts] = useState<any[]>([])
 
-  // ── Bookmark state ─────────────────────────────────────────────────────
-  const [bookmarks, setBookmarks]               = useState<any[]>([])
+  const [bookmarks, setBookmarks] = useState<any[]>([])
   const [bookmarksLoading, setBookmarksLoading] = useState(false)
-  const [bookmarksLoaded, setBookmarksLoaded]   = useState(false)
+  const [bookmarksLoaded, setBookmarksLoaded] = useState(false)
 
   const [isLoading, setIsLoading] = useState(true)
-  const [errorMsg, setErrorMsg]   = useState('')
+  const [errorMsg, setErrorMsg] = useState('')
 
-  const [isFollowing, setIsFollowing]     = useState(false)
+  const [isFollowing, setIsFollowing] = useState(false)
   const [followLoading, setFollowLoading] = useState(false)
+  const [busyId, setBusyId] = useState<string | null>(null)
+  const [sharing, setSharing] = useState<Post | null>(null)
 
-  // ── Banner state ───────────────────────────────────────────────────────
-  const [bannerPreview, setBannerPreview]     = useState<string | null>(null)
+  const [bannerPreview, setBannerPreview] = useState<string | null>(null)
   const [bannerUploading, setBannerUploading] = useState(false)
   const bannerInputRef = useRef<HTMLInputElement>(null)
+  const [imageError, setImageError] = useState(false)
 
-  const isOwnProfile = isAuthenticated && user?.user_handle === handle
+  const isOwnProfile = isAuthenticated && (user?.user_handle === handle || user?.handle === handle)
 
-  const RAW_API_URL  = process.env.NEXT_PUBLIC_API_URL
-  const API_BASE_URL = `${RAW_API_URL}`.replace('/api/v0', '')
+  const RAW_API_URL = process.env.NEXT_PUBLIC_API_URL || ''
+  const API_BASE_URL = RAW_API_URL.replace('/api/v0', '').replace(/\/$/, '')
 
-  const getAvatarUrl = (path: string | null) => {
+  const getMediaUrl = (path: string | null | undefined) => {
     if (!path) return null
-    if (path.startsWith('http')) return path
-    const base = API_BASE_URL.endsWith('/') ? API_BASE_URL.slice(0, -1) : API_BASE_URL
+    if (/^https?:\/\//.test(path)) return path
     const safe = path.startsWith('/') ? path : `/${path}`
-    return `${base}${safe}`
+    return `${API_BASE_URL}${safe}`
   }
 
-  // ── Load profile + publications ──────────────────────────────────────────
   useEffect(() => {
     if (!handle) return
     setIsLoading(true)
@@ -67,14 +171,11 @@ export default function ProfileHandlePage() {
           gisvizApi.fetchUserPosts(handle),
         ])
         setProfile(profileData)
-        setPosts(postsData)
+        setPosts(postsData || [])
         setIsFollowing(profileData.is_following || false)
       } catch (err: any) {
-        if (err.response?.status === 404) {
-          setErrorMsg('Profile deleted or deactivated')
-        } else {
-          setErrorMsg('Failed to load profile data.')
-        }
+        if (err.response?.status === 404) setErrorMsg('Profile deleted or deactivated')
+        else setErrorMsg('Failed to load profile data.')
       } finally {
         setIsLoading(false)
       }
@@ -82,7 +183,6 @@ export default function ProfileHandlePage() {
     loadProfileData()
   }, [handle, isAuthenticated, user])
 
-  // ── Lazy-load bookmarks ──────────────────────────────────────────────────
   useEffect(() => {
     if (activeTab !== 'saved' || !isOwnProfile || bookmarksLoaded || bookmarksLoading) return
 
@@ -90,7 +190,7 @@ export default function ProfileHandlePage() {
       setBookmarksLoading(true)
       try {
         const data = await gisvizApi.fetchUserBookmarks(handle)
-        setBookmarks(data)
+        setBookmarks(data || [])
       } catch (err) {
         console.error('Failed to load bookmarks', err)
         setBookmarks([])
@@ -102,49 +202,34 @@ export default function ProfileHandlePage() {
     loadBookmarks()
   }, [activeTab, isOwnProfile, handle, bookmarksLoaded, bookmarksLoading])
 
-  // ── Follow / unfollow ────────────────────────────────────────────────────
   const handleFollowToggle = async () => {
     if (!isAuthenticated) { router.push('/auth'); return }
     setFollowLoading(true)
     const wasFollowing = isFollowing
  
-    // Optimistic update — flip button AND counter instantly
     setIsFollowing(!wasFollowing)
-    setProfile((prev: any) => ({
-      ...prev,
-      follower_count: (prev.follower_count || 0) + (wasFollowing ? -1 : 1),
-    }))
+    setProfile((prev: any) => ({ ...prev, follower_count: (prev.follower_count || 0) + (wasFollowing ? -1 : 1) }))
  
     try {
-      if (wasFollowing) {
-        await gisvizApi.unfollowUser(profile.user_id)
-      } else {
-        await gisvizApi.followUser(profile.user_id)
-      }
+      if (wasFollowing) await gisvizApi.unfollowUser(profile.user_id)
+      else await gisvizApi.followUser(profile.user_id)
     } catch (err) {
-      // Revert both on failure
       setIsFollowing(wasFollowing)
-      setProfile((prev: any) => ({
-        ...prev,
-        follower_count: (prev.follower_count || 0) + (wasFollowing ? 1 : -1),
-      }))
+      setProfile((prev: any) => ({ ...prev, follower_count: (prev.follower_count || 0) + (wasFollowing ? 1 : -1) }))
     } finally {
       setFollowLoading(false)
     }
   }
 
-  // ── Banner upload ────────────────────────────────────────────────────────
   const handleBannerChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file || !file.type.startsWith('image/')) return
 
-    // Optimistic preview
     setBannerPreview(URL.createObjectURL(file))
     setBannerUploading(true)
 
     try {
       await gisvizApi.uploadBanner(file)
-      // Refresh profile so banner_path is updated without a full page reload
       const currentUserId = isAuthenticated && user ? user.user_id : undefined
       const updated = await gisvizApi.fetchUserProfile(handle, currentUserId)
       setProfile(updated)
@@ -153,27 +238,47 @@ export default function ProfileHandlePage() {
       setBannerPreview(null)
     } finally {
       setBannerUploading(false)
-      // Reset input so the same file can be re-selected if needed
       e.target.value = ''
     }
   }
 
-  // ── Sort ─────────────────────────────────────────────────────────────────
-  const activeList  = activeTab === 'publications' ? posts : bookmarks
+  const patch = (id: string, fn: (p: Post) => Post) => {
+    if (activeTab === 'publications') setPosts(ps => ps.map(p => (p.post_id === id ? fn(p) : p)))
+    else setBookmarks(ps => ps.map(p => (p.post_id === id ? fn(p) : p)))
+  }
+
+  const onLike = async (post: Post) => {
+    if (!isAuthenticated) { router.push('/auth'); return }
+    const was = !!post.is_liked
+    setBusyId(post.post_id)
+    patch(post.post_id, p => ({ ...p, is_liked: !was, total_likes_count: (p.total_likes_count || 0) + (was ? -1 : 1) }))
+    try { await gisvizApi.toggleLike(post.post_id) } 
+    catch { patch(post.post_id, p => ({ ...p, is_liked: was, total_likes_count: (p.total_likes_count || 0) + (was ? 1 : -1) })) } 
+    finally { setBusyId(null) }
+  }
+
+  const onBookmark = async (post: Post) => {
+    if (!isAuthenticated) { router.push('/auth'); return }
+    const was = !!post.is_bookmarked
+    setBusyId(post.post_id)
+    patch(post.post_id, p => ({ ...p, is_bookmarked: !was }))
+    try { await gisvizApi.toggleBookmark(post.post_id) } 
+    catch { patch(post.post_id, p => ({ ...p, is_bookmarked: was })) } 
+    finally { setBusyId(null) }
+  }
+
+  const activeList = activeTab === 'publications' ? posts : bookmarks
   const sortedPosts = [...activeList].sort((a, b) => {
     if (sortOption === 'latest') {
-      return new Date(b.created_timestamp).getTime() - new Date(a.created_timestamp).getTime()
-    } else {
-      return (a.title || '').localeCompare(b.title || '')
+      const timeA = new Date(a.created_at || (a as any).created_timestamp).getTime()
+      const timeB = new Date(b.created_at || (b as any).created_timestamp).getTime()
+      return timeB - timeA
     }
+    return (a.title || '').localeCompare(b.title || '')
   })
 
   if (isLoading) {
-    return (
-      <div className="flex justify-center items-center h-[calc(100vh-4rem)]">
-        <Loader2 size={32} className="animate-spin text-gisviz-accent" />
-      </div>
-    )
+    return <div className="flex justify-center items-center h-[calc(100vh-4rem)]"><Loader2 size={32} className="animate-spin text-gisviz-accent" /></div>
   }
 
   if (errorMsg || !profile) {
@@ -181,357 +286,261 @@ export default function ProfileHandlePage() {
       <div className="flex flex-col justify-center items-center h-[calc(100vh-4rem)] text-center">
         <h2 className="text-[24px] font-display text-gisviz-ink mb-2">Error 404</h2>
         <p className="text-gisviz-ink-soft font-mono uppercase text-[16px] mb-6">{errorMsg}</p>
-        <button onClick={() => router.push('/')} className="text-gisviz-accent hover:underline font-mono text-[16px] border border-gisviz-accent/20 px-4 py-2 rounded-md">
-          Return to Global Feed
-        </button>
+        <button onClick={() => router.push('/')} className="text-[14px] font-semibold bg-gisviz-accent text-[color:var(--accent-on)] px-6 py-2.5 rounded-[10px] shadow-sm">Return to Global Feed</button>
       </div>
     )
   }
 
-  const bannerSrc = bannerPreview ?? getAvatarUrl(profile.banner_path)
+  const bannerSrc = bannerPreview ?? getMediaUrl(profile.banner_path)
+  const avatarSrc = getMediaUrl(profile.avatar_path)
+  const profileInitials = profile.user_handle.slice(0, 2).toUpperCase()
 
   return (
-    <div className="py-6 mx-auto space-y-6 max-w-5xl px-4">
-
-      {/* Identity Plate */}
-      <div className="relative bg-gisviz-card border border-gisviz-border shadow-md rounded-sm plate-enter overflow-hidden">
-
-        {/* ── Banner ──────────────────────────────────────────────────────── */}
-        <div className="h-32 border-b border-gisviz-border relative overflow-hidden group">
-
-          {/* Image or default gradient */}
+    <main className="mx-auto w-full max-w-5xl px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 pb-14 flex flex-col gap-6 sm:gap-8">
+      
+      {/* ── 1. Profile Header Card ── */}
+      <div className="bg-gisviz-card rounded-[20px] border border-gisviz-border shadow-sm overflow-hidden flex flex-col">
+        
+        {/* Banner Section */}
+        <div className="w-full h-[140px] sm:h-[180px] relative group border-b border-gisviz-border">
           {bannerSrc ? (
-            <img
-              src={bannerSrc}
-              alt="Profile banner"
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div className="h-full bg-gradient-to-r from-gisviz-canvas via-gisviz-canvas to-gisviz-accent-soft">
-              <div
-                className="absolute inset-0 opacity-20"
-                style={{
-                  backgroundImage: 'linear-gradient(var(--color-gisviz-grid) 1px, transparent 1px), linear-gradient(90deg, var(--color-gisviz-grid) 1px, transparent 1px)',
-                  backgroundSize: '20px 20px',
-                }}
-              />
-            </div>
-          )}
+    <img src={bannerSrc} alt="Profile banner" className="w-full h-full object-cover" />
+  ) : (
+    <div className="absolute inset-0 bg-gradient-to-r from-gisviz-accent/10 to-gisviz-safe/10" />
+  )}
 
-          {/* Upload overlay — own profile only */}
           {isOwnProfile && (
             <>
               <div
                 onClick={() => !bannerUploading && bannerInputRef.current?.click()}
-                className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer z-10"
               >
                 {bannerUploading ? (
-                  <Loader2 size={24} className="text-white animate-spin" />
+                  <Loader2 size={28} className="text-white animate-spin" />
                 ) : (
-                  <div className="flex flex-col items-center gap-1 text-white">
+                  <div className="flex flex-col items-center gap-2 text-white bg-black/40 px-6 py-3 rounded-xl backdrop-blur-sm">
                     <ImageIcon size={22} />
-                    <span className="font-mono text-[12px] uppercase tracking-wider">
-                      {profile.banner_path ? 'Change Banner' : 'Upload Banner'}
+                    <span className="font-mono text-[12.5px] font-semibold uppercase tracking-wider">
+                      {profile.banner_path ? 'Change Cover Photo' : 'Upload Cover Photo'}
                     </span>
                   </div>
                 )}
               </div>
-              <input
-                ref={bannerInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleBannerChange}
-              />
+              <input ref={bannerInputRef} type="file" accept="image/*" className="hidden" onChange={handleBannerChange} />
             </>
           )}
         </div>
 
-        {/* ── Avatar + Info ────────────────────────────────────────────────── */}
-        <div className="px-8 py-8 relative flex flex-col sm:flex-row gap-6 items-start sm:items-end -mt-16">
-
-          {/* Avatar */}
-          <div className="w-24 h-24 rounded-xl border-gisviz-card bg-gisviz-canvas overflow-hidden shadow-sm shrink-0 z-10 relative flex items-center justify-center">
-            {profile.avatar_path ? (
-              <>
-                <img
-                  src={getAvatarUrl(profile.avatar_path) as string}
-                  alt={profile.user_handle}
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    e.currentTarget.style.display = 'none'
-                    e.currentTarget.nextElementSibling?.classList.remove('hidden')
-                  }}
-                />
-                <div className="hidden w-full h-full bg-gradient-to-tr from-gisviz-accent to-gisviz-safe flex items-center justify-center text-gisviz-white text-[24px] font-bold uppercase font-mono shadow-inner">
-                  {profile.user_handle.charAt(0)}
+        {/* Horizontal Details Section */}
+        <div className="px-6 sm:px-8 pb-6 sm:pb-8 relative flex flex-col lg:flex-row lg:items-end justify-between gap-6">
+          
+          {/* Left: Avatar & Bio */}
+          <div className="flex flex-col sm:flex-row sm:items-end gap-5 sm:gap-6 flex-1 min-w-0">
+            {/* Avatar overlapping banner */}
+            <div className="-mt-12 sm:-mt-16 w-24 h-24 sm:w-32 sm:h-32 shrink-0 rounded-[20px] bg-gisviz-paper border-4 border-gisviz-card shadow-sm flex items-center justify-center text-[30px] sm:text-[40px] font-bold text-gisviz-ink-soft overflow-hidden relative z-10">
+              {avatarSrc && !imageError ? (
+                <img src={avatarSrc} alt={profile.user_handle} className="w-full h-full object-cover" onError={() => setImageError(true)} />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-tr from-gisviz-accent to-gisviz-safe flex items-center justify-center text-[color:var(--accent-on)] shadow-inner">
+                  {profileInitials}
                 </div>
-              </>
-            ) : (
-              <div className="w-full h-full bg-gradient-to-tr from-gisviz-accent to-gisviz-safe flex items-center justify-center text-gisviz-white text-[24px] font-bold uppercase font-mono shadow-inner">
-                {profile.user_handle.charAt(0)}
-              </div>
-            )}
-          </div>
-
-          <div className="flex-1 space-y-1 z-10">
-            <h1 className="text-[24px] font-display font-bold text-gisviz-ink">
-              @{profile.user_handle}
-            </h1>
-            <p className="text-[16px] font-mono text-gisviz-ink-soft flex items-center flex-wrap gap-4">
-              <span>{profile.title || 'GIS Lover'}</span>
-              {profile.location?.formatted_string && (
-                <span className="flex items-center gap-1.5 text-gisviz-ink">
-                  <MapPin size={12} className="text-gisviz-accent" />
-                  {profile.location.formatted_string}
-                </span>
               )}
-            </p>
+            </div>
+            
+            <div className="flex flex-col min-w-0 pb-1">
+              <h1 className="font-display text-[26px] sm:text-[30px] font-bold text-gisviz-ink leading-tight tracking-tight truncate">
+                {profile.name || profile.user_handle.replace(/_/g, ' ')}
+              </h1>
+              <p className="text-[14.5px] font-medium text-gisviz-ink-soft mb-1.5">
+                @{profile.user_handle}
+              </p>
+              {profile.title && (
+                <p className="text-[14px] text-gisviz-ink leading-relaxed mb-2 line-clamp-2 max-w-xl">
+                  {profile.title}
+                </p>
+              )}
+              <div className="flex flex-wrap items-center gap-4 text-[13px] text-gisviz-ink-soft">
+                {profile.location?.formatted_string && (
+                  <div className="flex items-center gap-1.5">
+                    <MapPin size={14} className="text-gisviz-accent" /> <span className="truncate max-w-[200px]">{profile.location.formatted_string}</span>
+                  </div>
+                )}
+                {profile.website_url && (
+                  <div className="flex items-center gap-1.5">
+                    <LinkIcon size={14} /> 
+                    <a href={profile.website_url.startsWith('http') ? profile.website_url : `https://${profile.website_url}`} target="_blank" rel="noreferrer" className="hover:text-gisviz-accent hover:underline truncate max-w-[150px]">
+                      Website
+                    </a>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
-          <div className="flex gap-4 font-mono text-[16px] z-10 w-full sm:w-auto mt-4 sm:mt-0 justify-between sm:justify-end border-t sm:border-t-0 border-gisviz-border pt-4 sm:pt-0">
-            <div className="text-center sm:text-right">
-              <p className="text-[24px] font-bold text-gisviz-ink">{profile.post_count || posts.length}</p>
-              <p className="text-[12px] text-gisviz-ink-soft uppercase tracking-wider">Posts</p>
+          {/* Right: Stats & Action */}
+          <div className="flex flex-col sm:flex-row lg:flex-col items-start sm:items-center lg:items-end gap-5 shrink-0 pt-2 lg:pt-0 pb-1">
+            <div className="flex items-center gap-6 text-center">
+              <div className="flex flex-col items-center">
+                <span className="text-[20px] font-bold text-gisviz-ink">{profile.post_count || posts.length}</span>
+                <span className="text-[11px] font-mono uppercase tracking-wider text-gisviz-ink-soft">Posts</span>
+              </div>
+              <div className="flex flex-col items-center">
+                <span className="text-[20px] font-bold text-gisviz-ink">{profile.follower_count || 0}</span>
+                <span className="text-[11px] font-mono uppercase tracking-wider text-gisviz-ink-soft">Followers</span>
+              </div>
+              <div className="flex flex-col items-center">
+                <span className="text-[20px] font-bold text-gisviz-ink">{profile.following_count || 0}</span>
+                <span className="text-[11px] font-mono uppercase tracking-wider text-gisviz-ink-soft">Following</span>
+              </div>
             </div>
-            <div className="text-center sm:text-right">
-              <p className="text-[24px] font-bold text-gisviz-ink">{profile.follower_count || 0}</p>
-              <p className="text-[12px] text-gisviz-ink-soft uppercase tracking-wider">Followers</p>
-            </div>
-            <div className="text-center sm:text-right">
-              <p className="text-[24px] font-bold text-gisviz-ink">{profile.following_count || 0}</p>
-              <p className="text-[12px] text-gisviz-ink-soft uppercase tracking-wider">Following</p>
-            </div>
-          </div>
-        </div>
 
-        {/* ── Action Bar ───────────────────────────────────────────────────── */}
-        <div className="bg-gisviz-canvas/50 border-t border-gisviz-border px-8 py-3 flex justify-between items-center">
-          <div className="flex gap-6 font-mono text-[16px]">
-            <button
-              onClick={() => setActiveTab('publications')}
-              className={`pb-1 border-b-2 transition-colors ${activeTab === 'publications' ? 'border-gisviz-accent text-gisviz-ink font-bold' : 'border-transparent text-gisviz-ink-soft hover:text-gisviz-ink'}`}
-            >
-              My Posts
-            </button>
-            {isOwnProfile && (
+            {isOwnProfile ? (
+              <Link href="/settings" className="w-full sm:w-auto lg:w-full h-10 px-6 rounded-[10px] border border-gisviz-border bg-gisviz-paper flex items-center justify-center gap-2 text-[13.5px] font-semibold text-gisviz-ink hover:border-gisviz-border-strong transition-all shadow-sm">
+                <Edit2 size={14} className="text-gisviz-ink-soft" /> Edit Profile
+              </Link>
+            ) : (
               <button
-                onClick={() => setActiveTab('saved')}
-                className={`pb-1 border-b-2 transition-colors ${activeTab === 'saved' ? 'border-gisviz-accent text-gisviz-ink font-bold' : 'border-transparent text-gisviz-ink-soft hover:text-gisviz-ink'}`}
+                onClick={handleFollowToggle}
+                disabled={followLoading}
+                className={`group w-full sm:w-auto lg:w-full min-w-[140px] h-10 px-6 rounded-[10px] flex items-center justify-center gap-2 text-[13.5px] font-semibold transition-all shadow-sm disabled:opacity-50 ${
+                  isFollowing
+                    ? 'border border-gisviz-border bg-gisviz-paper text-gisviz-ink hover:bg-gisviz-alert/10 hover:text-gisviz-alert hover:border-gisviz-alert/50'
+                    : 'bg-gisviz-ink text-gisviz-card hover:bg-gisviz-ink-soft'
+                }`}
               >
-                Bookmarked Posts
+                {followLoading ? <Loader2 size={15} className="animate-spin" /> : isFollowing ? (
+                  <>
+                    <UserCheck size={15} className="block group-hover:hidden text-gisviz-ink-soft" />
+                    <UserMinus size={15} className="hidden group-hover:block text-gisviz-alert" />
+                    <span className="block group-hover:hidden">Following</span>
+                    <span className="hidden group-hover:block">Unfollow</span>
+                  </>
+                ) : (
+                  <><UserPlus size={15} /> Follow</>
+                )}
               </button>
             )}
           </div>
 
-          {!isOwnProfile ? (
+        </div>
+      </div>
+
+      {/* ── 2. Content Section ── */}
+      <div className="flex flex-col w-full gap-6">
+        
+        {/* Tabs & Controls Row */}
+        <div className="flex flex-col md:flex-row gap-4 items-center justify-between w-full">
+          
+          {/* 50/50 Split Segmented Tabs */}
+          <div className="flex items-center w-full md:w-auto md:min-w-[360px] bg-gisviz-paper/60 p-1.5 rounded-[12px] border border-gisviz-border shadow-sm">
             <button
-              onClick={handleFollowToggle}
-              disabled={followLoading}
-              className={`group/btn flex items-center justify-center gap-2 px-5 py-2 rounded-full transition-all font-mono text-[16px] font-bold shadow-sm disabled:opacity-50 border ${
-                isFollowing
-                  ? 'bg-gisviz-canvas border-gisviz-border text-gisviz-ink hover:bg-gisviz-alert/10 hover:text-gisviz-alert/90 hover:border-gisviz-alert/60'
-                  : 'bg-gisviz-accent border-transparent text-gisviz-white hover:bg-opacity-90'
+              onClick={() => setActiveTab('publications')}
+              className={`flex-1 h-9 flex items-center justify-center gap-2 rounded-[8px] text-[13.5px] font-semibold transition-all ${
+                activeTab === 'publications' 
+                  ? 'bg-gisviz-card text-gisviz-ink shadow-sm border border-gisviz-border/50' 
+                  : 'text-gisviz-ink-soft hover:text-gisviz-ink'
               }`}
             >
-              {followLoading ? (
-                <Loader2 size={15} className="animate-spin" />
-              ) : isFollowing ? (
-                <>
-                  <UserCheck size={15} className="block group-hover/btn:hidden" />
-                  <UserMinus size={15} className="hidden group-hover/btn:block text-gisviz-alert/80" />
-                </>
-              ) : (
-                <UserPlus size={15} />
-              )}
-              {isFollowing ? (
-                <>
-                  <span className="block group-hover/btn:hidden">Following</span>
-                  <span className="hidden group-hover/btn:block">Unfollow</span>
-                </>
-              ) : (
-                <span>Follow</span>
-              )}
+              <Grid size={15} /> Published
             </button>
+            {isOwnProfile && (
+              <button
+                onClick={() => setActiveTab('saved')}
+                className={`flex-1 h-9 flex items-center justify-center gap-2 rounded-[8px] text-[13.5px] font-semibold transition-all ${
+                  activeTab === 'saved' 
+                    ? 'bg-gisviz-card text-gisviz-ink shadow-sm border border-gisviz-border/50' 
+                    : 'text-gisviz-ink-soft hover:text-gisviz-ink'
+                }`}
+              >
+                <Bookmark size={15} className={activeTab === 'saved' ? 'fill-current' : ''} /> Bookmarks
+              </button>
+            )}
+          </div>
+
+          {/* Action Bar (Sort & Publish) */}
+          <div className="flex items-center justify-between md:justify-end gap-3 w-full md:w-auto">
+            <button
+              onClick={() => setSortOption(prev => prev === 'latest' ? 'alphabetical' : 'latest')}
+              className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-[8px] border border-gisviz-border bg-gisviz-paper text-[13px] font-medium text-gisviz-ink hover:border-gisviz-border-strong transition-all select-none shadow-sm"
+            >
+              <ArrowUpDown size={14} className="text-gisviz-ink-soft" />
+              {sortOption === 'latest' ? 'Sort: Latest First' : 'Sort: Alphabetical'}
+            </button>
+            
+            {isOwnProfile && activeTab === 'publications' && (
+              <Link href="/publish" className="inline-flex items-center justify-center gap-2 h-9 px-4 rounded-[8px] bg-gisviz-accent text-[13.5px] font-semibold text-[color:var(--accent-on)] hover:brightness-110 transition-[filter] shadow-sm">
+                <Plus size={15} /> Publish
+              </Link>
+            )}
+          </div>
+        </div>
+
+        {/* Feed List Grid */}
+        <div className="w-full">
+          {(activeTab === 'saved' && bookmarksLoading) ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6">
+              {Array.from({ length: 4 }).map((_, i) => <FeedCardSkeleton key={i} />)}
+            </div>
+          ) : sortedPosts.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6">
+              {sortedPosts.map((post: any) => (
+                activeTab === 'publications' ? (
+                  <ProfilePostCard 
+                    key={post.post_id} 
+                    post={post} 
+                    isOwnProfile={isOwnProfile}
+                    isBookmarkView={false}
+                    onLike={onLike}
+                    onBookmark={onBookmark}
+                    onShare={setSharing}
+                    busy={busyId === post.post_id}
+                    onEdit={() => router.push(`/post/${post.post_id}/edit`)}
+                  />
+                ) : (
+                  <FeedCard
+                    key={post.post_id}
+                    post={post}
+                    onLike={onLike}
+                    onBookmark={onBookmark}
+                    onShare={setSharing}
+                    busy={busyId === post.post_id}
+                  />
+                )
+              ))}
+            </div>
           ) : (
-            <Link href="/settings" className="flex items-center gap-2 bg-gisviz-rail-soft border border-gisviz-border text-gisviz-ink px-5 py-2 rounded-full hover:border-gisviz-ink transition-all font-mono text-[16px] shadow-sm font-bold">
-              Configure Profile
-            </Link>
+            <div className="rounded-[16px] border border-gisviz-border bg-gisviz-card p-14 flex flex-col items-center gap-4 text-center w-full mt-2 shadow-sm">
+              <div className="w-16 h-16 rounded-full bg-gisviz-paper border border-gisviz-border flex items-center justify-center">
+                 <Inbox size={28} className="text-gisviz-ink-soft" />
+              </div>
+              <div>
+                <p className="font-display text-[20px] font-bold text-gisviz-ink mb-1">
+                  {activeTab === 'publications' ? 'No posts published yet' : 'No saved posts'}
+                </p>
+                <p className="text-[14.5px] text-gisviz-ink-soft">
+                  {activeTab === 'publications' 
+                    ? (isOwnProfile ? "You haven't shared any visual posts with the community." : `@${handle} hasn't published anything yet.`) 
+                    : "Posts you bookmark will appear here."}
+                </p>
+              </div>
+              {isOwnProfile && activeTab === 'publications' && (
+                 <Link href="/publish" className="mt-2 text-[13.5px] font-semibold text-gisviz-accent hover:underline">
+                   Create your first post &rarr;
+                 </Link>
+              )}
+            </div>
           )}
         </div>
       </div>
- 
-{/* ── Grid header ──────────────────────────────────────────────────────── */}
-<div className="flex justify-between items-center mb-4 mt-8">
- 
-  {/* Sort — unchanged */}
-  <button
-    onClick={() => setSortOption(prev => prev === 'latest' ? 'alphabetical' : 'latest')}
-    className="text-[16px] font-mono text-gisviz-ink-soft hover:text-gisviz-ink flex items-center gap-1.5 border border-gisviz-border px-3 py-1.5 rounded-md bg-gisviz-card transition-colors select-none"
-  >
-    <ArrowUpDown size={14} />
-    {sortOption === 'latest' ? 'Sort: Latest' : 'Sort: A-Z'}
-  </button>
- 
-  {/* Publish — own profile only, matches feed page styling */}
-  {isOwnProfile && (
-    <Link
-      href="/post/upload"
-      className="flex items-center gap-2 bg-gisviz-accent text-gisviz-white px-4 py-2 rounded-full text-[12px] font-bold hover:bg-opacity-90 transition-all shadow-sm"
-    >
-      <Plus size={16} /> Publish
-    </Link>
-  )}
-</div>
 
-      {/* ── PUBLICATIONS TAB ─────────────────────────────────────────────────── */}
-      {activeTab === 'publications' && (
-        sortedPosts.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {sortedPosts.map((post) => {
-              const isInactive = post.is_active === 0
-
-              // Inactive posts: wrap in div (no public page). Active: wrap in Link as before.
-              const CardWrapper = ({ children }: { children: React.ReactNode }) =>
-                isInactive ? (
-                  <div className="bg-gisviz-card border border-amber-200 p-5 rounded-sm shadow-sm flex flex-col justify-between min-h-[192px] plate-enter relative opacity-60">
-                    {children}
-                  </div>
-                ) : (
-                  <Link
-                    href={`/post/${post.post_id}`}
-                    className="bg-gisviz-card border border-gisviz-border p-5 rounded-sm hover:border-gisviz-accent transition-colors group cursor-pointer shadow-sm flex flex-col justify-between min-h-[192px] plate-enter relative"
-                  >
-                    {children}
-                  </Link>
-                )
-
-              return (
-                <div key={post.post_id} className="flex flex-col gap-0">
-
-                  {/* Inactive banner — only visible on own profile when is_active = 0 */}
-                  {isInactive && isOwnProfile && (
-                    <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 border border-b-0 border-amber-200 rounded-t-sm">
-                      <span className="text-amber-600 text-[11px] font-mono font-semibold uppercase tracking-wide">
-                        ⚠ Inactive — not visible to others
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => router.push(`/post/${post.post_id}/edit`)}
-                        className="ml-auto text-[11px] font-mono text-gisviz-accent underline hover:opacity-70 transition-opacity"
-                      >
-                        Edit
-                      </button>
-                    </div>
-                  )}
-
-                  <CardWrapper>
-                    <div>
-                      <div className="flex justify-between items-start mb-2">
-                        <MapIcon
-                          className="text-gisviz-ink-soft group-hover:text-gisviz-accent transition-colors"
-                          size={20}
-                        />
-                        {isOwnProfile ? (
-                          <button
-                            onClick={(e) => {
-                              e.preventDefault()
-                              router.push(`/post/${post.post_id}/edit`)
-                            }}
-                            className="text-gisviz-ink-soft hover:text-gisviz-accent transition-colors z-10 p-1 bg-gisviz-canvas rounded-md border border-transparent hover:border-gisviz-accent/30"
-                            title="Edit Publication"
-                          >
-                            <Edit2 size={16} />
-                          </button>
-                        ) : (
-                          <ExternalLink
-                            className="text-gisviz-border group-hover:text-gisviz-ink-soft transition-colors opacity-0 group-hover:opacity-100"
-                            size={16}
-                          />
-                        )}
-                      </div>
-
-                      <h3 className="font-bold text-[16px] camelcase text-gisviz-ink leading-tight line-clamp-2">
-                        {post.title}
-                      </h3>
-
-                      <div className="flex gap-2 mt-3 flex-wrap">
-                        {post.categories.map((cat: any) => (
-                          <span
-                            key={cat.category_id}
-                            className="text-[12px] uppercase font-mono bg-gisviz-canvas border border-gisviz-border px-2 py-0.5 rounded-md text-gisviz-ink-soft"
-                          >
-                            {cat.label}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="flex justify-between items-center border-t border-gisviz-border pt-3 mt-4 text-[16px] font-mono text-gisviz-ink-soft">
-                      <span>
-                        {new Date(post.created_timestamp).toLocaleDateString(undefined, {
-                          month: 'short', day: 'numeric', year: 'numeric',
-                        })}
-                      </span>
-                      <div className="flex gap-3">
-                        <span>{post.total_likes_count || 0} Likes</span>
-                        <span>{post.total_comments_count || 0} Com</span>
-                      </div>
-                    </div>
-                  </CardWrapper>
-
-                </div>
-              )
-            })}
-          </div>
-        ) : (
-          <div className="text-center py-16 bg-gisviz-rail border border-gisviz-border border-dashed rounded-sm">
-            <p className="text-gisviz-ink-soft font-mono text-[16px] uppercase">No Posts published yet.</p>
-          </div>
-        )
+      {sharing && (
+        <ShareModal
+          isOpen={!!sharing}
+          onClose={() => setSharing(null)}
+          url={`/post/${sharing.post_id}`}
+          title={sharing.title}
+        />
       )}
-
-      {/* ── BOOKMARKS TAB ────────────────────────────────────────────────────── */}
-      {activeTab === 'saved' && (
-        bookmarksLoading ? (
-          <div className="flex justify-center items-center py-16">
-            <Loader2 size={28} className="animate-spin text-gisviz-accent" />
-          </div>
-        ) : sortedPosts.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {sortedPosts.map((post) => (
-              <Link href={`/post/${post.post_id}`} key={post.post_id} className="bg-gisviz-card border border-gisviz-border p-5 rounded-sm hover:border-gisviz-accent transition-colors group cursor-pointer shadow-sm flex flex-col justify-between min-h-[192px] plate-enter relative">
-                <div>
-                  <div className="flex justify-between items-start mb-2">
-                    <MapIcon className="text-gisviz-ink-soft group-hover:text-gisviz-accent transition-colors" size={20} />
-                    <ExternalLink className="text-gisviz-border group-hover:text-gisviz-ink-soft transition-colors opacity-0 group-hover:opacity-100" size={16} />
-                  </div>
-                  <h3 className="font-bold text-[16px] camelcase text-gisviz-ink leading-tight line-clamp-2">{post.title}</h3>
-                  <div className="flex gap-2 mt-3 flex-wrap">
-                    {post.categories?.map((cat: any) => (
-                      <span key={cat.category_id} className="text-[12px] uppercase font-mono bg-gisviz-canvas border border-gisviz-border px-2 py-0.5 rounded-md text-gisviz-ink-soft">
-                        {cat.label}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-                <div className="flex justify-between items-center border-t border-gisviz-border pt-3 mt-4 text-[16px] font-mono text-gisviz-ink-soft">
-                  <span>{new Date(post.created_timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
-                  <div className="flex gap-3">
-                    <span>{post.total_likes_count || 0} Likes</span>
-                    <span>{post.total_comments_count || 0} Com</span>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-16 bg-gisviz-rail border border-gisviz-border border-dashed rounded-sm">
-            <p className="text-gisviz-ink-soft font-mono text-[16px] uppercase">No Saved Posts.</p>
-          </div>
-        )
-      )}
-
-    </div>
+    </main>
   )
 }

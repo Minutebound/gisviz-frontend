@@ -12,8 +12,6 @@
 
 /* ─────────────────────────────────────────────────────────────
    1. Tailwind v4 Custom Theme Variables
-   All names are preserved exactly — the rest of the codebase
-   references these token names directly.
 ───────────────────────────────────────────────────────────── */
 @theme {
   --color-gisviz-ink:          var(--ink);
@@ -33,85 +31,80 @@
   --color-gisviz-safe:         var(--safe);
   --color-gisviz-white:        var(--white);
   --color-gisviz-black:        var(--black);
-  --font-sans:    var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--font-sora),  ui-sans-serif, system-ui, sans-serif;
-  --font-mono:    var(--font-plex-mono), ui-monospace, SFMono-Regular, monospace;
+
+  /* New REQUIRED tokens */
+  --color-gisviz-accent-text:   var(--accent-text);
+  --color-gisviz-raised:        var(--raised);
+  --color-gisviz-border-strong: var(--border-strong);
+
+  /* Updated Fonts */
+  --font-sans:      var(--font-instrument-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-display:   var(--font-space-grotesk),   ui-sans-serif, system-ui, sans-serif;
+  --font-mono:      var(--font-jetbrains-mono),  ui-monospace, SFMono-Regular, monospace;
   --font-condensed: var(--font-barlow-condensed), ui-monospace, monospace;
 }
 
 /* ─────────────────────────────────────────────────────────────
-   2. Light & Dark palettes
-   Issues fixed:
-   • --canvas unified to cool sage (was warm beige #f2eee3 in light,
-     which clashed with the teal/sage system everywhere else)
-   • --safe and --alert now defined in BOTH :root and .dark
-   • --border and --grid tightened for better contrast ratio
-   • Dark --card lifted slightly so layering reads clearly
+   2. Light & Dark palettes (Warm-Neutral Canvas Look)
 ───────────────────────────────────────────────────────────── */
 @layer base {
   :root {
-    /* Text */
-    --ink:          #14201b;   /* deep forest, high legibility */
-    --ink-soft:     #5d7268;   /* muted sage-gray */
+    --ink:          #282a29;
+    --ink-soft:     #6e6b63;
 
-    /* Surfaces */
-    --paper:        #f5f8f6;   /* elevated plate */
-    --canvas:       #f2eee3;   /* cool sage page background (was warm beige — now matches system) */
-    --card:         #ffffff;   /* crisp white cards */
+    --paper:        #f6f4ef;
+    --canvas:       #ffffff;
+    --card:         #ffffff;
 
-    /* Navigation / interactive rail */
-    --rail:         #14201c;   /* deep forest rail */
-    --rail-soft:    #d4e5da;   /* light sage hover fill */
+    --rail:         #28282a;
+    --rail-soft:    #f0ede6;
 
-    /* Accent — orange-coral primary action */
-    --accent:       #f65821;
-    --accent-soft:  #fde8df;   /* warm wash for accent fills (was cool emerald — now matches accent hue) */
+    --accent:       #06ba24;
+    --accent-soft:  #feede6;
+    --accent-text:  #0c8f1b;
+    --accent-on:    #1b1206;
 
-    /* Survey — warm amber cartographic secondary */
-    --survey:       #c2691f;
-    --survey-soft:  #f6e6d4;
+    --survey:       #b07d0a;
+    --survey-soft:  #f7eeda;
 
-    /* Structural */
-    --border:       #c4d4cc;   /* tinted sage border, slightly stronger than before */
-    --grid:         #b2c8bc;   /* graticule hairline */
+    --border:       #e3dfd6;
+    --border-strong:#d9d5cc;
+    --grid:         #eae6dd;
+    --raised:       #f0ede6;
 
-    /* Semantic */
-    --alert:        #e02020;   /* red — slightly desaturated from pure #ff0000 for readability */
-    --safe:         #2db67e;   /* green */
+    --alert:        #c0392b;
+    --safe:         #3f7d4e;
 
     --white: #ffffff;
     --black: #000000;
   }
 
   .dark {
-    /* Text */
-    --ink:          #e8f1ec;   /* crisp near-white */
-    --ink-soft:     #8ba499;   /* muted sage-gray */
+    --ink:          #fbfaf8;
+    --ink-soft:     #9c968a;
 
-    /* Surfaces */
-    --paper:        #14201b;   /* elevated dark */
-    --canvas:       #0c1611;   /* deep teal-forest page background */
-    --card:         #16251e;   /* lifted card — slightly more contrast than before */
+    --paper:        #1d1c18;
+    --canvas:       #181714;
+    --card:         #201f1b;
 
-    /* Navigation / interactive rail */
-    --rail:         #1e2e26;
-    --rail-soft:    #0c3b2b;   /* dark sage hover */
+    --rail:         #1d1c18;
+    --rail-soft:    #2a2824;
 
-    /* Accent */
-    --accent:       #f65821;   /* same vivid coral on dark — pops well */
-    --accent-soft:  #3a1a0a;   /* dark coral wash for fills */
+    --accent:       #0fc825;
+    --accent-soft:  #301a10;
+    --accent-text:  #0c8f1b;
+    --accent-on:    #1b1206;
 
-    /* Survey */
-    --survey:       #e3923f;   /* warm amber, glows on teal */
-    --survey-soft:  #3a2a17;
+    --survey:       #d9a72e;
+    --survey-soft:  #302713;
 
-    /* Structural */
-    --border:       #233d2f;   /* dark teal border, stronger than before */
-    --grid:         #1c3025;   /* graticule hairline */
+    --border:       #35322d;
+    --border-strong:#3f3b35;
+    --grid:         #262420;
+    --raised:       #2a2824;
 
-    /* Semantic — defined here too so dark mode doesn't inherit light values */
-    --alert:        #ff4444;   /* brighter red for dark bg legibility */
-    --safe:         #3ecf8e;   /* brighter green for dark bg legibility */
+    --alert:        #ff6b5e;
+    --safe:         #6fa97c;
 
     --white: #ffffff;
     --black: #000000;
@@ -124,31 +117,10 @@
 
 /* ─────────────────────────────────────────────────────────────
    3. Body — ambient graticule + tonal overlay
-   The ::before overlay now uses --canvas at 72% opacity (was 78%)
-   so the grid texture shows through slightly more in light mode.
-   Cool sage canvas no longer tints content warm.
 ───────────────────────────────────────────────────────────── */
 body {
   font-size: 16px;
   background-color: var(--canvas);
-  background-image:
-    /* primary accent glow — top right */
-    radial-gradient(
-      1200px 518px at 82% -12%,
-      color-mix(in srgb, var(--accent) 10%, transparent),
-      transparent 60%
-    ),
-    /* survey amber counter-glow — bottom left */
-    radial-gradient(
-      900px 480px at -8% 108%,
-      color-mix(in srgb, var(--survey) 7%, transparent),
-      transparent 60%
-    ),
-    /* graticule grid — horizontal */
-    linear-gradient(to right,  var(--grid) 1px, transparent 1px),
-    /* graticule grid — vertical */
-    linear-gradient(to bottom, var(--grid) 1px, transparent 1px);
-
   background-size: auto, auto, 64px 64px, 64px 64px;
   background-position: 0 0, 0 0, 0 0, 0 0;
   color: var(--ink);
@@ -172,7 +144,7 @@ body > * {
 }
 
 /* ─────────────────────────────────────────────────────────────
-   4. Cartographic helpers — unchanged
+   4. Cartographic helpers
 ───────────────────────────────────────────────────────────── */
 .reg-mark {
   position: absolute;
@@ -189,7 +161,7 @@ body > * {
 .reg-br { bottom: 12px; right: 12px; border-bottom: 2px solid; border-right: 2px solid; }
 
 /* ─────────────────────────────────────────────────────────────
-   5. Accessibility & Motion — unchanged
+   5. Accessibility & Motion
 ───────────────────────────────────────────────────────────── */
 :focus-visible {
   outline: 2px solid var(--accent);
@@ -211,4 +183,12 @@ body > * {
 }
 .plate-enter {
   animation: plate-rise 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   6. Navigation Progress Bar Z-Index Fix
+───────────────────────────────────────────────────────────── */
+#nprogress .bar,
+#nprogress .peg {
+  z-index: 9999 !important;
 }

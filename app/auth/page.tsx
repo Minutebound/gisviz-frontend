@@ -177,16 +177,16 @@ function AuthContent() {
             {view === 'verify' ? <ShieldCheck size={24} /> : <Key size={24} />}
           </div>
           <h1 className="text-[24px] font-display font-bold text-gisviz-ink">
-            {view === 'login' && 'Login Access'}
-            {view === 'register' && 'Platform Registration'}
-            {view === 'verify' && 'Verify Identity'}
-            {view === 'forgot' && 'Recover Access'}
+            {view === 'login' && 'Login'}
+            {view === 'register' && 'Register'}
+            {view === 'verify' && 'Verify Account'}
+            {view === 'forgot' && 'Password Reset'}
           </h1>
           <p className="text-[12px] font-mono text-gisviz-ink-soft mt-2 uppercase tracking-wider">
-            {view === 'login' && 'System Access'}
-            {view === 'register' && 'Platform Registration'}
-            {view === 'verify' && 'Identity Verification'}
-            {view === 'forgot' && 'Recover Access'}
+            {view === 'login' && 'Welcome Back!'}
+            {view === 'register' && 'Happy to have you!'}
+            {view === 'verify' && 'We just need to confirm your email.'}
+            {view === 'forgot' && 'Sorry to hear that!'}
           </p>
         </div>
 

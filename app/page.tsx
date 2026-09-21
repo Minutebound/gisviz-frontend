@@ -1,41 +1,32 @@
-import type { Metadata } from 'next'
-import Feed from './components/Feed'
-import Sidebar from './components/Sidebar'
-import FloatingSearch from './components/FloatingSearch'
+// app/page.tsx — Home
+//
+// Replaces the previous <Feed> + <Sidebar> + <FloatingSearch> arrangement.
+// FeedStream now owns the categorisation bar, the filter state and the right
+// rail, so the page itself is just chrome + a Suspense boundary.
+//
+// FeedStream calls useSearchParams(), which requires a Suspense boundary in the
+// App Router — without it `next build` fails with a prerender error on /.
 
-export const metadata: Metadata = {
-  title: 'Feed',
+import React, { Suspense } from 'react'
+import FeedStream from './components/feed/FeedStream'
+import { FeedCardSkeleton } from './components/feed/FeedCard'
+
+export default function HomePage() {
+  return (
+    <>
+      <Suspense fallback={<FeedBoot />}>
+        <FeedStream />
+      </Suspense>
+    </>
+  )
 }
 
-export default function Home() {
+function FeedBoot() {
   return (
-    <div className="min-h-screen bg-geomap-canvas/50 font-sans relative">
-
-      <main className="py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-
-          <div className="hidden lg:block lg:col-span-4 xl:col-span-3 rounded-xl">
-            <Sidebar />
-          </div>
-
-          <div className="lg:col-span-8 xl:col-span-9">
-            <div className="grid h-full relative">
-
-              <div className="col-start-1 row-start-1 min-w-0 pb-24">
-                <Feed />
-              </div>
-
-              {/* The Unified Search Component sticky at the bottom */}
-              <div className="col-start-1 row-start-1 self-end sticky bottom-6 z-50 pointer-events-none w-full max-w-3xl mx-auto">
-                <FloatingSearch />
-              </div>
-
-            </div>
-          </div>
-
-        </div>
-      </main>
-
-    </div>
+    <main className="mx-auto max-w-[1440px] px-4 sm:px-8 lg:px-[72px] pt-[136px] pb-14">
+      <div className="flex flex-col gap-6 max-w-[784px]">
+        {Array.from({ length: 3 }).map((_, i) => <FeedCardSkeleton key={i} />)}
+      </div>
+    </main>
   )
 }

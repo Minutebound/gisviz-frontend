@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { FeedFilters, filtersToParams, Post } from '../types/gisviz'
 
 // ── Base URL ──────────────────────────────────────────────────────────────────
 //
@@ -77,6 +78,22 @@ export const cookies = {
     document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`
   },
 }
+
+// ─── Caching Helpers ───────────────────────────────────────────────────────────
+const FEED_TTL = 30_000   // matches the existing 30s stream cache
+const _cache = new Map<string, { data: any; expiry: number }>()
+
+async function cached<T>(key: string, ttlMs: number, fn: () => Promise<T>): Promise<T> {
+  const now = Date.now()
+  const hit = _cache.get(key)
+  if (hit && hit.expiry > now) {
+    return hit.data
+  }
+  const data = await fn()
+  _cache.set(key, { data, expiry: now + ttlMs })
+  return data
+}
+
 
 // ════════════════════════════════════════════════════════════════════════════════
 export const gisvizApi = {
@@ -209,7 +226,6 @@ export const gisvizApi = {
       content, parent_comment_id: parentCommentId ?? null,
     })).data,
 
-  // ── Categories ────────────────────────────────────────────────────────────
   // ── Categories ────────────────────────────────────────────────────────────
   listCategories: async () =>
     (await axiosInstance.get('/categories/', { params: { _t: Date.now() } })).data,
@@ -460,4 +476,98 @@ export const gisvizApi = {
   // ── Slug ──────────────────────────────────────────────────────────────────
   getPostBySlug: async (slug: string) =>
     (await axiosInstance.get(`/posts/slug/${slug}`)).data,
+
+  // ── Feed (Added from api.additions.ts) ────────────────────────────────────
+  /**
+   * One entry point for the filtered feed.
+   *
+   * Today the backend has no filtered endpoint (see docs/BACKEND-NOTES.md), so
+   * this degrades: with no filters set it calls the existing /posts/stream or
+   * /posts/trending-full untouched. Once GET /posts/feed lands, delete the
+   * fallback branch — the call signature does not change.
+   */
+  fetchFeed: async ({
+    filters, skip = 0, limit = 12,
+  }: { filters: FeedFilters; skip?: number; limit?: number }): Promise<Post[]> => {
+    const extra = filtersToParams(filters)
+    const hasFilters = Object.keys(extra).length > 0
+
+    // ── fallback path: no filtered endpoint yet ──
+    if (!hasFilters) {
+      return filters.sort === 'trending' && skip === 0
+        ? cached(`feed:trending:${limit}`, FEED_TTL,
+            async () => (await axiosInstance.get('/posts/trending-full', {
+              params: { n: limit },
+            })).data)
+        : cached(`feed:stream:${skip}:${limit}`, FEED_TTL,
+            async () => (await axiosInstance.get('/posts/stream', {
+              params: { skip, limit },
+            })).data)
+    }
+
+    // ── filtered path ──
+    const params = { ...extra, skip, limit }
+    const key = `feed:${new URLSearchParams(params as any).toString()}`
+    return cached(key, FEED_TTL, async () => {
+      try {
+        return (await axiosInstance.get('/posts/feed', { params })).data
+      } catch (e: any) {
+        // Backend not deployed yet → fall back to the stream so the UI still works.
+        if (e?.response?.status === 404) {
+          return (await axiosInstance.get('/posts/stream', {
+            params: { skip, limit },
+          })).data
+        }
+        throw e
+      }
+    })
+  },
+
+  /** Region facets for the filter bar. Falls back to [] until the route exists. */
+  listRegions: async (): Promise<{ id: string; label: string; count: number }[]> => {
+    try {
+      return (await axiosInstance.get('/posts/regions')).data
+    } catch {
+      return []
+    }
+  },
+
+  // ── Ask this map (Added from api.additions.ts) ────────────────────────────
+  /**
+   * POST /posts/{id}/ask  — see claude/GISVIZ-ASK-ARCHITECTURE.md.
+   *
+   * Returns { content, result?, citations? }. The endpoint is responsible for
+   * scoping the model to that post's layers; the client never passes the data.
+   */
+  askPost: async (
+    postId: string,
+    question: string,
+    opts?: { conversationId?: string },
+  ): Promise<{
+    content: string
+    conversation_id?: string
+    result?: any
+    citations?: { kind: 'layer' | 'attr'; name: string; color?: string }[]
+  }> =>
+    (await axiosInstance.post(`/posts/${postId}/ask`, {
+      question,
+      conversation_id: opts?.conversationId ?? null,
+    })).data,
+
+  /** Promote an answer into a saved layer on the post's map. */
+  askToLayer: async (postId: string, messageId: string) =>
+    (await axiosInstance.post(`/posts/${postId}/ask/${messageId}/to-layer`)).data,
+
+  /** Thumbs up / down on an answer — feeds answer-quality review. */
+  askFeedback: async (postId: string, messageId: string, helpful: boolean) =>
+    (await axiosInstance.post(`/posts/${postId}/ask/${messageId}/feedback`, { helpful })).data,
+
+  // ── Geo (V2 Phase 3) (Added from api.additions.ts) ────────────────────────
+  /** Map + ordered layers + compiled MapLibre style. V2 plan §6.1. */
+  fetchMap: async (mapId: string) =>
+    (await axiosInstance.get(`/geo/maps/${mapId}`)).data,
+
+  fetchBasemaps: async () =>
+    cached('geo:basemaps', 600_000, async () =>
+      (await axiosInstance.get('/geo/basemaps')).data),
 }
