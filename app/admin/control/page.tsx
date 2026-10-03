@@ -13,7 +13,7 @@ import {
   Download,
 } from 'lucide-react'
 import { useAuth } from '../../../context/AuthContext'
-import { gisvizApi } from '../../../services/api'
+import { gisvizApi } from '../../../connector/api'
 import AccessRestricted from '../../components/AccessRestricted'
 import AccessControlPanel from './AccessControlPanel'
 
@@ -174,14 +174,14 @@ export default function AdminControlPage() {
   const meta = TABS.find(t => t.id === activeTab)!
 
   return (
-    <div className="max-w-6xl mx-auto py-8 px-4 pb-20">
+    <div className="mx-auto w-full max-w-5xl px-4 sm:px-6 lg:px-8 py-8 pb-20">
 
       <div className="flex items-start justify-between gap-4 mb-8 flex-wrap">
         <div>
-          <h1 className="text-[24px] font-display font-bold text-gisviz-ink flex items-center gap-3">
+          <h1 className="text-[28px] sm:text-[32px] font-display font-bold text-gisviz-ink tracking-tight flex items-center gap-3">
             <ShieldCheck className="text-gisviz-accent" size={28} /> Control Panel
           </h1>
-          <p className="text-gisviz-ink-soft font-mono text-[12px] mt-1">
+          <p className="text-[14.5px] text-gisviz-ink-soft mt-1.5 leading-relaxed">
             Platform management — <Badge color="admin">admin</Badge> only
           </p>
         </div>
@@ -190,14 +190,6 @@ export default function AdminControlPage() {
           <Link href="/admin"
             className="px-4 py-2 bg-gisviz-canvas border border-gisviz-border rounded-md font-mono text-[12px] text-gisviz-ink hover:border-gisviz-accent transition-colors flex items-center gap-1.5">
             <ArrowUpRight size={14} /> Admin Home
-          </Link>
-          <Link href="/admin/analytics"
-            className="px-4 py-2 bg-gisviz-canvas border border-gisviz-border rounded-md font-mono text-[12px] text-gisviz-ink hover:border-gisviz-accent transition-colors flex items-center gap-1.5">
-            <BarChart2 size={14} /> Analytics
-          </Link>
-          <Link href="/admin/activity"
-            className="px-4 py-2 bg-gisviz-canvas border border-gisviz-border rounded-md font-mono text-[12px] text-gisviz-ink hover:border-gisviz-accent transition-colors flex items-center gap-1.5">
-            <Activity size={14} /> Activity
           </Link>
 
           {/* ── Tab dropdown ── */}

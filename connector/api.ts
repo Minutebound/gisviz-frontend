@@ -118,6 +118,30 @@ export const gisvizApi = {
   deactivateAccount: async (currentPassword: string) =>
     (await axiosInstance.delete('/users/me', { data: { current_password: currentPassword } })).data,
 
+  // ── Visuals (DuckDB-backed dataset catalog) ───────────────────────────────
+  searchDatasets: async (q: string, limit = 12) =>
+    (await axiosInstance.get('/visuals/datasets', { params: { q, limit } })).data,
+
+  suggestVisual: async (datasetId: string) =>
+    (await axiosInstance.get(`/visuals/datasets/${encodeURIComponent(datasetId)}/suggest`)).data,
+
+  buildVisualSpec: async (
+    datasetId: string,
+    p: { viz?: string; x?: string | null; y?: string | null; z?: string | null; size?: string | null; label_field?: string | null },
+  ) =>
+    (await axiosInstance.get(`/visuals/datasets/${encodeURIComponent(datasetId)}/spec`, {
+      params: Object.fromEntries(Object.entries(p).filter(([, v]) => v != null && v !== '')),
+    })).data,
+
+  // Public dataset catalog (the /datasets page)
+  listCatalog: async (p: { q?: string; category?: string; kind?: 'spatial' | 'tabular' | ''; skip?: number; limit?: number }) =>
+    (await axiosInstance.get('/visuals/catalog', {
+      params: Object.fromEntries(Object.entries(p).filter(([, v]) => v != null && v !== '')),
+    })).data,
+
+  fetchCatalogDataset: async (datasetId: string) =>
+    (await axiosInstance.get(`/visuals/catalog/${encodeURIComponent(datasetId)}`)).data,
+
   // ── Uploads ───────────────────────────────────────────────────────────────
   uploadAvatar: async (file: File) => {
     const fd = new FormData(); fd.append('file', file)
@@ -126,16 +150,33 @@ export const gisvizApi = {
     })).data
   },
 
-  uploadVisual: async (file: File) => {
+  // ── Dataset management (admin, /admin/datasets) ─────────────────────────
+  listManagedDatasets: async (q = '', status = '') =>
+    (await axiosInstance.get('/visuals/manage/datasets', {
+      params: Object.fromEntries(Object.entries({ q, status }).filter(([, v]) => v)),
+    })).data,
+
+  createDataset: async (meta: Record<string, any>) =>
+    (await axiosInstance.post('/visuals/manage/datasets', meta)).data,
+
+  saveDatasetMeta: async (datasetId: string, meta: Record<string, any>) =>
+    (await axiosInstance.put(`/visuals/manage/datasets/${encodeURIComponent(datasetId)}`, meta)).data,
+
+  setDatasetActive: async (datasetId: string, active: boolean) =>
+    (await axiosInstance.put(`/visuals/manage/datasets/${encodeURIComponent(datasetId)}/status`, { active })).data,
+
+  uploadDatasetData: async (datasetId: string, file: File, onProgress?: (pct: number) => void) => {
     const fd = new FormData(); fd.append('file', file)
-    return (await axiosInstance.post('/uploads/visual', fd, {
+    return (await axiosInstance.post(`/visuals/manage/datasets/${encodeURIComponent(datasetId)}/data`, fd, {
       headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 0,
+      onUploadProgress: e => { if (onProgress && e.total) onProgress(Math.round((e.loaded / e.total) * 100)) },
     })).data
   },
 
-  deleteVisual: async (imagePath: string) => 
-    (await axiosInstance.delete('/uploads/visual', { data: { path: imagePath } })).data,
-  
+  deleteDataset: async (datasetId: string) =>
+    (await axiosInstance.delete(`/visuals/manage/datasets/${encodeURIComponent(datasetId)}`)).data,
+
   reportMissingVisual: async (postId: string) =>
     (await axiosInstance.post(`/posts/${postId}/missing-visual`)).data,
 
@@ -513,7 +554,8 @@ export const gisvizApi = {
         return (await axiosInstance.get('/posts/feed', { params })).data
       } catch (e: any) {
         // Backend not deployed yet → fall back to the stream so the UI still works.
-        if (e?.response?.status === 404) {
+        // 404 = route missing; 422 = /posts/feed was matched by /posts/{post_id} (no feed route yet)
+        if (e?.response?.status === 404 || e?.response?.status === 422) {
           return (await axiosInstance.get('/posts/stream', {
             params: { skip, limit },
           })).data

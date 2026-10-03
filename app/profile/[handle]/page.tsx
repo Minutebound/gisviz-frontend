@@ -9,7 +9,7 @@ import {
   Link as LinkIcon, Share2, MessageSquare, Bookmark, BarChart2, Heart, Database
 } from 'lucide-react'
 import { useAuth } from '../../../context/AuthContext'
-import { gisvizApi } from '../../../services/api'
+import { gisvizApi } from '../../../connector/api'
 import { Post } from '../../../types/gisviz'
 import FeedCard, { FeedCardSkeleton } from '../../components/feed/FeedCard'
 import ShareModal from '../../components/SharePost'
@@ -122,7 +122,7 @@ export default function ProfileHandlePage() {
   const handle = params.handle as string
   const { user, isAuthenticated } = useAuth() as any
 
-  const [activeTab, setActiveTab] = useState<'publications' | 'saved'>('publications')
+  const [activeTab, setActiveTab] = useState<'Posts' | 'saved'>('Posts')
   const [sortOption, setSortOption] = useState<'latest' | 'alphabetical'>('latest')
   const [profile, setProfile] = useState<any>(null)
   const [posts, setPosts] = useState<any[]>([])
@@ -243,7 +243,7 @@ export default function ProfileHandlePage() {
   }
 
   const patch = (id: string, fn: (p: Post) => Post) => {
-    if (activeTab === 'publications') setPosts(ps => ps.map(p => (p.post_id === id ? fn(p) : p)))
+    if (activeTab === 'Posts') setPosts(ps => ps.map(p => (p.post_id === id ? fn(p) : p)))
     else setBookmarks(ps => ps.map(p => (p.post_id === id ? fn(p) : p)))
   }
 
@@ -267,7 +267,7 @@ export default function ProfileHandlePage() {
     finally { setBusyId(null) }
   }
 
-  const activeList = activeTab === 'publications' ? posts : bookmarks
+  const activeList = activeTab === 'Posts' ? posts : bookmarks
   const sortedPosts = [...activeList].sort((a, b) => {
     if (sortOption === 'latest') {
       const timeA = new Date(a.created_at || (a as any).created_timestamp).getTime()
@@ -434,9 +434,9 @@ export default function ProfileHandlePage() {
           {/* 50/50 Split Segmented Tabs */}
           <div className="flex items-center w-full md:w-auto md:min-w-[360px] bg-gisviz-paper/60 p-1.5 rounded-[12px] border border-gisviz-border shadow-sm">
             <button
-              onClick={() => setActiveTab('publications')}
+              onClick={() => setActiveTab('Posts')}
               className={`flex-1 h-9 flex items-center justify-center gap-2 rounded-[8px] text-[13.5px] font-semibold transition-all ${
-                activeTab === 'publications' 
+                activeTab === 'Posts' 
                   ? 'bg-gisviz-card text-gisviz-ink shadow-sm border border-gisviz-border/50' 
                   : 'text-gisviz-ink-soft hover:text-gisviz-ink'
               }`}
@@ -467,7 +467,7 @@ export default function ProfileHandlePage() {
               {sortOption === 'latest' ? 'Sort: Latest First' : 'Sort: Alphabetical'}
             </button>
             
-            {isOwnProfile && activeTab === 'publications' && (
+            {isOwnProfile && activeTab === 'Posts' && (
               <Link href="/publish" className="inline-flex items-center justify-center gap-2 h-9 px-4 rounded-[8px] bg-gisviz-accent text-[13.5px] font-semibold text-[color:var(--accent-on)] hover:brightness-110 transition-[filter] shadow-sm">
                 <Plus size={15} /> Publish
               </Link>
@@ -484,7 +484,7 @@ export default function ProfileHandlePage() {
           ) : sortedPosts.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6">
               {sortedPosts.map((post: any) => (
-                activeTab === 'publications' ? (
+                activeTab === 'Posts' ? (
                   <ProfilePostCard 
                     key={post.post_id} 
                     post={post} 
@@ -515,15 +515,15 @@ export default function ProfileHandlePage() {
               </div>
               <div>
                 <p className="font-display text-[20px] font-bold text-gisviz-ink mb-1">
-                  {activeTab === 'publications' ? 'No posts published yet' : 'No saved posts'}
+                  {activeTab === 'Posts' ? 'No posts published yet' : 'No saved posts'}
                 </p>
                 <p className="text-[14.5px] text-gisviz-ink-soft">
-                  {activeTab === 'publications' 
+                  {activeTab === 'Posts' 
                     ? (isOwnProfile ? "You haven't shared any visual posts with the community." : `@${handle} hasn't published anything yet.`) 
                     : "Posts you bookmark will appear here."}
                 </p>
               </div>
-              {isOwnProfile && activeTab === 'publications' && (
+              {isOwnProfile && activeTab === 'Posts' && (
                  <Link href="/publish" className="mt-2 text-[13.5px] font-semibold text-gisviz-accent hover:underline">
                    Create your first post &rarr;
                  </Link>

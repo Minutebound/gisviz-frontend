@@ -13,7 +13,7 @@ const FOOTER_LINKS = [
 export default function Footer() {
   return (
     <footer className="w-full border-t border-gisviz-border bg-gisviz-card mt-auto shrink-0">
-      <div className="mx-auto max-w-[1440px] px-4 sm:px-8 lg:px-[72px] py-8 sm:py-10 flex flex-col md:flex-row items-center justify-between gap-6">
+      <div className="mx-auto max-w-5xl px-4 sm:px-8 lg:px-[72px] py-8 sm:py-10 flex flex-col md:flex-row items-center justify-between gap-6">
         
         {/* Brand & Copyright */}
         <div className="flex flex-col sm:flex-row items-center sm:items-end gap-3 sm:gap-4 text-center sm:text-left">

@@ -9,6 +9,7 @@ import React from 'react'
 import Link from 'next/link'
 import {
   Heart, MessageSquare, Bookmark, Share2, Layers, Database, Sparkles, BadgeCheck,
+  ThumbsUp,
 } from 'lucide-react'
 import { Post } from '../../../types/gisviz'
 // Note: ensure layerColor is properly defined in your lib/designTokens or replace with a fallback
@@ -126,7 +127,7 @@ function PublisherRow({ post, size = 34 }: { post: Post; size?: number }) {
           <BadgeCheck size={14} className="text-gisviz-accent-text" aria-label="Verified publisher" />
         </span>
         <span className="text-[12.5px] text-gisviz-ink-soft">
-          {timeAgo(timestamp)} · {readTime(post)}
+          {timeAgo(timestamp)}
         </span>
       </div>
     </div>
@@ -171,7 +172,7 @@ function CardFooter({ post, onLike, onBookmark, onShare, busy }: FooterProps) {
           post.is_liked ? 'text-gisviz-accent-text' : 'text-gisviz-ink-soft hover:text-gisviz-ink'
         }`}
       >
-        <Heart size={15} fill={post.is_liked ? 'currentColor' : 'none'} />
+        <ThumbsUp size={15} fill={post.is_liked ? 'currentColor' : 'none'} />
         {compact(post.total_likes_count)}
       </button>
 

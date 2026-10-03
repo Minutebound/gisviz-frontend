@@ -4,7 +4,7 @@ import React, { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Key, UserPlus, Mail, Lock, AtSign, Loader2, ArrowRight, ShieldCheck } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
-import { gisvizApi } from '../../services/api'
+import { gisvizApi } from '../../connector/api'
 
 type AuthView = 'login' | 'register' | 'verify' | 'forgot'
 

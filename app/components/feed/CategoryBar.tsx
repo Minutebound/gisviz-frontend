@@ -24,7 +24,7 @@ export default function CategoryBar({ filters, onChange }: CategoryBarProps) {
 
   return (
     <section className="w-full border-b border-gisviz-border bg-gisviz-card/95 backdrop-blur-sm z-40">
-      <div className="mx-auto max-w-[1440px] px-4 sm:px-8 lg:px-[72px]">
+      <div className="mx-auto max-w-6xl px-4 sm:px-8 lg:px-[72px]">
         <div 
           ref={scrollRef}
           className="flex items-center gap-1.5 py-3 overflow-x-auto no-scrollbar"

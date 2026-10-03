@@ -138,7 +138,10 @@ body::before {
   z-index: 0;
   background: color-mix(in srgb, var(--canvas) 72%, transparent);
 }
-body > * {
+/* Lift page content above the overlay. The header and any fixed layers (drawers, popups) are
+   excluded: this rule is unlayered, so it would beat Tailwind's z-[100] / fixed utilities and
+   leave the avatar dropdown underneath the category bar and banner. */
+body > *:not(header):not(.fixed) {
   position: relative;
   z-index: 1;
 }

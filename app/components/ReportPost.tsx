@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { X, Flag, AlertTriangle, Loader2, Check } from 'lucide-react'
-import { gisvizApi } from '../../services/api'
+import { gisvizApi } from '../../connector/api'
 
 interface ReportModalProps {
   isOpen: boolean

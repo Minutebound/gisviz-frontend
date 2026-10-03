@@ -1,6 +1,6 @@
 "use client";
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
-import { gisvizApi } from "../services/api";
+import { gisvizApi } from "../connector/api";
 
 export interface UserProfile {
   user_id: string;

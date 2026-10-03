@@ -88,8 +88,8 @@ export default function TopNav() {
   return (
     <>
       {/* ── Forced z-[100] to sit above ALL feed content and category bars ── */}
-      <header className="top-0 z-[100] bg-gisviz-card border-b border-gisviz-border">
-        <div className="mx-auto max-w-[1440px] px-4 sm:px-8 lg:px-[72px] h-[72px] flex items-center gap-6 lg:gap-10">
+      <header className="w-full relative top-0 z-[100] bg-gisviz-card border-b border-gisviz-border">
+        <div className="mx-auto max-w-6xl px-4 sm:px-8 lg:px-[72px] h-[72px] flex items-center gap-6 lg:gap-10">
 
           <Link href="/" className="shrink-0">
             <Logo />

@@ -23,7 +23,7 @@ export default function HomePage() {
 
 function FeedBoot() {
   return (
-    <main className="mx-auto max-w-[1440px] px-4 sm:px-8 lg:px-[72px] pt-[136px] pb-14">
+    <main className="mx-auto max-w-5xl px-4 sm:px-8 lg:px-[72px] pt-[136px] pb-14">
       <div className="flex flex-col gap-6 max-w-[784px]">
         {Array.from({ length: 3 }).map((_, i) => <FeedCardSkeleton key={i} />)}
       </div>

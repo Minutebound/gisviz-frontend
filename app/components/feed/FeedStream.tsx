@@ -7,7 +7,7 @@ import {
   Loader2, Inbox, Plus, ChevronDown, Globe2, BarChart2, Check, Flame, Clock, Search
 } from 'lucide-react'
 import { useAuth } from '../../../context/AuthContext'
-import { gisvizApi } from '../../../services/api'
+import { gisvizApi } from '../../../connector/api'
 import {
   Post,
   FeedFilters,
@@ -173,7 +173,7 @@ export default function FeedStream() {
       <CategoryBar filters={filters} onChange={applyFilters} />
 
       {/* Main Single-Column Content Wrapper */}
-      <main className="mx-auto max-w-[1440px] px-4 sm:px-8 lg:px-[72px] pt-5 sm:pt-8 pb-14 w-full flex flex-col gap-6 sm:gap-8">
+      <main className="mx-auto max-w-6xl px-4 sm:px-8 lg:px-[72px] pt-5 sm:pt-8 pb-14 w-full flex flex-col gap-6 sm:gap-8">
         
         {/* ── FULL WIDTH TOP SECTION ── */}
         

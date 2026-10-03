@@ -1,150 +1,110 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { 
-  Search, 
-  Lock,
+import {
+  Search,
   ChevronDown,
   Terminal,
-  ArrowUpRight
+  ArrowUpRight,
+  Loader2,
+  PlusCircle,
+  Settings2,
 } from 'lucide-react'
-import { Dataset, FileFormat, ExternalConnectorType } from '../../types/dataset'
+import { useAuth } from '../../context/AuthContext'
+import { gisvizApi } from '../../connector/api'
+import { canManageDatasets, canPublish } from '../../lib/roles'
+import type { CatalogDetail, CatalogPage, DatasetCard as Card } from '../../types/visuals'
 
-const DATASETS_MOCK: Dataset[] = [
-  {
-    id: 'ds-1',
-    title: 'Global Urban Heat Islands (2024)',
-    description: 'High-resolution surface temperature anomalies across 1,200 metropolitan regions worldwide with calibrated multi-sensor raster composites.',
-    category: 'Climate',
-    source_category: 'file',
-    format: 'geojson',
-    file_size_bytes: 42800000,
-    feature_count: 12400,
-    geometry_type: 'MultiPolygon',
-    crs: 'EPSG:4326',
-    resource_url: 'https://example.com/datasets/heat-islands',
-    updated_at: '2026-08-15',
-    publisher: { name: 'Earth Analytics Lab', handle: 'earthlab' },
-    license: 'CC-BY 4.0',
-    update_frequency: 'Annual',
-    bbox: [-180, -60, 180, 75],
-    schema: [
-      { name: 'id', type: 'uuid', description: 'Unique regional identifier' },
-      { name: 'city_name', type: 'varchar(120)', description: 'Metropolitan area name' },
-      { name: 'temp_anomaly_c', type: 'float4', description: 'Average heat anomaly in Celsius' },
-      { name: 'population_impacted', type: 'int8', description: 'Estimated population in zone' },
-      { name: 'geom', type: 'geometry(MultiPolygon, 4326)', description: 'Spatial boundary' }
-    ]
-  },
-  {
-    id: 'ds-2',
-    title: 'North America EV Fast Chargers',
-    description: 'Quarterly updated geospatial catalog of Level 3 DC fast charging stations with connector classifications and power ratings.',
-    category: 'Infrastructure',
-    source_category: 'file',
-    format: 'csv',
-    file_size_bytes: 1840000,
-    feature_count: 53200,
-    geometry_type: 'Point',
-    crs: 'EPSG:4326',
-    resource_url: 'https://example.com/datasets/ev-chargers',
-    updated_at: '2026-09-02',
-    publisher: { name: 'Energy Grid Network', handle: 'egrid' },
-    license: 'Open Data Commons (ODbL)',
-    update_frequency: 'Quarterly',
-    bbox: [-125.0, 24.5, -66.9, 49.3],
-    schema: [
-      { name: 'station_id', type: 'varchar(50)', description: 'NREL assigned identifier' },
-      { name: 'latitude', type: 'float8', description: 'WGS84 Latitude' },
-      { name: 'longitude', type: 'float8', description: 'WGS84 Longitude' },
-      { name: 'connector_type', type: 'varchar(50)', description: 'e.g., CCS, CHAdeMO, Tesla' },
-      { name: 'max_kw', type: 'int4', description: 'Maximum output in kilowatts' }
-    ]
-  },
-  {
-    id: 'ds-4',
-    title: 'Global Port Logistics & Cargo Flow',
-    description: 'Continuous AIS vessel telemetry stream and dwell-time boundary metrics synchronized from enterprise supply chain warehouses.',
-    category: 'Transport',
-    source_category: 'external',
-    format: 'snowflake',
-    crs: 'EPSG:4326',
-    external_status: 'coming_soon',
-    updated_at: '2026-09-10',
-    publisher: { name: 'Maritime Data Co', handle: 'maritime' },
-    license: 'Commercial / Proprietary',
-    update_frequency: 'Live Stream',
-    bbox: [-180, -90, 180, 90],
-    schema: [
-      { name: 'mmsi', type: 'number(9,0)', description: 'Maritime Mobile Service Identity' },
-      { name: 'timestamp', type: 'timestamp_ltz', description: 'Ping received time' },
-      { name: 'sog_knots', type: 'float', description: 'Speed over ground' },
-      { name: 'nav_status', type: 'varchar', description: 'Moored, Underway, etc.' },
-      { name: 'location', type: 'geography', description: 'Vessel coordinate' }
-    ]
-  }
-]
+const PAGE_SIZE = 20
+type Tab = 'all' | 'spatial' | 'tabular'
 
-function FormatBadge({ format, isExternal }: { format: FileFormat | ExternalConnectorType; isExternal: boolean }) {
+function FormatBadge({ format }: { format?: string | null }) {
   const formatLabels: Record<string, { label: string; bg: string; text: string }> = {
     geojson: { label: 'GeoJSON', bg: 'bg-emerald-500/10 dark:bg-emerald-500/20', text: 'text-emerald-700 dark:text-emerald-300' },
-    csv: { label: 'CSV / Lat-Lon', bg: 'bg-blue-500/10 dark:bg-blue-500/20', text: 'text-blue-700 dark:text-blue-300' },
+    csv: { label: 'CSV', bg: 'bg-blue-500/10 dark:bg-blue-500/20', text: 'text-blue-700 dark:text-blue-300' },
+    tsv: { label: 'TSV', bg: 'bg-blue-500/10 dark:bg-blue-500/20', text: 'text-blue-700 dark:text-blue-300' },
+    duckdb: { label: 'DuckDB', bg: 'bg-amber-500/10 dark:bg-amber-500/20', text: 'text-amber-700 dark:text-amber-300' },
+    parquet: { label: 'Parquet', bg: 'bg-sky-500/10 dark:bg-sky-500/20', text: 'text-sky-700 dark:text-sky-300' },
+    json: { label: 'JSON', bg: 'bg-indigo-500/10 dark:bg-indigo-500/20', text: 'text-indigo-700 dark:text-indigo-300' },
     gpkg: { label: 'GeoPackage', bg: 'bg-purple-500/10 dark:bg-purple-500/20', text: 'text-purple-700 dark:text-purple-300' },
-    shapefile: { label: 'Shapefile ZIP', bg: 'bg-amber-500/10 dark:bg-amber-500/20', text: 'text-amber-700 dark:text-amber-300' },
-    snowflake: { label: 'Snowflake Live', bg: 'bg-sky-500/10 dark:bg-sky-500/20', text: 'text-sky-700 dark:text-sky-300' },
-    wms: { label: 'OGC WMS', bg: 'bg-indigo-500/10 dark:bg-indigo-500/20', text: 'text-indigo-700 dark:text-indigo-300' },
+    shp: { label: 'Shapefile', bg: 'bg-amber-500/10 dark:bg-amber-500/20', text: 'text-amber-700 dark:text-amber-300' },
+    kml: { label: 'KML', bg: 'bg-amber-500/10 dark:bg-amber-500/20', text: 'text-amber-700 dark:text-amber-300' },
   }
-
-  const match = formatLabels[format] || { label: format.toUpperCase(), bg: 'bg-gisviz-rail-soft', text: 'text-gisviz-ink' }
+  const f = (format || '').toLowerCase()
+  const match = formatLabels[f] || { label: f ? f.toUpperCase() : 'DATA', bg: 'bg-gisviz-rail-soft', text: 'text-gisviz-ink' }
 
   return (
     <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md font-mono text-[11px] font-semibold ${match.bg} ${match.text}`}>
-      {isExternal && <Lock size={10} />}
       {match.label}
     </span>
   )
 }
 
-function formatBytes(bytes?: number): string {
-  if (!bytes) return '--'
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
+const fmtDate = (s?: string | null) =>
+  s ? new Date(s).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '—'
 
-function DatasetCard({ dataset }: { dataset: Dataset }) {
+const fmtBbox = (b?: number[] | null) =>
+  b && b.length === 4 ? `[${b.map(v => Number(v).toFixed(3)).join(', ')}]` : 'Not spatial'
+
+function DatasetCard({ dataset, publisher }: { dataset: Card; publisher: boolean }) {
   const [expanded, setExpanded] = useState(false)
-  const isExternal = dataset.source_category === 'external'
+  const [detail, setDetail] = useState<CatalogDetail | null>(null)
+  const [detailError, setDetailError] = useState('')
+  const isSpatial = !!dataset.geometry_type
+
+  // columns + post count are loaded the first time the schema is opened
+  useEffect(() => {
+    if (!expanded || detail) return
+    let cancelled = false
+    gisvizApi.fetchCatalogDataset(dataset.dataset_id)
+      .then((r: CatalogDetail) => { if (!cancelled) setDetail(r) })
+      .catch(() => { if (!cancelled) setDetailError('Could not load the schema.') })
+    return () => { cancelled = true }
+  }, [expanded, detail, dataset.dataset_id])
+
+  const sourceHref = dataset.source_url
+    ? (dataset.source_url.startsWith('http') ? dataset.source_url : `https://${dataset.source_url}`)
+    : null
 
   return (
     <article className="w-full rounded-xl border border-gisviz-border bg-gisviz-card hover:border-gisviz-border-strong hover:shadow-sm transition-all flex flex-col overflow-hidden">
       <div className="p-5 sm:p-6 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-2.5 mb-2">
-            <FormatBadge format={dataset.format} isExternal={isExternal} />
-            <span className="text-[12px] font-mono text-gisviz-ink-soft">{dataset.crs}</span>
-            <span className="text-[12px] text-gisviz-border-strong">·</span>
-            <span className="text-[12px] font-medium text-gisviz-ink-soft">{dataset.category}</span>
+            <FormatBadge format={dataset.format} />
+            {dataset.category && (
+              <>
+                <span className="text-[12px] text-gisviz-border-strong">·</span>
+                <span className="text-[12px] font-medium text-gisviz-ink-soft capitalize">{dataset.category}</span>
+              </>
+            )}
           </div>
 
           <h2 className="font-display text-[18px] font-bold text-gisviz-ink tracking-tight mb-1.5">
             {dataset.title}
           </h2>
-          <p className="text-[14px] text-gisviz-ink-soft leading-relaxed max-w-4xl line-clamp-2 lg:line-clamp-1">
-            {dataset.description}
-          </p>
+          {dataset.description && (
+            <p className="text-[14px] text-gisviz-ink-soft leading-relaxed max-w-4xl line-clamp-2 lg:line-clamp-1">
+              {dataset.description}
+            </p>
+          )}
 
           <div className="mt-3 flex flex-wrap items-center gap-4 text-[12.5px] text-gisviz-ink-soft">
             <div>
               <span className="text-gisviz-ink-soft/80">Brought to you by: </span>
-              <Link href={`/profile/${dataset.publisher.handle}`} className="font-semibold text-gisviz-ink hover:text-gisviz-accent transition-colors">
-                @{dataset.publisher.handle}
-              </Link>
+              {sourceHref ? (
+                <a href={sourceHref} target="_blank" rel="noopener noreferrer" className="font-semibold text-gisviz-ink hover:text-gisviz-accent transition-colors">
+                  {dataset.publisher || dataset.source_name || 'Source'}
+                </a>
+              ) : (
+                <span className="font-semibold text-gisviz-ink">{dataset.publisher || dataset.source_name || 'GISViz'}</span>
+              )}
             </div>
             <span className="hidden sm:inline text-gisviz-border-strong">·</span>
-            <span>Updated {dataset.updated_at}</span>
+            <span>Updated {fmtDate(dataset.updated_at)}</span>
             <span className="hidden sm:inline text-gisviz-border-strong">·</span>
-            <button 
+            <button
               onClick={() => setExpanded(!expanded)}
               className="inline-flex items-center gap-1.5 font-medium text-gisviz-ink hover:text-gisviz-accent transition-colors"
             >
@@ -158,34 +118,33 @@ function DatasetCard({ dataset }: { dataset: Dataset }) {
         <div className="flex items-center justify-between lg:justify-end gap-6 shrink-0 pt-4 lg:pt-0 border-t lg:border-t-0 border-gisviz-border/60">
           <div className="grid grid-cols-2 lg:flex items-center gap-6 text-left lg:text-right font-mono text-[12.5px]">
             <div>
-              <span className="block text-[10.5px] uppercase tracking-wider text-gisviz-ink-soft/70">Features</span>
-              <span className="font-semibold text-gisviz-ink">
-                {dataset.feature_count ? dataset.feature_count.toLocaleString() : 'Streamed'}
-              </span>
+              <span className="block text-[10.5px] uppercase tracking-wider text-gisviz-ink-soft/70">{isSpatial ? 'Features' : 'Rows'}</span>
+              <span className="font-semibold text-gisviz-ink">{Number(dataset.row_count || 0).toLocaleString()}</span>
             </div>
             <div>
-              <span className="block text-[10.5px] uppercase tracking-wider text-gisviz-ink-soft/70">Size</span>
-              <span className="font-semibold text-gisviz-ink">
-                {isExternal ? 'Live Query' : formatBytes(dataset.file_size_bytes)}
-              </span>
+              <span className="block text-[10.5px] uppercase tracking-wider text-gisviz-ink-soft/70">Geometry</span>
+              <span className="font-semibold text-gisviz-ink">{dataset.geometry_type || 'None'}</span>
             </div>
           </div>
 
           <div className="shrink-0 min-w-[140px] flex justify-end">
-            {isExternal ? (
-              <span className="inline-flex items-center gap-1.5 text-[12px] font-medium text-gisviz-ink-soft bg-gisviz-paper px-3 py-2 rounded-[8px] border border-gisviz-border">
-                <Lock size={12} /> Enterprise
-              </span>
-            ) : (
+            {publisher ? (
+              <Link
+                href={`/post/upload?dataset=${encodeURIComponent(dataset.dataset_id)}`}
+                className="inline-flex items-center gap-2 h-9 px-4 rounded-[8px] bg-gisviz-accent text-[13px] font-semibold text-[color:var(--accent-on)] hover:brightness-105 transition-all shadow-sm"
+              >
+                Create Post <PlusCircle size={14} className="opacity-70" />
+              </Link>
+            ) : sourceHref ? (
               <a
-                href={dataset.resource_url || '#'}
+                href={sourceHref}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 h-9 px-4 rounded-[8px] bg-gisviz-accent text-[13px] font-semibold text-[color:var(--accent-on)] hover:brightness-105 transition-all shadow-sm"
               >
-                Access Dataset <ArrowUpRight size={14} className="opacity-70" />
+                View Source <ArrowUpRight size={14} className="opacity-70" />
               </a>
-            )}
+            ) : null}
           </div>
         </div>
       </div>
@@ -207,19 +166,28 @@ function DatasetCard({ dataset }: { dataset: Dataset }) {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gisviz-border/50 text-[12.5px]">
-                    {dataset.schema ? dataset.schema.map(f => (
-                      <tr key={f.name}>
-                        <td className="px-4 py-2.5 font-mono text-gisviz-ink font-medium">{f.name}</td>
-                        <td className="px-4 py-2.5 font-mono text-gisviz-accent">{f.type}</td>
-                        <td className="px-4 py-2.5 text-gisviz-ink-soft hidden sm:table-cell">{f.description || '-'}</td>
-                      </tr>
-                    )) : (
+                    {!detail && !detailError && (
+                      <tr><td colSpan={3} className="px-4 py-5 text-center"><Loader2 size={16} className="inline animate-spin text-gisviz-accent" /></td></tr>
+                    )}
+                    {detailError && (
+                      <tr><td colSpan={3} className="px-4 py-4 text-center text-gisviz-alert">{detailError}</td></tr>
+                    )}
+                    {detail && detail.columns.length === 0 && (
                       <tr>
                         <td colSpan={3} className="px-4 py-4 text-center text-gisviz-ink-soft italic">
                           Schema definition not provided for this dataset.
                         </td>
                       </tr>
                     )}
+                    {detail?.columns.map(f => (
+                      <tr key={f.column_name}>
+                        <td className="px-4 py-2.5 font-mono text-gisviz-ink font-medium">{f.column_name}</td>
+                        <td className="px-4 py-2.5 font-mono text-gisviz-accent">{(f.sql_type || f.dtype).toLowerCase()}</td>
+                        <td className="px-4 py-2.5 text-gisviz-ink-soft hidden sm:table-cell">
+                          {f.label && f.label !== f.column_name ? `${f.label} · ` : ''}{f.dtype} · {Number(f.n_distinct).toLocaleString()} distinct
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
@@ -233,20 +201,30 @@ function DatasetCard({ dataset }: { dataset: Dataset }) {
                 <div>
                   <dt className="text-[11.5px] text-gisviz-ink-soft mb-1">Bounding Box (BBox)</dt>
                   <dd className="font-mono text-[11.5px] text-gisviz-ink bg-gisviz-card border border-gisviz-border rounded-md px-2.5 py-1.5 break-all">
-                    {dataset.bbox ? `[${dataset.bbox.join(', ')}]` : 'Global / Not Specified'}
+                    {fmtBbox(dataset.bbox)}
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-[11.5px] text-gisviz-ink-soft mb-1">Update Frequency</dt>
-                  <dd className="text-[13px] text-gisviz-ink font-medium">
-                    {dataset.update_frequency || 'Static'}
-                  </dd>
+                  <dt className="text-[11.5px] text-gisviz-ink-soft mb-1">Dataset ID</dt>
+                  <dd className="font-mono text-[12px] text-gisviz-ink">{dataset.dataset_id}</dd>
                 </div>
                 <div>
                   <dt className="text-[11.5px] text-gisviz-ink-soft mb-1">License & Terms</dt>
-                  <dd className="text-[13px] text-gisviz-ink font-medium">
-                    {dataset.license || 'Unknown'}
-                  </dd>
+                  <dd className="text-[13px] text-gisviz-ink font-medium">{dataset.license || 'Unknown'}</dd>
+                </div>
+                {dataset.source_name && (
+                  <div>
+                    <dt className="text-[11.5px] text-gisviz-ink-soft mb-1">Source</dt>
+                    <dd className="text-[13px] text-gisviz-ink font-medium">
+                      {sourceHref
+                        ? <a href={sourceHref} target="_blank" rel="noopener noreferrer" className="hover:text-gisviz-accent">{dataset.source_name}</a>
+                        : dataset.source_name}
+                    </dd>
+                  </div>
+                )}
+                <div>
+                  <dt className="text-[11.5px] text-gisviz-ink-soft mb-1">Posts Using It</dt>
+                  <dd className="text-[13px] text-gisviz-ink font-medium">{detail ? detail.post_count : '…'}</dd>
                 </div>
               </dl>
             </div>
@@ -258,26 +236,62 @@ function DatasetCard({ dataset }: { dataset: Dataset }) {
 }
 
 export default function DatasetsPage() {
-  const [activeTab, setActiveTab] = useState<'all' | 'file' | 'external'>('all')
-  const [search, setSearch] = useState('')
+  const { user } = useAuth() as any
+  const publisher = !!user && canPublish(user)
+  const manager = !!user && canManageDatasets(user)
 
-  const filtered = DATASETS_MOCK.filter(d => {
-    const matchesTab = activeTab === 'all' || d.source_category === activeTab
-    const matchesSearch = d.title.toLowerCase().includes(search.toLowerCase()) || 
-                          d.description.toLowerCase().includes(search.toLowerCase()) ||
-                          d.format.toLowerCase().includes(search.toLowerCase())
-    return matchesTab && matchesSearch
-  })
+  const [activeTab, setActiveTab] = useState<Tab>('all')
+  const [search, setSearch] = useState('')
+  const [term, setTerm] = useState('')
+  const [category, setCategory] = useState('')
+  const [items, setItems] = useState<Card[]>([])
+  const [total, setTotal] = useState(0)
+  const [categories, setCategories] = useState<CatalogPage['categories']>([])
+  const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    const t = setTimeout(() => setTerm(search.trim()), 300)
+    return () => clearTimeout(t)
+  }, [search])
+
+  const query = (skip: number) =>
+    gisvizApi.listCatalog({ q: term, category, kind: activeTab === 'all' ? '' : activeTab, skip, limit: PAGE_SIZE })
+
+  // first page whenever a filter changes
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    query(0)
+      .then((r: CatalogPage) => {
+        if (cancelled) return
+        setItems(r.items); setTotal(r.total); setCategories(r.categories); setError('')
+      })
+      .catch(() => { if (!cancelled) setError('Could not load the dataset catalog.') })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [term, category, activeTab])
+
+  const loadMore = async () => {
+    setLoadingMore(true)
+    try {
+      const r: CatalogPage = await query(items.length)
+      setItems(prev => [...prev, ...r.items]); setTotal(r.total)
+    } catch { setError('Could not load more datasets.') }
+    finally { setLoadingMore(false) }
+  }
 
   return (
-    <main className="mx-auto max-w-[1440px] px-4 sm:px-8 lg:px-[72px] pt-8 pb-16">
+    <main className="mx-auto w-full max-w-5xl px-4 sm:px-6 lg:px-8 pt-8 pb-16">
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 border-b border-gisviz-border">
         <div>
           <h1 className="font-display text-[30px] font-bold tracking-[-0.03em] text-gisviz-ink mt-1">
             Datasets
           </h1>
           <p className="text-[14.5px] text-gisviz-ink-soft mt-1 max-w-xl">
-            Access geospatial layers in standard formats.
+            Access varieties of data.
           </p>
         </div>
 
@@ -293,8 +307,21 @@ export default function DatasetsPage() {
             />
           </div>
 
+          {categories.length > 0 && (
+            <select
+              value={category}
+              onChange={e => setCategory(e.target.value)}
+              className="h-10 px-3 rounded-[10px] border border-gisviz-border bg-gisviz-card text-[13px] font-medium text-gisviz-ink focus:outline-none focus:ring-1 focus:ring-gisviz-accent capitalize"
+            >
+              <option value="">All categories</option>
+              {categories.map(c => (
+                <option key={c.category} value={c.category}>{c.category} ({c.count})</option>
+              ))}
+            </select>
+          )}
+
           <div className="inline-flex h-10 p-1 rounded-[10px] border border-gisviz-border bg-gisviz-paper/80">
-            {(['all', 'file', 'external'] as const).map(tab => (
+            {(['all', 'spatial', 'tabular'] as const).map(tab => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -304,19 +331,38 @@ export default function DatasetsPage() {
                     : 'text-gisviz-ink-soft hover:text-gisviz-ink'
                 }`}
               >
-                {tab === 'all' ? 'All Sources' : tab === 'file' ? 'Direct Files' : 'External'}
+                {tab === 'all' ? 'All' : tab === 'spatial' ? 'Spatial' : 'Tabular'}
               </button>
             ))}
           </div>
+
+          {manager && (
+            <Link
+              href="/admin/datasets"
+              className="inline-flex items-center justify-center gap-1.5 h-10 px-3.5 rounded-[10px] border border-gisviz-border bg-gisviz-card text-[13px] font-semibold text-gisviz-ink hover:border-gisviz-accent hover:text-gisviz-accent transition-colors"
+            >
+              <Settings2 size={15} /> Manage
+            </Link>
+          )}
         </div>
       </header>
 
       <div className="mt-6 flex flex-col gap-3">
-        {filtered.map(dataset => (
-          <DatasetCard key={dataset.id} dataset={dataset} />
-        ))}
+        {loading && items.length === 0 && (
+          <div className="flex justify-center py-16"><Loader2 size={28} className="animate-spin text-gisviz-accent" /></div>
+        )}
 
-        {filtered.length === 0 && (
+        {error && (
+          <div className="rounded-xl border border-gisviz-border bg-gisviz-card py-6 px-6 text-center text-[13.5px] text-gisviz-alert">{error}</div>
+        )}
+
+        <div className={`flex flex-col gap-3 transition-opacity ${loading && items.length ? 'opacity-60' : ''}`}>
+          {items.map(dataset => (
+            <DatasetCard key={dataset.dataset_id} dataset={dataset} publisher={publisher} />
+          ))}
+        </div>
+
+        {!loading && !error && items.length === 0 && (
           <div className="rounded-xl border border-gisviz-border bg-gisviz-card py-16 px-6 text-center">
             <p className="font-display text-[16px] font-bold text-gisviz-ink">
               No datasets found matching your criteria
@@ -324,6 +370,19 @@ export default function DatasetsPage() {
             <p className="text-[13.5px] text-gisviz-ink-soft mt-1">
               Try adjusting your search query or reset the filter tab.
             </p>
+          </div>
+        )}
+
+        {items.length < total && (
+          <div className="flex justify-center pt-3">
+            <button
+              onClick={loadMore}
+              disabled={loadingMore}
+              className="inline-flex items-center gap-2 h-10 px-5 rounded-[10px] border border-gisviz-border bg-gisviz-card text-[13px] font-semibold text-gisviz-ink hover:border-gisviz-accent hover:text-gisviz-accent disabled:opacity-60"
+            >
+              {loadingMore && <Loader2 size={14} className="animate-spin" />}
+              Load more ({(total - items.length).toLocaleString()} remaining)
+            </button>
           </div>
         )}
       </div>

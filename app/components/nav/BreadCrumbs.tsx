@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { ChevronRight, Home, Loader2 } from 'lucide-react'
-import { gisvizApi } from '../../../services/api' // Strictly requested import
+import { gisvizApi } from '../../../connector/api' // Strictly requested import
 
 export default function GlobalSubNav() {
   const pathname = usePathname()
@@ -40,15 +40,43 @@ export default function GlobalSubNav() {
     }
   }, [pathname, dynamicData?.id])
 
-  // Hide the SubNav entirely on the main feed or authentication pages
-  if (!pathname || pathname === '/' || pathname === '/auth' || pathname === '/services' || pathname === '/datasets' || pathname.startsWith('/legal')) {
-    return null
-  }
+  if (!pathname) return null
+
+  // On these pages the bar is shown on mobile only (hidden from the sm breakpoint up, as before).
+  const mobileOnly =
+    pathname === '/' || pathname === '/auth' || pathname === '/services' || pathname.startsWith('/legal')
 
   // ── Route Logic Directory ──
   const crumbs: { label: string; href?: string }[] = []
 
-  if (pathname.startsWith('/settings')) {
+  const pretty = (seg: string) => decodeURIComponent(seg).replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+
+  if (pathname === '/') {
+    // Home: no trailing crumbs, the Feed label itself is the current page
+  }
+  else if (pathname === '/auth') {
+    crumbs.push({ label: 'Sign in' })
+  }
+  else if (pathname === '/services') {
+    crumbs.push({ label: 'Services' })
+  }
+  else if (pathname === '/datasets') {
+    crumbs.push({ label: 'Datasets' })
+  }
+  else if (pathname.startsWith('/admin/datasets')) {
+    crumbs.push({ label: 'Admin', href: '/admin' })
+    crumbs.push({ label: 'Datasets', href: '/admin/datasets' })
+  }
+  else if (pathname.startsWith('/legal')) {
+    crumbs.push({ label: 'Legal', href: '/legal' })
+    const rest = pathname.split('/').filter(Boolean).slice(1)
+    if (rest.length) crumbs.push({ label: pretty(rest[rest.length - 1]) })
+  }
+  else if (pathname.startsWith('/post/upload')) {
+    crumbs.push({ label: 'Publications' })
+    crumbs.push({ label: 'New Post', href: '/post/upload' })
+  }
+  else if (pathname.startsWith('/settings')) {
     crumbs.push({ label: 'Account' })
     crumbs.push({ label: 'Settings', href: '/settings' })
   } 
@@ -83,8 +111,8 @@ export default function GlobalSubNav() {
   }
 
   return (
-    <div className="w-full border-b border-gisviz-border/60 z-40">
-      <div className="mx-auto max-w-[1440px] px-4 sm:px-8 lg:px-[72px] h-11 flex items-center">
+    <div className={`w-full border-b border-gisviz-border/60 z-40 ${mobileOnly ? 'sm:hidden' : ''}`}>
+      <div className="mx-auto max-w-6xl px-4 sm:px-8 lg:px-[72px] h-11 flex items-center">
         
         <nav 
           className="flex items-center gap-1.5 sm:gap-2 text-[12.5px] font-medium text-gisviz-ink-soft overflow-x-auto whitespace-nowrap"
@@ -94,7 +122,6 @@ export default function GlobalSubNav() {
           
           <Link href="/" className="flex items-center gap-1.5 hover:text-gisviz-accent transition-colors shrink-0">
             <Home size={14} className="mb-[1px]" />
-            <span className="hidden sm:inline">Feed</span>
           </Link>
 
           {crumbs.map((crumb, index) => {

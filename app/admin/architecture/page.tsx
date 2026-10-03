@@ -154,17 +154,17 @@ export default function ArchitecturePage() {
   const totalSecured = routes.filter(r => r.secured).length
 
   return (
-    <div className="max-w-6xl mx-auto py-8 px-4 pb-20">
+    <div className="mx-auto w-full max-w-5xl px-4 sm:px-6 lg:px-8 py-8 pb-20">
 
       {/* ── header ──────────────────────────────────────────────────────────── */}
       <div className="mb-6">
 
         <div className="flex items-start justify-between flex-wrap gap-4">
           <div>
-            <h1 className="text-[24px] font-display font-bold text-gisviz-ink flex items-center gap-3">
+            <h1 className="text-[28px] sm:text-[32px] font-display font-bold text-gisviz-ink tracking-tight flex items-center gap-3">
               <Cpu className="text-gisviz-accent" size={28} /> System Architecture
             </h1>
-            <p className="text-gisviz-ink-soft font-mono text-[12px] mt-1">
+            <p className="text-[14.5px] text-gisviz-ink-soft mt-1.5 leading-relaxed">
               Drawn from <code className="text-gisviz-ink">/openapi.json</code> at page load — never hand-written.
             </p>
           </div>

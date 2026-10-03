@@ -84,15 +84,15 @@ export default function ERDPage() {
   const dbs           = data ? [...new Set(data.tables.map(t => t.database))] : []
 
   return (
-    <div className="max-w-full py-8 px-4 pb-20">
+    <div className="mx-auto w-full max-w-5xl px-4 sm:px-6 lg:px-8 py-8 pb-20">
 
-      <div className="mb-6 max-w-6xl mx-auto">
+      <div className="mb-6 max-w-5xl mx-auto">
         <div className="flex items-start justify-between flex-wrap gap-4">
           <div>
-            <h1 className="text-[24px] font-display font-bold text-gisviz-ink flex items-center gap-3">
+            <h1 className="text-[28px] sm:text-[32px] font-display font-bold text-gisviz-ink tracking-tight flex items-center gap-3">
               <Database className="text-gisviz-accent" size={28} /> Entity Relationship Diagram
             </h1>
-            <p className="text-gisviz-ink-soft font-mono text-[12px] mt-1">
+            <p className="text-[14.5px] text-gisviz-ink-soft mt-1.5 leading-relaxed">
               Live from <code className="text-gisviz-ink">GET /api/v0/admin/schema</code> — introspects SQLAlchemy metadata directly.
             </p>
           </div>
@@ -110,7 +110,7 @@ export default function ERDPage() {
       </div>
 
       {data && (
-        <div className="mb-4 max-w-6xl mx-auto flex flex-wrap items-center gap-3">
+        <div className="mb-4 max-w-5xl mx-auto flex flex-wrap items-center gap-3">
           <div className="flex gap-1.5 flex-wrap">
             <button onClick={() => setFilterDb(null)}
               className={`px-3 py-1 rounded-sm text-[12px]  font-mono border transition-colors ${!filterDb ? 'bg-gisviz-ink text-gisviz-canvas border-gisviz-ink' : 'bg-gisviz-card border-gisviz-border text-gisviz-ink-soft hover:text-gisviz-ink'}`}>
@@ -160,18 +160,19 @@ export default function ERDPage() {
       )}
 
       {error && (
-        <div className="mb-4 max-w-6xl mx-auto px-4 py-3 rounded-sm border border-gisviz-alert/30 bg-gisviz-alert/5 text-[12px] font-mono text-gisviz-alert">
+        <div className="mb-4 max-w-5xl mx-auto px-4 py-3 rounded-sm border border-gisviz-alert/30 bg-gisviz-alert/5 text-[12px] font-mono text-gisviz-alert">
           {error}
         </div>
       )}
 
       {loading ? (
-        <div className="flex items-center justify-center py-24 bg-gisviz-card border border-gisviz-border rounded-sm max-w-6xl mx-auto">
+        <div className="flex items-center justify-center py-24 bg-gisviz-card border border-gisviz-border rounded-sm max-w-5xl mx-auto">
           <Loader2 size={24} className="animate-spin text-gisviz-accent" />
         </div>
       ) : data ? (
-        <div className="overflow-auto border border-gisviz-border rounded-sm bg-gisviz-canvas shadow-sm">
-          <div style={{ transform: `scale(${zoom})`, transformOrigin: 'top left' }}>
+        <div className="overflow-auto border border-gisviz-border rounded-sm bg-gisviz-canvas shadow-sm w-full">
+          {/* CSS zoom (not transform) scales the layout box too, so the diagram stays centred at any zoom level */}
+          <div style={{ zoom, width: 'fit-content', margin: '0 auto' }}>
             <ERDCanvas
               tables={visibleTables}
               relationships={visibleRels}
@@ -184,7 +185,7 @@ export default function ERDPage() {
       ) : null}
 
       {selected && (
-        <div className="mt-4 max-w-6xl mx-auto bg-gisviz-card border rounded-sm shadow-sm overflow-hidden"
+        <div className="mt-4 max-w-5xl mx-auto bg-gisviz-card border rounded-sm shadow-sm overflow-hidden"
              style={{ borderColor: selected.dbColor }}>
           <div className="flex items-center justify-between px-5 py-3 border-b border-gisviz-border"
                style={{ backgroundColor: selected.dbColor + '18' }}>
@@ -236,7 +237,8 @@ function ERDCanvas({ tables, relationships, crossRefs, selected, onSelect }: {
   selected: ERDTable | null; onSelect: (t: ERDTable) => void
 }) {
   const COL_W  = 210; const ROW_H = 20; const HEAD_H = 30
-  const GAP_X  = 40;  const GAP_Y = 28; const COLS   = 4;  const PAD = 30
+  const GAP_X  = 40;  const GAP_Y = 28; const PAD = 30
+  const COLS   = Math.max(1, Math.min(4, tables.length))   // no empty columns when a DB filter shows few tables
 
   const heights: Record<string, number> = {}
   tables.forEach(t => { heights[t.id] = HEAD_H + t.columns.length * ROW_H + 6 })
@@ -252,7 +254,7 @@ function ERDCanvas({ tables, relationships, crossRefs, selected, onSelect }: {
     colHeights[c] += h + GAP_Y
   })
 
-  const SVG_W = COLS * (COL_W + GAP_X) + PAD
+  const SVG_W = COLS * COL_W + (COLS - 1) * GAP_X + 2 * PAD     // symmetric padding so the diagram is truly centred
   const SVG_H = Math.max(...colHeights) + PAD
 
   function connector(rel: Rel, color: string, dashed = false) {

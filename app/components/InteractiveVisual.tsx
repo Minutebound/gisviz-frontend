@@ -21,13 +21,16 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTheme } from 'next-themes'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import type { GeoJSONSource, Map as MLMap, MapLayerMouseEvent, Popup } from 'maplibre-gl'
+import D3Chart from './visuals/D3Chart'
 import {
   AlertTriangle, BarChart3, Loader2, Map as MapIcon, Maximize2, Minimize2, Pause, Play, Table2,
 } from 'lucide-react'
 
 /* ═══════════════════ Types: the post's `visual_spec` ═══════════════════ */
 
-export type ChartType = 'line' | 'bar' | 'scatter'
+export type ChartType =
+  | 'line' | 'area' | 'bar' | 'hbar' | 'stacked' | 'scatter'
+  | 'bubble' | 'histogram' | 'donut' | 'treemap' | 'heatmap'
 export type Row = Record<string, unknown>
 
 export interface GeoFeature {
@@ -43,11 +46,17 @@ export interface GeoFeatureCollection {
 
 export interface ChartSpec {
   kind: 'chart'
+  /** Post theme colour (#rrggbb). Overrides the site accent for this visual only. */
+  accent?: string
   chart_type: ChartType
   /** Inline rows, or a URL returning a JSON array of rows. */
   data: Row[] | string
-  /** x-axis column (category/date label, or a number for scatter). */
+  /** x-axis column (category/date label, or a number for scatter). Unused by histogram. */
   x: string
+  /** Series / second category column (stacked bar, heatmap). */
+  z?: string
+  /** Numeric column that sets bubble size. */
+  size?: string
   /** Numeric column plotted by default. */
   y: string
   /** Numeric columns the viewer can switch between. Defaults to [y]. */
@@ -58,8 +67,12 @@ export interface ChartSpec {
 
 export interface MapSpec {
   kind: 'map'
+  /** Post theme colour (#rrggbb). Overrides the site accent for this visual only. */
+  accent?: string
   /** Inline GeoJSON FeatureCollection, or a URL returning one. */
   data: GeoFeatureCollection | string
+  /** 'heat' draws point density with MapLibre's heatmap layer; 'auto' picks by geometry. */
+  map_style?: 'auto' | 'heat'
   /** Numeric property that drives colour (and point size). */
   value_field: string
   /** Property used as the popup title, e.g. "name". */
@@ -127,30 +140,11 @@ const fmt = (v: unknown): string => {
 const compact = (n: number) =>
   new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(n)
 
-const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v))
 const truncate = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1) + '…' : s)
 
 /** User data ends up in popup HTML, so always escape it. */
 const escapeHtml = (s: string) =>
   s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string))
-
-function niceTicks(min: number, max: number, count = 5): number[] {
-  if (!Number.isFinite(min) || !Number.isFinite(max)) return [0, 1]
-  if (min === max) {
-    const pad = Math.abs(min) * 0.1 || 1
-    min -= pad
-    max += pad
-  }
-  const raw = (max - min) / Math.max(1, count)
-  const mag = 10 ** Math.floor(Math.log10(raw))
-  const norm = raw / mag
-  const step = (norm < 1.5 ? 1 : norm < 3 ? 2 : norm < 7 ? 5 : 10) * mag
-  const start = Math.floor(min / step) * step
-  const end = Math.ceil(max / step) * step
-  const out: number[] = []
-  for (let v = start; v <= end + step / 2; v += step) out.push(Number(v.toFixed(12)))
-  return out
-}
 
 const hex2 = (n: number) => n.toString(16).padStart(2, '0')
 const rgbToHex = (r: number, g: number, b: number) => `#${hex2(r)}${hex2(g)}${hex2(b)}`
@@ -228,190 +222,7 @@ function useElementSize<T extends HTMLElement>() {
   return [ref, size] as const
 }
 
-/* ═══════════════════ Chart renderer (no dependencies) ═══════════════════ */
-
-interface Pt { row: Row; xRaw: unknown; xNum: number | null; y: number }
-
-function ChartView({ rows, x, field, fields, type }: {
-  rows: Row[]; x: string; field: string; fields: string[]; type: ChartType
-}) {
-  const [ref, { width, height }] = useElementSize<HTMLDivElement>()
-  const [hover, setHover] = useState<number | null>(null)
-
-  const pts = useMemo(() => {
-    const out: Pt[] = []
-    for (const row of rows) {
-      const y = toNum(row[field])
-      if (y !== null) out.push({ row, xRaw: row[x], xNum: toNum(row[x]), y })
-    }
-    return out
-  }, [rows, x, field])
-
-  useEffect(() => setHover(null), [field, type])
-
-  const L = useMemo(() => {
-    if (!pts.length || width < 80 || height < 80) return null
-    const M = { top: 18, right: 20, bottom: 42, left: 58 }
-    const iw = width - M.left - M.right
-    const ih = height - M.top - M.bottom
-
-    const ys = pts.map(p => p.y)
-    let yLo = Math.min(...ys)
-    let yHi = Math.max(...ys)
-    if (type === 'bar') { yLo = Math.min(0, yLo); yHi = Math.max(0, yHi) }
-    const yTicks = niceTicks(yLo, yHi, Math.max(2, Math.floor(ih / 64)))
-    const y0 = yTicks[0]
-    const y1 = yTicks[yTicks.length - 1]
-    const sy = (v: number) => M.top + ih - ((v - y0) / (y1 - y0 || 1)) * ih
-    const bottom = M.top + ih
-    const zeroY = sy(clamp(0, y0, y1))
-
-    const numericX = type === 'scatter' && pts.every(p => p.xNum !== null)
-    const band = iw / pts.length
-    let xOf: (k: number) => number
-    let xLabels: { x: number; text: string }[]
-
-    if (numericX) {
-      const xs = pts.map(p => p.xNum as number)
-      const xt = niceTicks(Math.min(...xs), Math.max(...xs), Math.max(2, Math.floor(iw / 90)))
-      const x0 = xt[0]
-      const x1 = xt[xt.length - 1]
-      const sx = (v: number) => M.left + ((v - x0) / (x1 - x0 || 1)) * iw
-      xOf = k => sx(pts[k].xNum as number)
-      xLabels = xt.map(t => ({ x: sx(t), text: compact(t) }))
-    } else {
-      xOf = k => M.left + band * (k + 0.5)
-      const every = Math.ceil(pts.length / Math.max(1, Math.floor(iw / 72)))
-      xLabels = pts.flatMap((p, k) =>
-        k % every === 0 ? [{ x: xOf(k), text: truncate(String(p.xRaw ?? ''), 10) }] : [])
-    }
-    return { M, iw, ih, bottom, zeroY, yTicks, sy, xOf, band, numericX, xLabels }
-  }, [pts, width, height, type])
-
-  const onPointer = (e: React.PointerEvent<SVGRectElement>) => {
-    if (!L) return
-    const box = (e.currentTarget.ownerSVGElement as SVGSVGElement).getBoundingClientRect()
-    const mx = e.clientX - box.left
-    const my = e.clientY - box.top
-    if (L.numericX) {
-      let best = -1
-      let bestD = Infinity
-      pts.forEach((p, k) => {
-        const d = Math.hypot(L.xOf(k) - mx, L.sy(p.y) - my)
-        if (d < bestD) { bestD = d; best = k }
-      })
-      setHover(bestD < 40 ? best : null)
-    } else {
-      const k = Math.floor((mx - L.M.left) / L.band)
-      setHover(k >= 0 && k < pts.length ? k : null)
-    }
-  }
-
-  if (!pts.length) {
-    return (
-      <div className="h-full flex items-center justify-center text-[13.5px] text-gisviz-ink-soft">
-        No numeric values in <span className="font-mono mx-1">{field}</span> to plot.
-      </div>
-    )
-  }
-
-  const tip = hover !== null && L ? { x: L.xOf(hover), y: L.sy(pts[hover].y), p: pts[hover] } : null
-  const tipBelow = tip ? tip.y < 120 : false
-  const showDots = type === 'line' && pts.length <= 80
-
-  return (
-    <div ref={ref} className="relative w-full h-full text-gisviz-accent">
-      {L && (
-        <svg width={width} height={height} className="block select-none touch-none" role="img"
-             aria-label={`${type} chart of ${field} by ${x}`}>
-          {L.yTicks.map(t => (
-            <g key={t}>
-              <line x1={L.M.left} x2={width - L.M.right} y1={L.sy(t)} y2={L.sy(t)}
-                    className="stroke-gisviz-border" strokeWidth={1}
-                    strokeDasharray={t === 0 ? undefined : '3 4'} />
-              <text x={L.M.left - 10} y={L.sy(t)} dy="0.32em" textAnchor="end" fontSize={11.5}
-                    className="fill-gisviz-ink-soft font-mono">{compact(t)}</text>
-            </g>
-          ))}
-
-          {L.xLabels.map((l, i) => (
-            <text key={i} x={l.x} y={L.bottom + 22} textAnchor="middle" fontSize={11.5}
-                  className="fill-gisviz-ink-soft">{l.text}</text>
-          ))}
-
-          {tip && type !== 'bar' && (
-            <line x1={tip.x} x2={tip.x} y1={L.M.top} y2={L.bottom}
-                  className="stroke-gisviz-ink-soft" strokeOpacity={0.5} strokeWidth={1} strokeDasharray="2 3" />
-          )}
-
-          {type === 'line' && (() => {
-            const line = pts.map((p, k) => `${k ? 'L' : 'M'}${L.xOf(k)},${L.sy(p.y)}`).join('')
-            const area = `${line}L${L.xOf(pts.length - 1)},${L.bottom}L${L.xOf(0)},${L.bottom}Z`
-            return (
-              <>
-                <path d={area} fill="currentColor" opacity={0.08} />
-                <path d={line} fill="none" stroke="currentColor" strokeWidth={2.25}
-                      strokeLinejoin="round" strokeLinecap="round" />
-                {showDots && pts.map((p, k) => (
-                  <circle key={k} cx={L.xOf(k)} cy={L.sy(p.y)} r={hover === k ? 5.5 : 3}
-                          fill="currentColor" className="stroke-gisviz-card" strokeWidth={hover === k ? 2 : 0} />
-                ))}
-                {!showDots && tip && (
-                  <circle cx={tip.x} cy={tip.y} r={5.5} fill="currentColor"
-                          className="stroke-gisviz-card" strokeWidth={2} />
-                )}
-              </>
-            )
-          })()}
-
-          {type === 'bar' && pts.map((p, k) => {
-            const bw = Math.max(2, Math.min(56, L.band * 0.68))
-            const top = L.sy(p.y)
-            return (
-              <rect key={k} x={L.xOf(k) - bw / 2} y={Math.min(top, L.zeroY)}
-                    width={bw} height={Math.max(1, Math.abs(L.zeroY - top))}
-                    rx={Math.min(4, bw / 4)} fill="currentColor"
-                    opacity={hover === null ? 0.85 : hover === k ? 1 : 0.4}
-                    style={{ transition: 'opacity 120ms' }} />
-            )
-          })}
-
-          {type === 'scatter' && pts.map((p, k) => (
-            <circle key={k} cx={L.xOf(k)} cy={L.sy(p.y)} r={hover === k ? 7.5 : 5}
-                    fill="currentColor" opacity={hover === null || hover === k ? 0.8 : 0.3}
-                    className="stroke-gisviz-card" strokeWidth={hover === k ? 2 : 1} />
-          ))}
-
-          {/* One transparent hit area drives all hovering (mouse + touch). */}
-          <rect x={L.M.left} y={L.M.top} width={L.iw} height={L.ih} fill="transparent"
-                onPointerMove={onPointer} onPointerDown={onPointer}
-                onPointerLeave={() => setHover(null)} />
-        </svg>
-      )}
-
-      {tip && (
-        <div
-          className="pointer-events-none absolute z-10 min-w-[170px] rounded-[10px] border border-gisviz-border bg-gisviz-card px-3 py-2 text-[12.5px] shadow-lg"
-          style={{
-            left: clamp(tip.x, 95, Math.max(95, width - 95)),
-            top: tipBelow ? tip.y + 14 : tip.y - 14,
-            transform: `translate(-50%, ${tipBelow ? '0' : '-100%'})`,
-          }}
-        >
-          <div className="mb-1 font-semibold text-gisviz-ink">
-            {L?.numericX ? `${x}: ${fmt(tip.p.xRaw)}` : String(tip.p.xRaw ?? '—')}
-          </div>
-          {fields.map(f => (
-            <div key={f} className={`flex justify-between gap-4 ${f === field ? 'font-semibold text-gisviz-accent' : 'text-gisviz-ink-soft'}`}>
-              <span>{f}</span>
-              <span className="font-mono">{fmt(tip.p.row[f])}</span>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
+/* Charts are drawn by <D3Chart> (app/components/visuals/D3Chart.tsx); maps by MapLibre below. */
 
 /* ═══════════════════ Map renderer (MapLibre) ═══════════════════ */
 
@@ -516,7 +327,8 @@ function popupHtml(props: Row, c: PopupCtx) {
   return `${title}${when}${rows}${spark}`
 }
 
-function MapView({ fc, field, fields, labelField, basemap, accent, dark, domainRows, historyOf, currentT }: {
+function MapView({ fc, field, fields, labelField, basemap, accent, dark, domainRows, historyOf, currentT, heat }: {
+  heat?: boolean
   fc: GeoFeatureCollection; field: string; fields: string[]
   labelField?: string; basemap: string; accent: string; dark: boolean
   /** Every period's rows (time series), so the colour scale doesn't shift as time moves. */
@@ -611,12 +423,29 @@ function MapView({ fc, field, fields, labelField, basemap, accent, dark, domainR
 
         let hit: string
         if (kind === 'point') {
+          if (heat) {
+            // Density surface when zoomed out; individual points (hoverable) fade in as you zoom.
+            const { lo, hi } = st[f] ?? { lo: 0, hi: 1 }
+            const rp2 = live.current.ramp
+            map.addLayer({
+              id: 'gv-heat', type: 'heatmap', source: SRC, maxzoom: 11,
+              paint: {
+                'heatmap-weight': ['interpolate', ['linear'], ['coalesce', ['to-number', ['get', f]], lo], lo, 0.15, hi === lo ? lo + 1 : hi, 1],
+                'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 0, 1, 9, 3],
+                'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 0, 8, 9, 30],
+                'heatmap-color': ['interpolate', ['linear'], ['heatmap-density'],
+                  0, 'rgba(0,0,0,0)', 0.2, rp2[0], 0.45, rp2[2], 0.75, rp2[3], 1, rp2[4]],
+                'heatmap-opacity': ['interpolate', ['linear'], ['zoom'], 7, 0.9, 11, 0],
+              },
+            })
+          }
           map.addLayer({
             id: 'gv-point', type: 'circle', source: SRC,
+            ...(heat ? { minzoom: 7 } : {}),
             paint: {
               'circle-color': color,
               'circle-radius': radiusExpr(f, st[f]),
-              'circle-opacity': 0.88,
+              'circle-opacity': heat ? ['interpolate', ['linear'], ['zoom'], 7, 0, 10, 0.88] : 0.88,
               'circle-stroke-width': ['case', hovered, 2.5, 1],
               'circle-stroke-color': ['case', hovered, '#14201b', '#ffffff'],
             },
@@ -685,7 +514,7 @@ function MapView({ fc, field, fields, labelField, basemap, accent, dark, domainR
     }
     // Geometry type and basemap rebuild the map; data changes go through setData below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [kind, basemap, labelField])
+  }, [kind, basemap, labelField, heat])
 
   // New period (or new data): swap the source data in place, no map rebuild.
   useEffect(() => {
@@ -800,7 +629,10 @@ function DataTable({ rows }: { rows: Row[] }) {
 
 /* ═══════════════════ Main component ═══════════════════ */
 
-const TYPE_LABEL: Record<ChartType, string> = { line: 'Line', bar: 'Bar', scatter: 'Scatter' }
+const TYPE_LABEL: Record<ChartType, string> = {
+  line: 'Line', area: 'Area', bar: 'Bar', hbar: 'Horizontal bar', stacked: 'Stacked', scatter: 'Scatter',
+  bubble: 'Bubble', histogram: 'Histogram', donut: 'Donut', treemap: 'Treemap', heatmap: 'Heatmap',
+}
 
 /** CSVs often give numbers as strings; coerce the colour fields so MapLibre sees real numbers. */
 function normalizeFc(fc: GeoFeatureCollection, fields: string[]): GeoFeatureCollection {
@@ -825,7 +657,8 @@ export default function InteractiveVisual({ spec, height = 520, className = '' }
   className?: string
 }) {
   const probeRef = useRef<HTMLSpanElement>(null)
-  const accent = useAccentHex(probeRef)
+  const siteAccent = useAccentHex(probeRef)
+  const accent = spec.accent && /^#[0-9a-f]{6}$/i.test(spec.accent) ? spec.accent : siteAccent
   const { resolvedTheme } = useTheme()
   const main = useSpecData<Row[] | GeoFeatureCollection>(spec.data)
   const time = spec.kind === 'map' ? spec.time : undefined
@@ -1040,7 +873,7 @@ export default function InteractiveVisual({ spec, height = 520, className = '' }
         {rows && !badData && view === 'table' && <DataTable rows={rows} />}
         {rows && !badData && view === 'visual' && spec.kind === 'chart' && (
           <div className="h-full px-2 pt-3 pb-1 sm:px-4">
-            <ChartView rows={rows} x={spec.x} field={field} fields={fields} type={chartType} />
+            <D3Chart rows={rows} type={chartType} x={spec.x} y={field} z={spec.z} size={spec.size} accent={accent} />
           </div>
         )}
         {viewFc && !badData && view === 'visual' && spec.kind === 'map' && (
@@ -1048,7 +881,8 @@ export default function InteractiveVisual({ spec, height = 520, className = '' }
                    basemap={basemap} accent={accent} dark={resolvedTheme === 'dark'}
                    domainRows={series ?? undefined}
                    historyOf={time ? historyOf : undefined}
-                   currentT={currentT} />
+                   currentT={currentT}
+                   heat={spec.map_style === 'heat'} />
         )}
       </div>
 

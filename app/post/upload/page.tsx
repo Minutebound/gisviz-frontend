@@ -1,10 +1,15 @@
 'use client'
 
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { UploadCloud, Image as ImageIcon, Loader2, Map as MapIcon, X, Tag, Info, Link as LinkIcon, Send } from 'lucide-react'
+import { UploadCloud, Loader2, X, Tag, Info, Link as LinkIcon, Send } from 'lucide-react'
 import { useAuth } from '../../../context/AuthContext'
-import { gisvizApi } from '../../../services/api'
+import { canPublish } from '../../../lib/roles'
+import NoPublishAccess from '../../components/post/NoPublishAccess'
+import { gisvizApi } from '../../../connector/api'
+import DatasetVisualPicker from '../../components/post/DataVisualPicker'
+import type { DatasetCard, VisualChoice } from '../../../types/visuals'
+import { CATEGORIES } from '../../../types/gisviz'
 
 export default function UploadPage() {
   const router = useRouter()
@@ -30,9 +35,15 @@ export default function UploadPage() {
   
   const [availableCategories, setAvailableCategories] = useState<any[]>([])
 
-  const [file, setFile] = useState<File | null>(null)
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  // Posts are built from a dataset (no image uploads): pick one, the visual type and the theme colour.
+  const [visualChoice, setVisualChoice] = useState<VisualChoice | null>(null)
+  // Post theme colour: follows the first category until the publisher picks one manually.
+  const [themeColor, setThemeColor] = useState<string>(CATEGORIES[0].theme_color)
+  const [themeTouched, setThemeTouched] = useState(false)
+  const [presetDataset, setPresetDataset] = useState<string | undefined>()
+  useEffect(() => {
+    setPresetDataset(new URLSearchParams(window.location.search).get('dataset') || undefined)
+  }, [])
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -53,17 +64,20 @@ export default function UploadPage() {
     }
   }
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const selectedFile = e.target.files[0]
-      if (!selectedFile.type.startsWith('image/')) {
-        setErrorMsg('Only image files are allowed.')
-        return
-      }
-      setFile(selectedFile)
-      setPreviewUrl(URL.createObjectURL(selectedFile))
-      setErrorMsg('')
+  // When a dataset is picked, pre-fill any empty fields from its catalog card.
+  const handleVisualChange = (choice: VisualChoice | null, card?: DatasetCard) => {
+    setVisualChoice(choice)
+    if (!card) return
+    // suggested theme colour: the dataset's category colour, until the publisher picks one
+    if (!themeTouched && card.category) {
+      const cat = card.category.toLowerCase()
+      const match = CATEGORIES.find(c => c.slug && (c.slug === cat || c.label.toLowerCase() === cat))
+      if (match) setThemeColor(match.theme_color)
     }
+    setTitle(t => t || card.title)
+    setDescription(d => d || card.description || '')
+    setSourceName(s => s || card.source_name || '')
+    setSourceUrl(u => u || card.source_url || '')
   }
 
   const addCategory = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -72,6 +86,11 @@ export default function UploadPage() {
       if (selectedCategoryIds.length >= 2) {
         e.target.value = ""
         return
+      }
+      if (selectedCategoryIds.length === 0 && !themeTouched) {
+        const slug = availableCategories.find(c => c.category_id === id)?.slug
+        const match = CATEGORIES.find(c => c.slug && c.slug === slug)
+        if (match) setThemeColor(match.theme_color)
       }
       setSelectedCategoryIds(prev => [...prev, id])
     }
@@ -130,71 +149,62 @@ export default function UploadPage() {
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault()
+    e.preventDefault()
 
-  // ── 1. Strict Pre-flight Validation ──────────────────────────────────────
-  if (!file)                          { setErrorMsg('Please upload a visual file before publishing.'); return }
-  if (!title.trim())                  { setErrorMsg('A title is required.'); return }
-  if (!sourceName.trim())             { setErrorMsg('Data Source Name is required.'); return }
-  if (selectedCategoryIds.length < 1) { setErrorMsg('Please select at least one category.'); return }
-  if (keywords.length < 1)            { setErrorMsg('Please add at least one keyword.'); return }
-  if (keywords.length > 3)            { setErrorMsg('You can only add up to 3 keywords.'); return }
+    if (!visualChoice)                  { setErrorMsg('Please search for and select a dataset first.'); return }
+    if (!title.trim())                  { setErrorMsg('A title is required.'); return }
+    if (!sourceName.trim())             { setErrorMsg('Data Source Name is required.'); return }
+    if (selectedCategoryIds.length < 1) { setErrorMsg('Please select at least one category.'); return }
+    if (keywords.length < 1)            { setErrorMsg('Please add at least one keyword.'); return }
+    if (keywords.length > 3)            { setErrorMsg('You can only add up to 3 keywords.'); return }
 
-  setIsLoading(true)
-  setErrorMsg('')
-
-  // Declare this outside so we can access it in the catch block if needed
-  let uploadedVisualPath: string | null = null
-
-  try {
-    // ── 2. Upload the Visual (Only happens if validation passes) ───────────
-    const uploadRes = await gisvizApi.uploadVisual(file)
-    uploadedVisualPath = uploadRes.visual_path
-
-    // ── 3. Create the Post ─────────────────────────────────────────────────
-    const postRes = await gisvizApi.createPost({
-      title: title.trim(),
-      description: description?.trim() || null,
-      note: note?.trim() || null,
-      source_name: sourceName.trim(),
-      source_url: sourceUrl?.trim() || null,
-      visual_image_path: uploadedVisualPath,
-      category_ids: selectedCategoryIds,
-      keywords: keywords
-    })
-
-    // ── 4. Success Redirect ────────────────────────────────────────────────
-    router.push(`/post/${postRes.post_id}`)
-
-  } catch (err: any) {
-    // ── 5. Error Handling & Potential Cleanup ──────────────────────────────
-    
-    // BONUS: If you ever add a delete endpoint to your API, you can wipe 
-    // the orphaned file right here because we saved `uploadedVisualPath`.
-    // if (uploadedVisualPath) {
-    //   await gisvizApi.deleteVisual(uploadedVisualPath).catch(console.error)
-    // }
-
-    const detail = err.response?.data?.detail
-    setErrorMsg(typeof detail === 'string' ? detail : 'Failed to publish the post. Please try again.')
-    
-  } finally {
-    setIsLoading(false)
+    setIsLoading(true)
+    setErrorMsg('')
+    try {
+      // The server validates the choice, saves the spec + theme colour, and renders the PNG for the feed/share.
+      const postRes = await gisvizApi.createPost({
+        title: title.trim(),
+        description: description?.trim() || null,
+        note: note?.trim() || null,
+        source_name: sourceName.trim(),
+        source_url: sourceUrl?.trim() || null,
+        dataset_id: visualChoice.dataset_id,
+        visual_params: {
+          viz: visualChoice.viz,
+          x: visualChoice.x ?? null,
+          y: visualChoice.y ?? null,
+          z: visualChoice.z ?? null,
+          size: visualChoice.size ?? null,
+          label_field: visualChoice.label_field ?? null,
+        },
+        theme_color: themeColor,
+        category_ids: selectedCategoryIds,
+        keywords,
+      })
+      router.push(`/post/${postRes.post_id}`)
+    } catch (err: any) {
+      const detail = err.response?.data?.detail
+      setErrorMsg(typeof detail === 'string' ? detail : 'Failed to publish the post. Please try again.')
+    } finally {
+      setIsLoading(false)
+    }
   }
-}
 
   if (authLoading || !user) return <div className="flex justify-center items-center h-64"><Loader2 size={32} className="animate-spin text-gisviz-accent" /></div>
+  if (!canPublish(user)) return <NoPublishAccess what="publish posts" />
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8 pb-24">
+    <div className="mx-auto w-full max-w-5xl px-4 sm:px-6 lg:px-8 py-8 pb-24">
       
       <div className="mb-8">
         {/* ── Renamed from "Publish Spatial Data" to "Post a GISViz" ── */}
-        <h1 className="text-[24px] font-display font-bold text-gisviz-ink flex items-center gap-3">
-          <UploadCloud className="text-gisviz-accent" size={32} />
+        <h1 className="text-[28px] sm:text-[32px] font-display font-bold text-gisviz-ink tracking-tight flex items-center gap-3">
+          <UploadCloud className="text-gisviz-accent" size={28} />
           Post a gisviz
         </h1>
-        <p className="text-gisviz-ink-soft font-mono mt-2">Upload a new visual map, dataset rendering, or dashboard to the global feed.</p>
+        <p className="text-[14.5px] text-gisviz-ink-soft mt-1.5 leading-relaxed">
+          Pick a dataset, let the suggestion choose the chart or map (or override it), set a theme colour and publish. Readers get the interactive visual; the feed and social shares get a PNG.
+        </p>
       </div>
 
       {errorMsg && (
@@ -212,47 +222,22 @@ export default function UploadPage() {
       )}
 
       <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        
-        {/* LEFT COLUMN - IMAGE UPLOAD */}
-        <div className="lg:col-span-5 space-y-4">
-          <div 
-            onClick={() => fileInputRef.current?.click()}
-            className={`w-full aspect-[4/3] rounded-xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all overflow-hidden relative group ${
-              previewUrl ? 'border-gisviz-accent bg-gisviz-canvas' : 'border-gisviz-border bg-gisviz-card hover:border-gisviz-accent'
-            }`}
-          >
-            {previewUrl ? (
-              <>
-                <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
-                <div className="absolute inset-0 bg-gisviz-black/10 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white">
-                  <UploadCloud size={32} className="mb-2" />
-                  <span className="font-mono text-[12px] font-bold text-sentence-camelcase tracking-wider">Change Visual</span>
-                </div>
-              </>
-            ) : (
-              <div className="text-center p-6 text-gisviz-ink-soft group-hover:text-gisviz-accent transition-colors">
-                <ImageIcon size={48} className="mx-auto mb-4 opacity-50" />
-                <p className="font-bold text-[12px] mb-1">Click to browse or drag & drop</p>
-                <p className="font-mono text-xs text-sentence-camelcase opacity-75">JPG, PNG, WebP • Max 10MB</p>
-              </div>
-            )}
-            <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
-          </div>
 
-          <div className="bg-gisviz-rail border border-gisviz-border rounded-xl p-4 text-xs font-mono text-gisviz-ink-soft">
-            <h4 className="font-bold text-gisviz-ink-soft mb-2 uppercase tracking-wider flex items-center gap-2">
-              <MapIcon size={14} /> Post Guidelines
-            </h4>
-            <ul className="space-y-1.5 list-inside list-disc opacity-80">
-              <li>Ensure maps have appropriate legends or scale bars.</li>
-              <li>Always credit your data sources accurately below.</li>
-              <li>Do not upload sensitive or proprietary coordinates.</li>
-            </ul>
+        {/* Dataset search, suggested visual, theme colour, live preview */}
+        {(
+          <div className="lg:col-span-12 bg-gisviz-card border border-gisviz-border rounded-xl p-6 sm:p-8 shadow-sm">
+            <DatasetVisualPicker
+              value={visualChoice}
+              onChange={handleVisualChange}
+              initialDatasetId={presetDataset}
+              accent={themeColor}
+              onAccentChange={c => { setThemeTouched(true); setThemeColor(c) }}
+            />
           </div>
-        </div>
+        )}
 
         {/* RIGHT COLUMN - METADATA */}
-        <div className="lg:col-span-7 bg-gisviz-card border border-gisviz-border rounded-xl p-6 sm:p-8 shadow-sm h-fit">
+        <div className="lg:col-span-12 bg-gisviz-card border border-gisviz-border rounded-xl p-6 sm:p-8 shadow-sm h-fit">
           <div className="space-y-6">
             
             {/* Title */}

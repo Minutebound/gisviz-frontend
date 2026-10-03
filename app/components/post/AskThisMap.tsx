@@ -20,7 +20,7 @@ import {
   Sparkles, Send, Layers, Download, Code2, X, ThumbsUp, ThumbsDown,
   Crosshair, Loader2, AlertTriangle,
 } from 'lucide-react'
-import { gisvizApi } from '../../../services/api'
+import { gisvizApi } from '../../../connector/api'
 import { AskMessage, AskGrounding, AskCitation, AskResult } from '../../../types/gisviz'
 import { layerColor } from '../../../lib/designTokens'
 

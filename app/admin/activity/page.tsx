@@ -9,7 +9,7 @@
  *
  * Requires:
  *   • Backend: admin_audit.py router registered (see companion file)
- *   • Frontend: adminFetchAuditActions in services/api.ts (see companion)
+ *   • Frontend: adminFetchAuditActions in connector/api.ts (see companion)
  *   • admin_db audit logging wired into your mutation endpoints
  */
 
@@ -21,7 +21,7 @@ import {
   Trash2, ShieldCheck, UserX, Flag, Tag, MessageSquare, BarChart2,
 } from 'lucide-react'
 import { useAuth } from '../../../context/AuthContext'
-import { gisvizApi } from '../../../services/api'
+import { gisvizApi } from '../../../connector/api'
 import AccessRestricted from '../../components/AccessRestricted'
 
 type Action = {
@@ -101,15 +101,15 @@ export default function AdminActivityPage() {
     return <AccessRestricted requiredRoles={['admin']} currentRole={user?.role_name} backHref="/" backLabel="Return to Feed" />
 
   return (
-    <div className="max-w-5xl mx-auto py-8 px-4 pb-20">
+    <div className="mx-auto w-full max-w-5xl px-4 sm:px-6 lg:px-8 py-8 pb-20">
 
       {/* header */}
       <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
         <div>
-          <h1 className="text-[24px] font-display font-bold text-gisviz-ink flex items-center gap-3">
+          <h1 className="text-[28px] sm:text-[32px] font-display font-bold text-gisviz-ink tracking-tight flex items-center gap-3">
             <Activity className="text-gisviz-accent" size={28} /> Admin Activity
           </h1>
-          <p className="text-gisviz-ink-soft font-mono text-[12px] mt-1">
+          <p className="text-[14.5px] text-gisviz-ink-soft mt-1.5 leading-relaxed">
             Permanent audit trail · live · written at action time
           </p>
         </div>
@@ -117,14 +117,6 @@ export default function AdminActivityPage() {
           <Link href="/admin"
             className="px-4 py-2 bg-gisviz-canvas border border-gisviz-border rounded-md font-mono text-[12px] text-gisviz-ink hover:border-gisviz-accent transition-colors flex items-center gap-1.5">
             <ArrowUpRight size={14} /> Admin Home
-          </Link>
-          <Link href="/admin/control"
-            className="px-4 py-2 bg-gisviz-canvas border border-gisviz-border rounded-md font-mono text-[12px] text-gisviz-ink hover:border-gisviz-accent transition-colors flex items-center gap-1.5">
-            <ArrowUpRight size={14} /> Control Panel
-          </Link>
-          <Link href="/admin/analytics"
-            className="px-4 py-2 bg-gisviz-canvas border border-gisviz-border rounded-md font-mono text-[12px] text-gisviz-ink hover:border-gisviz-accent transition-colors flex items-center gap-1.5">
-            <BarChart2 size={14} /> Analytics
           </Link>
           <button onClick={() => load()}
             className="p-2 bg-gisviz-canvas border border-gisviz-border rounded-md text-gisviz-ink-soft hover:text-gisviz-ink transition-colors"

@@ -8,7 +8,7 @@ import { ThemeProvider } from 'next-themes'
 
 export const metadata = {
   title: 'GisViz',
-  description: 'Geospatial visualization and publishing platform',
+  description: ' visualization and publishing platform',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

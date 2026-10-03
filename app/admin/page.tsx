@@ -9,7 +9,7 @@ import {
   Cpu, Database, LifeBuoy, BookOpen,
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
-import { API_ORIGIN } from '../../services/api'
+import { API_ORIGIN } from '../../connector/api'
 import AccessRestricted from '../components/AccessRestricted'
 
 // ── Main area cards ───────────────────────────────────────────────────────────
@@ -53,6 +53,13 @@ function buildAreas(): AreaCard[] {
       icon:  <Cpu size={22} />,
       title: 'System Architecture',
       desc:  'Live diagram of routers, routes, and infrastructure — read from /openapi.json.',
+    },
+    {
+      key:   'datasets',
+      href:  '/admin/datasets',
+      icon:  <FileText size={22} />,
+      title: 'Datasets',
+      desc:  'Create datasets, drop their Parquet files, activate, edit, delete.',
     },
     {
       key:   'erd',
@@ -119,14 +126,14 @@ export default function AdminHomePage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto py-8 px-4 pb-20">
+    <div className="mx-auto w-full max-w-5xl px-4 sm:px-6 lg:px-8 py-8 pb-20">
 
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-[24px] font-display font-bold text-gisviz-ink flex items-center gap-3">
+        <h1 className="text-[28px] sm:text-[32px] font-display font-bold text-gisviz-ink tracking-tight flex items-center gap-3">
           <ShieldCheck className="text-gisviz-accent" size={28} /> Admin Home
         </h1>
-        <p className="text-gisviz-ink-soft font-mono text-[12px] mt-1">
+        <p className="text-[14.5px] text-gisviz-ink-soft mt-1.5 leading-relaxed">
           Signed in as{' '}
           <span className="text-gisviz-ink font-bold">@{user.user_handle}</span> · admin
         </p>

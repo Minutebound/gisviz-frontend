@@ -1,10 +1,15 @@
 'use client'
 
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { Edit2, Image as ImageIcon, Loader2, Map as MapIcon, X, Tag, Info, Link as LinkIcon, Send, Bookmark } from 'lucide-react'
+import { Edit2, Loader2, X, Tag, Info, Link as LinkIcon, Send, Bookmark } from 'lucide-react'
 import { useAuth } from '../../../../context/AuthContext'
-import { API_ORIGIN, gisvizApi } from '../../../../services/api'
+import { gisvizApi } from '../../../../connector/api'
+import { canPublish } from '../../../../lib/roles'
+import NoPublishAccess from '../../../components/post/NoPublishAccess'
+import DatasetVisualPicker from '../../../components/post/DataVisualPicker'
+import type { VisualChoice, DatasetCard } from '../../../../types/visuals'
+import { CATEGORIES } from '../../../../types/gisviz'
 
 export default function EditPostPage() {
   const params = useParams()
@@ -16,8 +21,6 @@ export default function EditPostPage() {
   const [isSaving, setIsSaving]     = useState(false)
   const [errorMsg, setErrorMsg]     = useState('')
   const [successMsg, setSuccessMsg] = useState('')
-
-  const [isModalOpen, setIsModalOpen] = useState(false)
 
   const [title, setTitle]           = useState('')
   const [description, setDescription] = useState('')
@@ -35,14 +38,14 @@ export default function EditPostPage() {
 
   const [availableCategories, setAvailableCategories] = useState<any[]>([])
 
-  const [file, setFile]                       = useState<File | null>(null)
-  const [previewUrl, setPreviewUrl]           = useState<string | null>(null)
-  const [existingImagePath, setExistingImagePath] = useState<string | null>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  // The visual comes from a dataset: the picker is preloaded with the post's current choice.
+  const [visualChoice, setVisualChoice] = useState<VisualChoice | null>(null)
+  const [themeColor, setThemeColor]     = useState<string>(CATEGORIES[0].theme_color)
 
   // ── Init ────────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!authLoading && !isAuthenticated) { router.push('/auth'); return }
+    if (authLoading || !user || !canPublish(user)) { if (!authLoading) setIsLoading(false); return }   // no fetch for roles without edit access
 
     const initData = async () => {
       try {
@@ -70,10 +73,21 @@ export default function EditPostPage() {
         setKeywords(postData.keywords.map((k: any) => k.word))
         setSelectedCategoryIds(postData.categories.map((c: any) => c.category_id))
 
-        setExistingImagePath(postData.visual_image_path)
-        if (postData.visual_image_path) {
-          setPreviewUrl(`${API_ORIGIN}${postData.visual_image_path}`)
+        // Rebuild the picker choice from the saved spec.
+        const spec = postData.visual_spec
+        if (postData.dataset_id && spec) {
+          const isMap = spec.kind === 'map'
+          setVisualChoice({
+            dataset_id: postData.dataset_id,
+            viz: isMap ? (spec.map_style === 'heat' ? 'map_heat' : 'map') : spec.chart_type,
+            x: isMap ? null : spec.x ?? null,
+            y: isMap ? spec.value_field ?? null : spec.y ?? null,
+            z: spec.z ?? null,
+            size: spec.size ?? null,
+            label_field: isMap ? spec.label_field ?? null : null,
+          } as VisualChoice)
         }
+        setThemeColor(postData.theme_color || spec?.accent || CATEGORIES[0].theme_color)
       } catch {
         setErrorMsg('Failed to load post data.')
       } finally {
@@ -85,15 +99,7 @@ export default function EditPostPage() {
   }, [postId, isAuthenticated, authLoading, user, router])
 
   // ── Handlers ────────────────────────────────────────────────────────────────
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const f = e.target.files[0]
-      if (!f.type.startsWith('image/')) { setErrorMsg('Only image files are allowed.'); return }
-      setFile(f)
-      setPreviewUrl(URL.createObjectURL(f))
-      setErrorMsg('')
-    }
-  }
+  const handleVisualChange = (choice: VisualChoice | null, _card?: DatasetCard) => setVisualChoice(choice)
 
   const addCategory = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const id = parseInt(e.target.value)
@@ -161,54 +167,37 @@ export default function EditPostPage() {
   setIsSaving(true)
   setErrorMsg('')
 
-  // Track the newly uploaded file specifically for rollbacks
-  let uploadedVisualPath: string | null = null
-
   try {
-    let finalImagePath = existingImagePath
-
-    // ── 2. Upload the New Visual (Only if the user selected one) ───────────
-    if (file) {
-      const uploadRes = await gisvizApi.uploadVisual(file)
-      uploadedVisualPath = uploadRes.visual_path
-      finalImagePath = uploadedVisualPath
-    }
-
-    // ── 3. Update the Post ─────────────────────────────────────────────────
+    // The server re-validates the choice, rebuilds the spec + PNG and removes the old preview.
     await gisvizApi.updatePost(postId, {
       title: title.trim(),
       description: description?.trim() || null,
       note: note?.trim() || null,
       source_name: sourceName.trim(),
       source_url: sourceUrl?.trim() || null,
-      visual_image_path: finalImagePath,
+      dataset_id: visualChoice?.dataset_id,
+      visual_params: visualChoice ? {
+        viz: visualChoice.viz,
+        x: visualChoice.x ?? null,
+        y: visualChoice.y ?? null,
+        z: visualChoice.z ?? null,
+        size: visualChoice.size ?? null,
+        label_field: visualChoice.label_field ?? null,
+      } : undefined,
+      theme_color: themeColor,
       category_ids: selectedCategoryIds,
       keywords,
     })
-
-    // ── 4. Cleanup Old Visual (Success Scenario) ───────────────────────────
-    // If a new file was uploaded AND the update succeeded, delete the old file.
-    // We use .catch(console.error) so a deletion failure doesn't block the redirect.
-    if (file && existingImagePath && existingImagePath !== finalImagePath) {
-      gisvizApi.deleteVisual(existingImagePath).catch(console.error)
-    }
-
-    // ── 5. Success Redirect ────────────────────────────────────────────────
     router.push(`/post/${postId}`)
-
   } catch (err: any) {
-    // ── 6. Rollback Orphaned New Visual (Failure Scenario) ─────────────────
-    // If the post update failed, but we already uploaded a NEW image, delete it.
-    if (uploadedVisualPath) {
-      gisvizApi.deleteVisual(uploadedVisualPath).catch(console.error)
-    }
-
     const detail = err.response?.data?.detail
     setErrorMsg(typeof detail === 'string' ? detail : 'Failed to update the post. Please try again.')
   } finally {
     setIsSaving(false)
   }
 }
+
+  if (!authLoading && user && !canPublish(user)) return <NoPublishAccess what="edit posts" />
 
   if (isLoading) return (
     <div className="flex justify-center items-center h-[calc(100vh-4rem)]">
@@ -218,14 +207,16 @@ export default function EditPostPage() {
 
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8 pb-24 relative">
+    <div className="mx-auto w-full max-w-5xl px-4 sm:px-6 lg:px-8 py-8 pb-24 relative">
 
       <div className="mb-8">
-        <h1 className="text-[24px] font-display font-bold text-gisviz-ink flex items-center gap-3">
-          <Edit2 className="text-gisviz-accent" size={32} />
+        <h1 className="text-[28px] sm:text-[32px] font-display font-bold text-gisviz-ink tracking-tight flex items-center gap-3">
+          <Edit2 className="text-gisviz-accent" size={28} />
           Edit gisviz
         </h1>
-        <p className="text-gisviz-ink-soft font-mono mt-2 text-[12px]">Update your visual map, dataset metadata, or sources.</p>
+        <p className="text-[14.5px] text-gisviz-ink-soft mt-1.5 leading-relaxed">
+          Change the dataset, chart or map type, theme colour and details. Saving re-renders the feed/share PNG.
+        </p>
       </div>
 
       {errorMsg && (
@@ -244,65 +235,18 @@ export default function EditPostPage() {
 
       <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-12 gap-8">
 
-        {/* ── LEFT COLUMN — image + guidelines only (same as upload page) ── */}
-        <div className="lg:col-span-5 space-y-4">
-
-          {/* Image drop zone */}
-          <div
-            className={`w-full aspect-[4/3] rounded-xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all overflow-hidden relative group ${
-              previewUrl ? 'border-gisviz-accent bg-gisviz-canvas' : 'border-gisviz-border bg-gisviz-card hover:border-gisviz-accent'
-            }`}
-          >
-            {previewUrl ? (
-              <>
-                <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
-                <div className="absolute inset-0 bg-gisviz-black/10 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-gisviz-white gap-3 z-10">
-                  <button
-                    type="button"
-                    onClick={() => setIsModalOpen(true)}
-                    className="p-2.5 bg-white/20 rounded-full hover:bg-white/30 transition-colors"
-                    title="Enlarge Visual"
-                  >
-                    <ImageIcon size={24} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="p-2.5 bg-white/20 rounded-full hover:bg-white/30 transition-colors"
-                    title="Change Visual"
-                  >
-                    <Edit2 size={24} />
-                  </button>
-                </div>
-              </>
-            ) : (
-              <div
-                onClick={() => fileInputRef.current?.click()}
-                className="text-center p-6 text-gisviz-ink-soft group-hover:text-gisviz-accent transition-colors z-10 w-full h-full flex flex-col items-center justify-center"
-              >
-                <ImageIcon size={48} className="mx-auto mb-4 opacity-50" />
-                <p className="font-bold text-[12px] mb-1">Click to browse or drag & drop</p>
-                <p className="font-mono text-[12px] uppercase opacity-75">JPG, PNG, WebP • Max 10MB</p>
-              </div>
-            )}
-            <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
-          </div>
-
-          {/* Guidelines */}
-          <div className="bg-gisviz-rail border border-gisviz-border rounded-xl p-4 text-[12px] font-mono text-gisviz-ink-soft">
-            <h4 className="font-bold text-gisviz-ink-soft mb-2 uppercase tracking-wider flex items-center gap-2 text-[12px]">
-              <MapIcon size={14} /> Post Guidelines
-            </h4>
-            <ul className="space-y-1.5 list-inside list-disc opacity-80 text-[12px]">
-              <li>Ensure maps have appropriate legends or scale bars.</li>
-              <li>Always credit your data sources accurately below.</li>
-              <li>Do not upload sensitive or proprietary coordinates.</li>
-            </ul>
-          </div>
+        {/* Dataset, visual type, theme colour, live preview */}
+        <div className="lg:col-span-12 bg-gisviz-card border border-gisviz-border rounded-xl p-6 sm:p-8 shadow-sm">
+          <DatasetVisualPicker
+            value={visualChoice}
+            onChange={handleVisualChange}
+            accent={themeColor}
+            onAccentChange={setThemeColor}
+          />
         </div>
 
         {/* ── RIGHT COLUMN — metadata (identical structure to upload page) ── */}
-        <div className="lg:col-span-7 bg-gisviz-card border border-gisviz-border rounded-xl p-6 sm:p-8 shadow-sm h-fit">
+        <div className="lg:col-span-12 bg-gisviz-card border border-gisviz-border rounded-xl p-6 sm:p-8 shadow-sm h-fit">
           <div className="space-y-6">
 
             {/* Title */}
@@ -492,26 +436,6 @@ export default function EditPostPage() {
         </div>
       </form>
 
-      {/* Image Enlargement Modal */}
-      {isModalOpen && previewUrl && (
-        <div
-          className="fixed inset-0 z-50 backdrop-blur-xl bg-gisviz-black/10 flex items-center justify-center p-4 md:p-8"
-          onClick={() => setIsModalOpen(false)}
-        >
-          <div
-            className="relative bg-gisviz-card border border-gisviz-border rounded-2xl shadow-2xl p-2 max-w-4xl max-h-[90vh] overflow-hidden"
-            onClick={e => e.stopPropagation()}
-          >
-            <button
-              onClick={() => setIsModalOpen(false)}
-              className="absolute top-4 right-4 z-20 p-2 bg-white/30 backdrop-blur-md rounded-full text-gisviz-white hover:bg-white/40 transition-colors shadow-lg"
-            >
-              <X size={24} className="text-gisviz-ink" />
-            </button>
-            <img src={previewUrl} alt="Enlarged Post Visual" className="w-full h-full object-contain rounded-xl" />
-          </div>
-        </div>
-      )}
     </div>
   )
 }

@@ -8,7 +8,7 @@ import {
   ShieldCheck, ExternalLink, Link as LinkIcon
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
-import { gisvizApi } from '../../services/api' // Fixed to standard import path
+import { gisvizApi } from '../../connector/api' // Fixed to standard import path
 
 const RAW_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://'
 const API_BASE_URL = RAW_API_URL.replace('/api/v0', '').replace(/\/$/, '')
@@ -364,7 +364,7 @@ export default function SettingsPage() {
   const mediumFullUrl   = toFullUrl(mediumUsername,   MEDIUM_PREFIX)
 
   return (
-    <div className="py-8 max-w-4xl mx-auto px-4 md:px-0 flex flex-col gap-6 sm:gap-8">
+    <div className="py-8 mx-auto w-full max-w-5xl px-4 sm:px-6 lg:px-8 flex flex-col gap-6 sm:gap-8">
       
       {/* ── Page Header ── */}
       <div className="mb-2">
@@ -573,7 +573,7 @@ export default function SettingsPage() {
             {/* Location */}
             <div className="md:col-span-2 pt-2">
               <div className="relative">
-                <LabelWithEdit label="Base Location" fieldName="location" />
+                <LabelWithEdit label="Location" fieldName="location" />
                 <div className="relative flex items-center">
                   <MapPin size={16} className={`absolute left-3.5 ${!editingFields.location ? 'text-gisviz-ink-soft' : 'text-gisviz-accent'}`} />
                   <input
@@ -762,7 +762,7 @@ export default function SettingsPage() {
       {/* ============================================================ */}
       {/* ACCOUNT STATUS (DANGER ZONE)                                 */}
       {/* ============================================================ */}
-      <div className="bg-amber-50/20 border border-amber-500/30 shadow-sm p-6 sm:p-8 rounded-2xl mb-6">
+      <div className="bg-amber-50 border border-amber-500/30 shadow-sm p-6 sm:p-8 rounded-2xl mb-6">
         <h2 className="text-[18px] font-display font-bold text-amber-700 border-b border-amber-500/20 pb-3 mb-4 flex items-center gap-2">
           <Shield size={16} /> Account Deactivation
         </h2>

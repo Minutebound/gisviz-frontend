@@ -10,10 +10,11 @@ import {
   User, Layers, MapPin
 } from 'lucide-react'
 import { useAuth } from '../../../context/AuthContext'
-import { gisvizApi } from '../../../services/api'
+import { gisvizApi } from '../../../connector/api'
 import ShareModal from '../../components/SharePost'
 import InteractiveVisual, { type VisualSpec } from '../../components/InteractiveVisual'
 import { DEMO_SPECS, type DemoKind } from '../../components/VisualDemos'
+import { resolveSpec } from '../../../lib/visualSpec'
 
 const RAW_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://'
 const API_BASE_URL = RAW_API_URL.replace('/api/v0', '').replace(/\/$/, '')
@@ -221,13 +222,13 @@ export default function PostDetail() {
   // Interactive visual wins over the static image when present.
   // Priority: ?demo=… (testing) → post.visual_spec (from backend) → static image.
   const visualSpec: VisualSpec | null =
-    (demoKind ? DEMO_SPECS[demoKind] : null) ?? (post.visual_spec as VisualSpec | undefined) ?? null
+    (demoKind ? DEMO_SPECS[demoKind] : null) ?? resolveSpec(post.visual_spec as VisualSpec | undefined) ?? null
   const visualTypeLabel = visualSpec
     ? (visualSpec.kind === 'map' ? 'map' : visualSpec.chart_type)
     : post.chart_type
 
   return (
-    <main className="mx-auto w-full max-w-[1440px] px-4 sm:px-8 lg:px-[72px] pt-4 sm:pt-6 pb-14">
+    <main className="mx-auto w-full max-w-5xl px-4 sm:px-8 lg:px-[72px] pt-4 sm:pt-6 pb-14">
 
       <div className="flex flex-col lg:flex-row gap-8 xl:gap-14 items-start mt-4">
 
@@ -343,7 +344,7 @@ export default function PostDetail() {
           </header>
 
           {/* 3. Enterprise Data Specifications Container (Full Width) */}
-          {(post.source_name || post.note || post.map_preview?.layer_count > 0 || visualTypeLabel) && (
+          {(post.source_name || post.dataset || post.note || post.map_preview?.layer_count > 0 || visualTypeLabel) && (
             <div className="rounded-[12px] border border-gisviz-border bg-gisviz-card shadow-sm overflow-hidden mb-6">
               <div className="px-5 py-3.5 border-b border-gisviz-border bg-gisviz-paper/50">
                 <h3 className="font-display text-[15px] font-bold text-gisviz-ink flex items-center gap-2">
@@ -369,6 +370,39 @@ export default function PostDetail() {
                           ) : (
                             <span className="font-semibold">{post.source_name}</span>
                           )}
+                        </td>
+                      </tr>
+                    )}
+                    {post.dataset && (
+                      <>
+                        <tr className="border-b border-gisviz-border/50 last:border-0">
+                          <th className="py-3.5 px-5 font-medium text-gisviz-ink-soft w-1/3 bg-gisviz-canvas/30">Linked Dataset</th>
+                          <td className="py-3.5 px-5 text-gisviz-ink">
+                            <Link href="/datasets" className="text-gisviz-accent hover:underline font-semibold">{post.dataset.title}</Link>
+                            <span className="block font-mono text-[11.5px] text-gisviz-ink-soft mt-0.5">{post.dataset_id}</span>
+                          </td>
+                        </tr>
+                        {[
+                          ['Dataset Publisher', post.dataset.publisher],
+                          ['Licence', post.dataset.license],
+                          ['Format', post.dataset.format ? String(post.dataset.format).toUpperCase() : null],
+                          ['Geometry', post.dataset.geometry_type],
+                          ['CRS', post.dataset.crs],
+                          ['Rows', post.dataset.row_count != null ? Number(post.dataset.row_count).toLocaleString() : null],
+                          ['Dataset Updated', post.dataset.updated_at ? new Date(post.dataset.updated_at).toLocaleDateString() : null],
+                        ].filter(([, v]) => v).map(([k, v]) => (
+                          <tr key={k as string} className="border-b border-gisviz-border/50 last:border-0">
+                            <th className="py-3.5 px-5 font-medium text-gisviz-ink-soft w-1/3 bg-gisviz-canvas/30">{k}</th>
+                            <td className="py-3.5 px-5 text-gisviz-ink">{v as string}</td>
+                          </tr>
+                        ))}
+                      </>
+                    )}
+                    {post.theme_color && (
+                      <tr className="border-b border-gisviz-border/50 last:border-0">
+                        <th className="py-3.5 px-5 font-medium text-gisviz-ink-soft w-1/3 bg-gisviz-canvas/30">Theme Colour</th>
+                        <td className="py-3.5 px-5 text-gisviz-ink font-mono text-[12.5px] flex items-center gap-2">
+                          <span className="inline-block w-4 h-4 rounded-full border border-gisviz-border" style={{ background: post.theme_color }} /> {post.theme_color}
                         </td>
                       </tr>
                     )}

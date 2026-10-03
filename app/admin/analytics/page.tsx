@@ -9,7 +9,7 @@ import {
   Loader2, RefreshCw, ArrowUpRight, Activity, Database,
 } from 'lucide-react'
 import { useAuth } from '../../../context/AuthContext'
-import { gisvizApi } from '../../../services/api'
+import { gisvizApi } from '../../../connector/api'
 import AccessRestricted from '../../components/AccessRestricted'
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -142,15 +142,15 @@ export default function AdminAnalyticsPage() {
   const asOf = overview?.as_of   || null
 
   return (
-    <div className="max-w-6xl mx-auto py-8 px-4 pb-20">
+    <div className="mx-auto w-full max-w-5xl px-4 sm:px-6 lg:px-8 py-8 pb-20">
 
       {/* ── Header ── */}
       <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
         <div>
-          <h1 className="text-[24px] font-display font-bold text-gisviz-ink flex items-center gap-3">
+          <h1 className="text-[28px] sm:text-[32px] font-display font-bold text-gisviz-ink tracking-tight flex items-center gap-3">
             <BarChart2 className="text-gisviz-accent" size={28} /> Analytics Dashboard
           </h1>
-          <p className="text-gisviz-ink-soft font-mono text-[12px] mt-1 flex items-center gap-1.5">
+          <p className="text-[14.5px] text-gisviz-ink-soft mt-1.5 leading-relaxed flex items-center gap-1.5">
             <Database size={11} />
             Snapshot warehouse
             {asOf && <span className="text-gisviz-ink-soft/60 ml-1">· as of {asOf}</span>}
@@ -160,14 +160,6 @@ export default function AdminAnalyticsPage() {
           <Link href="/admin"
             className="px-4 py-2 bg-gisviz-canvas border border-gisviz-border rounded-md font-mono text-[12px] text-gisviz-ink hover:border-gisviz-accent transition-colors flex items-center gap-1.5">
             <ArrowUpRight size={14} /> Admin Home
-          </Link>
-          <Link href="/admin/control"
-            className="px-4 py-2 bg-gisviz-canvas border border-gisviz-border rounded-md font-mono text-[12px] text-gisviz-ink hover:border-gisviz-accent transition-colors flex items-center gap-1.5">
-            <ArrowUpRight size={14} /> Control Panel
-          </Link>
-          <Link href="/admin/activity"
-            className="px-4 py-2 bg-gisviz-canvas border border-gisviz-border rounded-md font-mono text-[12px] text-gisviz-ink hover:border-gisviz-accent transition-colors flex items-center gap-1.5">
-            <Activity size={14} /> Activity
           </Link>
           <button
             onClick={loadAll}
