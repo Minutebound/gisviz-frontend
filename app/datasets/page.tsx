@@ -3,42 +3,16 @@
 import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
 import {
-  Search,
-  ChevronDown,
-  Info,
-  ArrowUpRight,
-  Loader2,
-  Settings2,
+  ArrowUpRight, ChevronDown, Globe2, Info, Loader2, Search, Settings2,
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { gisvizApi } from '../../connector/api'
 import { canManageDatasets } from '../../lib/roles'
+import { useCategories, useRegions } from '../../lib/referenceData'
 import type { CatalogDetail, CatalogPage, DatasetCard as Card } from '../../types/visuals'
 
 const PAGE_SIZE = 20
 type Tab = 'all' | 'spatial' | 'tabular'
-
-function FormatBadge({ format }: { format?: string | null }) {
-  const formatLabels: Record<string, { label: string; bg: string; text: string }> = {
-    geojson: { label: 'GeoJSON', bg: 'bg-emerald-500/10 dark:bg-emerald-500/20', text: 'text-emerald-700 dark:text-emerald-300' },
-    csv: { label: 'CSV', bg: 'bg-blue-500/10 dark:bg-blue-500/20', text: 'text-blue-700 dark:text-blue-300' },
-    tsv: { label: 'TSV', bg: 'bg-blue-500/10 dark:bg-blue-500/20', text: 'text-blue-700 dark:text-blue-300' },
-    duckdb: { label: 'DuckDB', bg: 'bg-amber-500/10 dark:bg-amber-500/20', text: 'text-amber-700 dark:text-amber-300' },
-    parquet: { label: 'Parquet', bg: 'bg-sky-500/10 dark:bg-sky-500/20', text: 'text-sky-700 dark:text-sky-300' },
-    json: { label: 'JSON', bg: 'bg-indigo-500/10 dark:bg-indigo-500/20', text: 'text-indigo-700 dark:text-indigo-300' },
-    gpkg: { label: 'GeoPackage', bg: 'bg-purple-500/10 dark:bg-purple-500/20', text: 'text-purple-700 dark:text-purple-300' },
-    shp: { label: 'Shapefile', bg: 'bg-amber-500/10 dark:bg-amber-500/20', text: 'text-amber-700 dark:text-amber-300' },
-    kml: { label: 'KML', bg: 'bg-amber-500/10 dark:bg-amber-500/20', text: 'text-amber-700 dark:text-amber-300' },
-  }
-  const f = (format || '').toLowerCase()
-  const match = formatLabels[f] || { label: f ? f.toUpperCase() : 'DATA', bg: 'bg-gisviz-rail-soft', text: 'text-gisviz-ink' }
-
-  return (
-    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md font-mono text-[11px] font-semibold ${match.bg} ${match.text}`}>
-      {match.label}
-    </span>
-  )
-}
 
 const fmtDate = (s?: string | null) =>
   s ? new Date(s).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '—'
@@ -54,7 +28,7 @@ const fmtBytes = (n?: number | null) => {
 const fmtBbox = (b?: number[] | null) =>
   b && b.length === 4 ? `[${b.map(v => Number(v).toFixed(3)).join(', ')}]` : 'Not spatial'
 
-function DatasetCard({ dataset }: { dataset: Card }) {
+function DatasetCard({ dataset, regionName, categoryLabel }: { dataset: Card; regionName?: string; categoryLabel?: string }) {
   const [expanded, setExpanded] = useState(false)
   const [detail, setDetail] = useState<CatalogDetail | null>(null)
   const [detailError, setDetailError] = useState('')
@@ -73,18 +47,25 @@ function DatasetCard({ dataset }: { dataset: Card }) {
   const sourceHref = dataset.source_url
     ? (dataset.source_url.startsWith('http') ? dataset.source_url : `https://${dataset.source_url}`)
     : null
+  const pill = 'inline-flex items-center px-2.5 py-0.5 rounded-md font-mono text-[11px] font-semibold'
 
   return (
     <article className="w-full rounded-xl border border-gisviz-border bg-gisviz-card hover:border-gisviz-border-strong hover:shadow-sm transition-all flex flex-col overflow-hidden">
       <div className="p-5 sm:p-6 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
         <div className="flex-1 min-w-0">
-          <div className="flex flex-wrap items-center gap-2.5 mb-2">
-            <FormatBadge format={dataset.format} />
-            <span className="text-[12px] font-mono text-gisviz-ink-soft">{isSpatial ? (dataset.crs || 'EPSG:4326') : 'Tabular'}</span>
+          <div className="flex flex-wrap items-center gap-2 mb-2">
+            <span className={`${pill} ${isSpatial ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' : 'bg-gisviz-rail-soft text-gisviz-ink'}`}>
+              {isSpatial ? 'Spatial' : 'Non-spatial'}
+            </span>
+            {dataset.region && (
+              <span className="inline-flex items-center gap-1 text-[12px] font-medium text-gisviz-ink-soft">
+                <Globe2 size={13} /> {regionName || dataset.region}
+              </span>
+            )}
             {dataset.category && (
               <>
                 <span className="text-[12px] text-gisviz-border-strong">·</span>
-                <span className="text-[12px] font-medium text-gisviz-ink-soft capitalize">{dataset.category}</span>
+                <span className="text-[12px] font-medium text-gisviz-ink-soft">{categoryLabel || dataset.category}</span>
               </>
             )}
           </div>
@@ -99,17 +80,6 @@ function DatasetCard({ dataset }: { dataset: Card }) {
           )}
 
           <div className="mt-3 flex flex-wrap items-center gap-4 text-[12.5px] text-gisviz-ink-soft">
-            <div>
-              <span className="text-gisviz-ink-soft/80">Brought to you by: </span>
-              {sourceHref ? (
-                <a href={sourceHref} target="_blank" rel="noopener noreferrer" className="font-semibold text-gisviz-ink hover:text-gisviz-accent transition-colors">
-                  {dataset.publisher || dataset.source_name || 'Source'}
-                </a>
-              ) : (
-                <span className="font-semibold text-gisviz-ink">{dataset.publisher || dataset.source_name || 'GISViz'}</span>
-              )}
-            </div>
-            <span className="hidden sm:inline text-gisviz-border-strong">·</span>
             <span>Updated {fmtDate(dataset.updated_at)}</span>
             <span className="hidden sm:inline text-gisviz-border-strong">·</span>
             <button
@@ -123,23 +93,23 @@ function DatasetCard({ dataset }: { dataset: Card }) {
           </div>
         </div>
 
-        <div className="flex items-center justify-between lg:justify-end gap-6 shrink-0 pt-4 lg:pt-0 border-t lg:border-t-0 border-gisviz-border/60">
-          <div className="grid grid-cols-2 lg:flex items-center gap-6 text-left lg:text-right font-mono text-[12.5px]">
-            <div>
-              <span className="block text-[10.5px] uppercase tracking-wider text-gisviz-ink-soft/70">{isSpatial ? 'Features' : 'Rows'}</span>
-              <span className="font-semibold text-gisviz-ink">{Number(dataset.row_count || 0).toLocaleString()}</span>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between lg:justify-end gap-5 lg:gap-8 shrink-0 pt-4 lg:pt-0 border-t lg:border-t-0 border-gisviz-border/60">
+          <dl className="grid grid-cols-2 gap-6 text-left lg:text-right text-[12.5px]">
+            <div className="min-w-0 max-w-[170px]">
+              <dt className="text-[10.5px] font-mono uppercase tracking-wider text-gisviz-ink-soft/70">Publisher</dt>
+              <dd className="font-semibold text-gisviz-ink truncate" title={dataset.publisher || undefined}>{dataset.publisher || 'GISViz'}</dd>
             </div>
-            <div>
-              <span className="block text-[10.5px] uppercase tracking-wider text-gisviz-ink-soft/70">Geometry</span>
-              <span className="font-semibold text-gisviz-ink">{dataset.geometry_type || 'None'}</span>
+            <div className="min-w-0 max-w-[190px]">
+              <dt className="text-[10.5px] font-mono uppercase tracking-wider text-gisviz-ink-soft/70">Source</dt>
+              <dd className="font-semibold text-gisviz-ink truncate" title={dataset.source_name || undefined}>
+                {sourceHref
+                  ? <a href={sourceHref} target="_blank" rel="noopener noreferrer" className="hover:text-gisviz-accent">{dataset.source_name || 'Source'}</a>
+                  : (dataset.source_name || '—')}
+              </dd>
             </div>
-            <div>
-              <span className="block text-[10.5px] uppercase tracking-wider text-gisviz-ink-soft/70">Size</span>
-              <span className="font-semibold text-gisviz-ink">{fmtBytes(dataset.file_size_bytes)}</span>
-            </div>
-          </div>
+          </dl>
 
-          <div className="shrink-0 min-w-[140px] flex justify-end">
+          <div className="shrink-0 min-w-[140px] flex sm:justify-end">
             {sourceHref ? (
               <a
                 href={sourceHref}
@@ -161,6 +131,18 @@ function DatasetCard({ dataset }: { dataset: Card }) {
 
       {expanded && (
         <div className="border-t border-gisviz-border/60 bg-gisviz-paper/40 p-5 sm:px-6 sm:py-6 text-[13px] animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="grid grid-cols-3 gap-4 max-w-md mb-6">
+            {[
+              ['Columns', detail ? detail.columns.length.toLocaleString() : (dataset.column_count ?? '…')],
+              ['Rows', Number(dataset.row_count || 0).toLocaleString()],
+              ['Size', fmtBytes(dataset.file_size_bytes)],
+            ].map(([k, v]) => (
+              <div key={k as string} className="rounded-lg border border-gisviz-border bg-gisviz-card px-3 py-2.5">
+                <div className="text-[10.5px] font-mono uppercase tracking-wider text-gisviz-ink-soft">{k}</div>
+                <div className="font-display text-[18px] font-bold text-gisviz-ink tabular-nums">{v}</div>
+              </div>
+            ))}
+          </div>
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
             <div className="lg:col-span-3">
               <h4 className="font-semibold text-gisviz-ink mb-3 font-mono text-[11px] uppercase tracking-wider">
@@ -208,16 +190,14 @@ function DatasetCard({ dataset }: { dataset: Card }) {
                 Metadata
               </h4>
               <dl className="flex flex-col gap-4">
-                <div>
-                  <dt className="text-[11.5px] text-gisviz-ink-soft mb-1">Bounding Box (BBox)</dt>
-                  <dd className="font-mono text-[11.5px] text-gisviz-ink bg-gisviz-card border border-gisviz-border rounded-md px-2.5 py-1.5 break-all">
-                    {fmtBbox(dataset.bbox)}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-[11.5px] text-gisviz-ink-soft mb-1">File Size</dt>
-                  <dd className="text-[13px] text-gisviz-ink font-medium">{fmtBytes(dataset.file_size_bytes)}</dd>
-                </div>
+                {isSpatial && (
+                  <div>
+                    <dt className="text-[11.5px] text-gisviz-ink-soft mb-1">Geometry · Bounding box</dt>
+                    <dd className="font-mono text-[11.5px] text-gisviz-ink bg-gisviz-card border border-gisviz-border rounded-md px-2.5 py-1.5 break-all">
+                      {dataset.geometry_type} · {fmtBbox(dataset.bbox)}
+                    </dd>
+                  </div>
+                )}
                 <div>
                   <dt className="text-[11.5px] text-gisviz-ink-soft mb-1">Dataset ID</dt>
                   <dd className="font-mono text-[12px] text-gisviz-ink">{dataset.dataset_id}</dd>
@@ -226,16 +206,6 @@ function DatasetCard({ dataset }: { dataset: Card }) {
                   <dt className="text-[11.5px] text-gisviz-ink-soft mb-1">License & Terms</dt>
                   <dd className="text-[13px] text-gisviz-ink font-medium">{dataset.license || 'Unknown'}</dd>
                 </div>
-                {dataset.source_name && (
-                  <div>
-                    <dt className="text-[11.5px] text-gisviz-ink-soft mb-1">Source</dt>
-                    <dd className="text-[13px] text-gisviz-ink font-medium">
-                      {sourceHref
-                        ? <a href={sourceHref} target="_blank" rel="noopener noreferrer" className="hover:text-gisviz-accent">{dataset.source_name}</a>
-                        : dataset.source_name}
-                    </dd>
-                  </div>
-                )}
                 <div>
                   <dt className="text-[11.5px] text-gisviz-ink-soft mb-1">Posts Using It</dt>
                   <dd className="text-[13px] text-gisviz-ink font-medium">{detail ? detail.post_count : '…'}</dd>
@@ -250,6 +220,8 @@ function DatasetCard({ dataset }: { dataset: Card }) {
 }
 
 export default function DatasetsPage() {
+  const regionNames = new Map(useRegions().map(r => [r.code, r.name]))          // from the misc DB
+  const categoryLabels = new Map(useCategories().map(c => [c.slug, c.label]))  // from the posts DB
   const { user } = useAuth() as any
   const manager = !!user && canManageDatasets(user)
 
@@ -297,14 +269,14 @@ export default function DatasetsPage() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8 pt-8 pb-16">
+    <main className="mx-auto w-full max-w-5xl px-4 sm:px-6 lg:px-8 pt-8 pb-16">
       <header className="flex flex-col gap-5 pb-6 border-b border-gisviz-border">
         <div>
           <h1 className="font-display text-[30px] font-bold tracking-[-0.03em] text-gisviz-ink mt-1">
             Datasets
           </h1>
           <p className="text-[14.5px] text-gisviz-ink-soft mt-1 max-w-xl">
-            Access geospatial layers in standard formats.
+            Open datasets behind GISViz posts: spatial and non-spatial, with their publisher and source.
           </p>
         </div>
 
@@ -344,7 +316,7 @@ export default function DatasetsPage() {
                     : 'text-gisviz-ink-soft hover:text-gisviz-ink'
                 }`}
               >
-                {tab === 'all' ? 'All Sources' : tab === 'spatial' ? 'Spatial' : 'Tabular'}
+                {tab === 'all' ? 'All Sources' : tab === 'spatial' ? 'Spatial' : 'Non-spatial'}
               </button>
             ))}
           </div>
@@ -371,7 +343,9 @@ export default function DatasetsPage() {
 
         <div className={`flex flex-col gap-3 transition-opacity ${loading && items.length ? 'opacity-60' : ''}`}>
           {items.map(dataset => (
-            <DatasetCard key={dataset.dataset_id} dataset={dataset} />
+            <DatasetCard key={dataset.dataset_id} dataset={dataset}
+                         regionName={regionNames.get(dataset.region || '')}
+                         categoryLabel={categoryLabels.get(dataset.category || '')} />
           ))}
         </div>
 

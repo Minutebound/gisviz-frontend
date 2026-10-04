@@ -2,14 +2,13 @@
 
 // app/components/feed/FeedCard.tsx
 //
-// The business-first feed card, plus the featured (hero) variant.
+// The feed card: the same design for every post in the stream.
 // Updated to handle both V0 flat data shapes and V2 nested (post.publisher.*) shapes safely.
 
 import React from 'react'
 import Link from 'next/link'
 import {
-  Heart, MessageSquare, Bookmark, Share2, Layers, Database, Sparkles, BadgeCheck,
-  ThumbsUp,
+  Heart, MessageSquare, Bookmark, Share2, Database, BadgeCheck,
 } from 'lucide-react'
 import { Post } from '../../../types/gisviz'
 // Note: ensure layerColor is properly defined in your lib/designTokens or replace with a fallback
@@ -127,7 +126,7 @@ function PublisherRow({ post, size = 34 }: { post: Post; size?: number }) {
           <BadgeCheck size={14} className="text-gisviz-accent-text" aria-label="Verified publisher" />
         </span>
         <span className="text-[12.5px] text-gisviz-ink-soft">
-          {timeAgo(timestamp)}
+          {timeAgo(timestamp)} · {readTime(post)}
         </span>
       </div>
     </div>
@@ -172,7 +171,7 @@ function CardFooter({ post, onLike, onBookmark, onShare, busy }: FooterProps) {
           post.is_liked ? 'text-gisviz-accent-text' : 'text-gisviz-ink-soft hover:text-gisviz-ink'
         }`}
       >
-        <ThumbsUp size={15} fill={post.is_liked ? 'currentColor' : 'none'} />
+        <Heart size={15} fill={post.is_liked ? 'currentColor' : 'none'} />
         {compact(post.total_likes_count)}
       </button>
 
@@ -211,109 +210,57 @@ function CardFooter({ post, onLike, onBookmark, onShare, busy }: FooterProps) {
   )
 }
 
-// ── standard card ───────────────────────────────────────────────────────────
+// ── the feed card (one design for every post) ───────────────────────────────
+// The post's poster image (title, chart / map, legend, sources — drawn by the server at publish) on top, then
+// the title, the description and the actions.
 
 export default function FeedCard(props: FooterProps) {
   const { post } = props
   return (
-    <article className="w-full rounded-2xl bg-gisviz-card border border-gisviz-border
-                        p-5 flex flex-col gap-4 transition-colors hover:border-gisviz-accent/40">
-      <PublisherRow post={post} />
+    <article className="w-full overflow-hidden rounded-2xl border border-gisviz-border bg-gisviz-card
+                        flex flex-col transition-colors hover:border-gisviz-accent/40">
+      <div className="px-5 pt-4 pb-3">
+        <PublisherRow post={post} />
+      </div>
 
-      <Link href={`/post/${post.post_id}`} className="flex gap-5 items-start group">
-        <div className="flex-1 min-w-0 flex flex-col gap-2.5">
-          <h3 className="font-display text-[22px] sm:text-[25px] font-bold leading-[1.16]
-                         tracking-[-0.02em] text-gisviz-ink group-hover:text-gisviz-accent-text
-                         transition-colors">
+      <Link href={`/post/${post.post_id}`} className="group block">
+        <Thumb post={post} className="block aspect-square w-full bg-gisviz-paper" />
+        <div className="flex flex-col gap-2 px-5 pt-4">
+          <h3 className="font-display text-[20px] sm:text-[22px] font-bold leading-[1.2]
+                         tracking-[-0.02em] text-gisviz-ink group-hover:text-gisviz-accent-text transition-colors">
             {post.title}
           </h3>
           {post.description && (
-            <p className="text-[14.5px] leading-[1.55] text-gisviz-ink-soft line-clamp-2">
-              {post.description}
-            </p>
-          )}
-          {(post as any).post_type === 'map' && (post as any).map_preview && (
-            <span className="inline-flex items-center gap-1.5 font-mono text-[11px] text-gisviz-ink-soft">
-              <Layers size={13} />
-              {(post as any).map_preview.layer_count} layers · zoom {(post as any).map_preview.zoom}
-            </span>
-          )}
-        </div>
-
-        <div className="relative shrink-0">
-          <Thumb post={post} className="w-[120px] h-[84px] sm:w-[200px] sm:h-[136px] rounded-[11px]" />
-          {(post as any).post_type === 'map' && (
-            <span className="absolute left-2 top-2 inline-flex items-center h-[22px] px-2
-                             rounded-md bg-gisviz-card border border-gisviz-border
-                             font-mono text-[9.5px] uppercase tracking-wider text-gisviz-ink-soft">
-              Interactive
-            </span>
+            <p className="text-[14.5px] leading-[1.55] text-gisviz-ink-soft line-clamp-2">{post.description}</p>
           )}
         </div>
       </Link>
 
-      <div className="h-px bg-gisviz-border" />
-      <CardFooter {...props} />
-    </article>
-  )
-}
-
-// ── hero / featured card ────────────────────────────────────────────────────
-
-export function HeroCard(props: FooterProps) {
-  const { post } = props
-  return (
-    <article className="w-full rounded-[18px] bg-gisviz-card border border-gisviz-border
-                        overflow-hidden flex flex-col">
-      <Link href={`/post/${post.post_id}`} className="relative block group">
-        <Thumb post={post} className="w-full h-[200px] sm:h-[268px]" />
-        <span className="absolute left-4 top-4 inline-flex items-center gap-1.5 h-7 px-3
-                         rounded-full bg-gisviz-accent text-[12px] font-semibold
-                         text-[color:var(--accent-on)]">
-          <Sparkles size={13} />
-          Editor&rsquo;s pick
-        </span>
-      </Link>
-
-      <div className="p-5 flex flex-col gap-3.5">
-        <PublisherRow post={post} />
-        <Link href={`/post/${post.post_id}`} className="group">
-          <h2 className="font-display text-[26px] sm:text-[34px] font-bold leading-[1.1]
-                         tracking-[-0.03em] text-gisviz-ink group-hover:text-gisviz-accent-text
-                         transition-colors">
-            {post.title}
-          </h2>
-        </Link>
-        {post.description && (
-          <p className="text-[15.5px] leading-[1.58] text-gisviz-ink-soft line-clamp-3">
-            {post.description}
-          </p>
-        )}
-        <div className="h-px bg-gisviz-border" />
+      <div className="px-5 pt-3 pb-4">
+        <div className="mb-3 h-px bg-gisviz-border" />
         <CardFooter {...props} />
       </div>
     </article>
   )
 }
 
+/** @deprecated the stream uses FeedCard for every post; kept so older imports still compile. */
+export const HeroCard = FeedCard
+
 export function FeedCardSkeleton() {
   return (
-    <div className="w-full rounded-2xl bg-gisviz-card border border-gisviz-border p-5
-                    flex flex-col gap-4 animate-pulse" aria-hidden>
-      <div className="flex items-center gap-2.5">
+    <div className="w-full overflow-hidden rounded-2xl border border-gisviz-border bg-gisviz-card flex flex-col animate-pulse" aria-hidden>
+      <div className="flex items-center gap-2.5 px-5 pt-4 pb-3">
         <span className="w-[34px] h-[34px] rounded-[9px] bg-gisviz-rail-soft/60" />
         <span className="flex flex-col gap-1.5">
           <span className="block w-32 h-3 rounded bg-gisviz-rail-soft/60" />
           <span className="block w-20 h-2.5 rounded bg-gisviz-rail-soft/40" />
         </span>
       </div>
-      <div className="flex gap-5">
-        <div className="flex-1 flex flex-col gap-2.5">
-          <span className="block w-full h-6 rounded bg-gisviz-rail-soft/60" />
-          <span className="block w-4/5 h-6 rounded bg-gisviz-rail-soft/60" />
-          <span className="block w-full h-3 rounded bg-gisviz-rail-soft/40" />
-        </div>
-        <span className="w-[200px] h-[136px] rounded-[11px] bg-gisviz-rail-soft/60" />
+      <span className="block aspect-square w-full bg-gisviz-rail-soft/50" />
+      <div className="flex flex-col gap-2.5 px-5 py-4">
+        <span className="block w-4/5 h-5 rounded bg-gisviz-rail-soft/60" />
+        <span className="block w-full h-3 rounded bg-gisviz-rail-soft/40" />
       </div>
     </div>
   )

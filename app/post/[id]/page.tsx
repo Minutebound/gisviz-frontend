@@ -13,8 +13,10 @@ import { useAuth } from '../../../context/AuthContext'
 import { gisvizApi } from '../../../connector/api'
 import ShareModal from '../../components/SharePost'
 import InteractiveVisual, { type VisualSpec } from '../../components/InteractiveVisual'
-import { resolveSpec } from '../../../lib/visualSpec'
-import DatasetDataPanel from '../../components/post/DatasetDataPanel'
+import VisualBackdrop from '../../components/visuals/VisualBackdrop'
+import { toDesign } from '../../../lib/poster'
+import { resolveSpec, visualHeightFor } from '../../../lib/visualSpec'
+import { DEFAULT_ACCENT, useRegions, useVisualCatalog } from '../../../lib/referenceData'
 
 const RAW_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://'
 const API_BASE_URL = RAW_API_URL.replace('/api/v0', '').replace(/\/$/, '')
@@ -84,6 +86,8 @@ export default function PostDetail() {
   // Count this visit once per page open (the server counts each visitor once a day, in the analytics DB).
   const viewedRef = useRef<string | null>(null)
   const [viewCount, setViewCount] = useState<number | null>(null)
+  const regionList = useRegions()          // misc DB
+  const catalog = useVisualCatalog()       // misc DB
   useEffect(() => {
     if (!postId || authLoading || viewedRef.current === postId) return
     viewedRef.current = postId
@@ -226,12 +230,21 @@ export default function PostDetail() {
   // Priority: ?demo=… (testing) → post.visual_spec (from backend) → static image.
   const visualSpec: VisualSpec | null =
     resolveSpec(post.visual_spec as VisualSpec | undefined) ?? null
-  const visualTypeLabel = visualSpec
-    ? (visualSpec.kind === 'map' ? 'map' : visualSpec.chart_type)
-    : post.chart_type
+  const vt = (visualSpec as any)?.visual_type || (visualSpec ? (visualSpec.kind === 'map' ? 'map' : visualSpec.chart_type) : post.chart_type)
+  const visualTypeName = vt ? (catalog.types.find(t => t.code === vt || t.renderer_code === vt)?.name ?? String(vt)) : null
+  const regionName = (code: string) => regionList.find(r => r.code === code)?.name ?? code
+  const visualHeight = visualHeightFor(visualSpec, 820)                       // no poster: a fixed desktop width
+  const posterDesign = toDesign(post.backdrop ?? 'auto')                       // null = the publisher chose no poster
+  // poster footer: where the numbers come from, in parentheses, linked
+  const posterSources = [
+    ...(post.dataset?.source_name || post.source_name ? [{ label: post.dataset?.source_name || post.source_name,
+      url: post.dataset?.source_url || post.source_url }] : []),
+    ...(post.source_name && post.dataset?.source_name && post.source_name !== post.dataset.source_name ? [{ label: post.source_name, url: post.source_url }] : []),
+    ...(post.dataset?.title ? [{ label: `${post.dataset.title}${post.dataset.license ? `, ${post.dataset.license}` : ''}`, url: null }] : []),
+  ]
 
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 sm:px-8 lg:px-[72px] pt-4 sm:pt-6 pb-14">
+    <main className="mx-auto w-full max-w-7xl px-4 sm:px-8 lg:px-[72px] pt-4 sm:pt-6 pb-14">
 
       <div className="flex flex-col lg:flex-row gap-8 xl:gap-14 items-start mt-4">
 
@@ -239,8 +252,21 @@ export default function PostDetail() {
         <div className="flex-1 min-w-0 flex flex-col w-full order-1">
 
           {/* 1. Visual (Hero): interactive when a spec exists, else the static image */}
-          {visualSpec ? (
-            <InteractiveVisual spec={visualSpec} className="mb-8" />
+          {visualSpec && !posterDesign ? (
+            <div className="mb-8">
+              <InteractiveVisual spec={visualSpec} datasetId={post.dataset_id}
+                                 showData={!!post.dataset?.show_data} height={visualHeight} />
+            </div>
+          ) : visualSpec ? (
+            <VisualBackdrop regionCode={post.region} regions={regionList} design={posterDesign!}
+                            accent={post.theme_color || (visualSpec as any).accent || post.categories?.[0]?.theme_color || DEFAULT_ACCENT}
+                            eyebrow={post.categories?.[0]?.label}
+                            title={(visualSpec as any).title || post.title} subtitle={(visualSpec as any).subtitle}
+                            sources={posterSources} note={post.note}
+                            renderVisual={w => (
+                              <InteractiveVisual spec={visualSpec} datasetId={post.dataset_id}
+                                                 showData={!!post.dataset?.show_data} height={visualHeightFor(visualSpec, w)} />
+                            )} />
           ) : visualUrl ? (
             <div
               className="w-full rounded-[16px] bg-gisviz-canvas border border-gisviz-border overflow-hidden cursor-zoom-in shadow-sm group relative mb-8"
@@ -324,8 +350,8 @@ export default function PostDetail() {
 
             </div>
 
-            {/* Meta Info (Publisher, Date, & Views) */}
-            <div className="flex flex-wrap items-center gap-4 text-[13.5px] text-gisviz-ink-soft font-medium mt-2">
+            {/* Meta Info (Publisher, Date, & Views) — phones/tablets; desktop shows it in the right column */}
+            <div className="flex lg:hidden flex-wrap items-center gap-4 text-[13.5px] text-gisviz-ink-soft font-medium mt-2">
               <Link href={`/profile/${displayHandle}`} className="flex items-center gap-2 hover:text-gisviz-accent transition-colors">
                 {avatarUrl ? (
                   <img src={avatarUrl} alt={displayHandle} className="w-10 h-10 rounded-full object-cover border border-gisviz-border bg-gisviz-paper" />
@@ -346,108 +372,6 @@ export default function PostDetail() {
             </div>
           </header>
 
-          {/* 3. Enterprise Data Specifications Container (Full Width) */}
-          {(post.source_name || post.dataset || post.note || post.map_preview?.layer_count > 0 || visualTypeLabel) && (
-            <div className="rounded-[12px] border border-gisviz-border bg-gisviz-card shadow-sm overflow-hidden mb-6">
-              <div className="px-5 py-3.5 border-b border-gisviz-border bg-gisviz-paper/50">
-                <h3 className="font-display text-[15px] font-bold text-gisviz-ink flex items-center gap-2">
-                  <Database size={16} className="text-gisviz-accent" /> Dataset Specifications
-                </h3>
-              </div>
-              <div className="p-0">
-                <table className="w-full text-left border-collapse text-[13.5px]">
-                  <tbody>
-                    {post.source_name && (
-                      <tr className="border-b border-gisviz-border/50 last:border-0">
-                        <th className="py-3.5 px-5 font-medium text-gisviz-ink-soft w-1/3 bg-gisviz-canvas/30">Data Source</th>
-                        <td className="py-3.5 px-5 text-gisviz-ink">
-                          {post.source_url ? (
-                            <a
-                              href={post.source_url.startsWith('http') ? post.source_url : `https://${post.source_url}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-gisviz-accent hover:underline flex items-center gap-1.5 font-semibold"
-                            >
-                              {post.source_name} <ExternalLink size={13} />
-                            </a>
-                          ) : (
-                            <span className="font-semibold">{post.source_name}</span>
-                          )}
-                        </td>
-                      </tr>
-                    )}
-                    {post.dataset && (
-                      <>
-                        <tr className="border-b border-gisviz-border/50 last:border-0">
-                          <th className="py-3.5 px-5 font-medium text-gisviz-ink-soft w-1/3 bg-gisviz-canvas/30">Linked Dataset</th>
-                          <td className="py-3.5 px-5 text-gisviz-ink">
-                            <Link href="/datasets" className="text-gisviz-accent hover:underline font-semibold">{post.dataset.title}</Link>
-                            <span className="block font-mono text-[11.5px] text-gisviz-ink-soft mt-0.5">{post.dataset_id}</span>
-                          </td>
-                        </tr>
-                        {[
-                          ['Dataset Publisher', post.dataset.publisher],
-                          ['Licence', post.dataset.license],
-                          ['Format', post.dataset.format ? String(post.dataset.format).toUpperCase() : null],
-                          ['Geometry', post.dataset.geometry_type],
-                          ['CRS', post.dataset.crs],
-                          ['Rows', post.dataset.row_count != null ? Number(post.dataset.row_count).toLocaleString() : null],
-                          ['Dataset Updated', post.dataset.updated_at ? new Date(post.dataset.updated_at).toLocaleDateString() : null],
-                        ].filter(([, v]) => v).map(([k, v]) => (
-                          <tr key={k as string} className="border-b border-gisviz-border/50 last:border-0">
-                            <th className="py-3.5 px-5 font-medium text-gisviz-ink-soft w-1/3 bg-gisviz-canvas/30">{k}</th>
-                            <td className="py-3.5 px-5 text-gisviz-ink">{v as string}</td>
-                          </tr>
-                        ))}
-                      </>
-                    )}
-                    {post.theme_color && (
-                      <tr className="border-b border-gisviz-border/50 last:border-0">
-                        <th className="py-3.5 px-5 font-medium text-gisviz-ink-soft w-1/3 bg-gisviz-canvas/30">Theme Colour</th>
-                        <td className="py-3.5 px-5 text-gisviz-ink font-mono text-[12.5px] flex items-center gap-2">
-                          <span className="inline-block w-4 h-4 rounded-full border border-gisviz-border" style={{ background: post.theme_color }} /> {post.theme_color}
-                        </td>
-                      </tr>
-                    )}
-                    {visualTypeLabel && (
-                      <tr className="border-b border-gisviz-border/50 last:border-0">
-                        <th className="py-3.5 px-5 font-medium text-gisviz-ink-soft w-1/3 bg-gisviz-canvas/30">Visualization Type</th>
-                        <td className="py-3.5 px-5 text-gisviz-ink uppercase font-mono text-[12.5px]">{visualTypeLabel}</td>
-                      </tr>
-                    )}
-                    {post.map_preview?.layer_count > 0 && (
-                      <tr className="border-b border-gisviz-border/50 last:border-0">
-                        <th className="py-3.5 px-5 font-medium text-gisviz-ink-soft w-1/3 bg-gisviz-canvas/30">Rendering Layers</th>
-                        <td className="py-3.5 px-5 text-gisviz-ink font-mono text-[12.5px] flex items-center gap-1.5">
-                          <Layers size={14} className="text-gisviz-ink-soft" /> {post.map_preview.layer_count} Layers
-                        </td>
-                      </tr>
-                    )}
-                    {post.region && (
-                      <tr className="border-b border-gisviz-border/50 last:border-0">
-                        <th className="py-3.5 px-5 font-medium text-gisviz-ink-soft w-1/3 bg-gisviz-canvas/30">Region Focus</th>
-                        <td className="py-3.5 px-5 text-gisviz-ink capitalize flex items-center gap-1.5">
-                           <MapPin size={14} className="text-gisviz-ink-soft" /> {post.region}
-                        </td>
-                      </tr>
-                    )}
-                    {post.note && (
-                      <tr className="border-b border-gisviz-border/50 last:border-0">
-                        <th className="py-3.5 px-5 font-medium text-gisviz-ink-soft w-1/3 bg-gisviz-canvas/30 align-top">Author Note</th>
-                        <td className="py-3.5 px-5 text-gisviz-ink leading-relaxed">{post.note}</td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {/* 3b. the dataset's rows — only when an admin switched "Show data" on; loaded on click */}
-          {post.dataset?.show_data && post.dataset_id && (
-            <DatasetDataPanel datasetId={post.dataset_id} totalRows={post.dataset.row_count} />
-          )}
-
           {/* 4. Large Description & Document Flow (Separate Container) */}
           {post.description && (
             <div className="rounded-[12px] border border-gisviz-border bg-gisviz-card shadow-sm overflow-hidden mb-10 p-6 sm:p-8">
@@ -460,13 +384,10 @@ export default function PostDetail() {
             </div>
           )}
 
-        </div>
 
-        {/* ── RIGHT COLUMN (Comments Sidebar Only) ── */}
-        <aside className="w-full lg:w-[340px] xl:w-[380px] shrink-0 flex flex-col lg:sticky lg:top-[96px] h-auto lg:h-[calc(100vh-120px)] order-2">
-
+          {/* 5. Discussion — below the visual and the story */}
           {/* Comments Panel */}
-          <div className="rounded-[16px] border border-gisviz-border bg-gisviz-card shadow-sm flex flex-col flex-1 h-full max-h-[800px] lg:max-h-full overflow-hidden">
+          <div id="discussion" className="rounded-[16px] border border-gisviz-border bg-gisviz-card shadow-sm flex flex-col overflow-hidden">
 
             {/* Comments Header */}
             <div className="px-5 py-4 border-b border-gisviz-border shrink-0 bg-gisviz-paper/30">
@@ -477,7 +398,7 @@ export default function PostDetail() {
             </div>
 
             {/* Comments Feed */}
-            <div className="flex-1 overflow-y-auto px-5 py-2 space-y-1 divide-y divide-gisviz-border/50" style={{ scrollbarWidth: 'thin' }}>
+            <div className="max-h-[640px] overflow-y-auto px-5 py-2 space-y-1 divide-y divide-gisviz-border/50" style={{ scrollbarWidth: 'thin' }}>
               {comments.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-center py-10 opacity-70">
                   <MessageSquare size={24} className="text-gisviz-ink-soft mb-2" />
@@ -526,6 +447,101 @@ export default function PostDetail() {
             )}
           </div>
 
+        </div>
+
+        {/* ── RIGHT COLUMN (desktop): publisher, post details, the dataset — compact ── */}
+        <aside className="w-full lg:w-[320px] xl:w-[360px] shrink-0 flex flex-col gap-4 lg:sticky lg:top-[24px] order-2">
+
+          {/* Publisher */}
+          <div className="hidden lg:block rounded-[14px] border border-gisviz-border bg-gisviz-card shadow-sm p-5">
+            <Link href={`/profile/${displayHandle}`} className="flex items-center gap-3 group">
+              {avatarUrl
+                ? <img src={avatarUrl} alt={displayHandle} className="w-11 h-11 rounded-full object-cover border border-gisviz-border bg-gisviz-paper" />
+                : <span className="w-11 h-11 rounded-full grid place-items-center bg-gisviz-paper border border-gisviz-border"><User size={18} className="text-gisviz-ink-soft" /></span>}
+              <span className="min-w-0">
+                <span className="block text-[14.5px] font-semibold text-gisviz-ink group-hover:text-gisviz-accent truncate">@{displayHandle}</span>
+                <span className="block text-[12.5px] text-gisviz-ink-soft">Publisher</span>
+              </span>
+            </Link>
+            <dl className="mt-4 grid grid-cols-3 gap-2 text-center">
+              {[
+                ['Views', Math.max(viewCount ?? 0, post.views_count ?? 0).toLocaleString()],
+                ['Likes', likeCount.toLocaleString()],
+                ['Comments', Number(post.total_comments_count || 0).toLocaleString()],
+              ].map(([k, v]) => (
+                <div key={k} className="rounded-lg bg-gisviz-paper/60 border border-gisviz-border/60 py-2">
+                  <dd className="font-display text-[16px] font-bold text-gisviz-ink tabular-nums">{v}</dd>
+                  <dt className="text-[10.5px] font-mono uppercase tracking-wider text-gisviz-ink-soft">{k}</dt>
+                </div>
+              ))}
+            </dl>
+            <p className="mt-3 flex items-center gap-1.5 text-[12.5px] text-gisviz-ink-soft">
+              <Calendar size={13} /> {new Date(post.created_timestamp).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}
+            </p>
+          </div>
+
+          {/* Post details */}
+          <div className="rounded-[14px] border border-gisviz-border bg-gisviz-card shadow-sm overflow-hidden">
+            <h3 className="px-5 py-3 border-b border-gisviz-border bg-gisviz-paper/50 font-display text-[14px] font-bold text-gisviz-ink">About this post</h3>
+            <dl className="divide-y divide-gisviz-border/50 text-[13px]">
+              {post.region && (
+                <div className="flex justify-between gap-3 px-5 py-2.5"><dt className="text-gisviz-ink-soft">Region</dt>
+                  <dd className="flex items-center gap-1.5 font-medium text-gisviz-ink"><MapPin size={13} /> {regionName(post.region)}</dd></div>
+              )}
+              {post.categories?.length > 0 && (
+                <div className="flex justify-between gap-3 px-5 py-2.5"><dt className="text-gisviz-ink-soft">Category</dt>
+                  <dd className="flex flex-wrap justify-end gap-1.5">
+                    {post.categories.map((c: any) => (
+                      <Link key={c.slug} href={`/?category=${encodeURIComponent(c.slug)}`}
+                        className="rounded-md px-2 py-0.5 text-[12px] font-semibold"
+                        style={{ background: `${c.theme_color || '#888888'}1f`, color: c.theme_color || undefined }}>{c.label}</Link>
+                    ))}
+                  </dd></div>
+              )}
+              {visualTypeName && (
+                <div className="flex justify-between gap-3 px-5 py-2.5"><dt className="text-gisviz-ink-soft">Visual</dt>
+                  <dd className="font-medium text-gisviz-ink text-right">{visualTypeName}</dd></div>
+              )}
+              {post.note && (
+                <div className="px-5 py-2.5"><dt className="text-gisviz-ink-soft mb-1">Author note</dt>
+                  <dd className="text-gisviz-ink leading-relaxed">{post.note}</dd></div>
+              )}
+            </dl>
+          </div>
+
+          {/* The dataset (only what a reader needs) */}
+          {(post.dataset || post.source_name) && (
+            <div className="rounded-[14px] border border-gisviz-border bg-gisviz-card shadow-sm overflow-hidden">
+              <h3 className="px-5 py-3 border-b border-gisviz-border bg-gisviz-paper/50 font-display text-[14px] font-bold text-gisviz-ink flex items-center gap-2">
+                <Database size={15} className="text-gisviz-accent" /> Data
+              </h3>
+              <dl className="divide-y divide-gisviz-border/50 text-[13px]">
+                {post.dataset && (
+                  <div className="px-5 py-2.5"><dt className="text-gisviz-ink-soft">Dataset</dt>
+                    <dd><Link href="/datasets" className="font-semibold text-gisviz-accent hover:underline">{post.dataset.title}</Link></dd></div>
+                )}
+                {(post.dataset?.source_name || post.source_name) && (() => {
+                  const name = post.dataset?.source_name || post.source_name
+                  const url = post.dataset?.source_url || post.source_url
+                  const href = url ? (url.startsWith('http') ? url : `https://${url}`) : null
+                  return (
+                    <div className="flex justify-between gap-3 px-5 py-2.5"><dt className="text-gisviz-ink-soft">Source</dt>
+                      <dd className="text-right font-medium text-gisviz-ink">
+                        {href ? <a href={href} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 hover:text-gisviz-accent">{name} <ExternalLink size={12} /></a> : name}
+                      </dd></div>
+                  )
+                })()}
+                {[
+                  ['Publisher', post.dataset?.publisher],
+                  ['Licence', post.dataset?.license],
+                  ['Updated', post.dataset?.updated_at ? new Date(post.dataset.updated_at).toLocaleDateString() : null],
+                ].filter(([, v]) => v).map(([k, v]) => (
+                  <div key={k as string} className="flex justify-between gap-3 px-5 py-2.5"><dt className="text-gisviz-ink-soft">{k}</dt>
+                    <dd className="text-right font-medium text-gisviz-ink">{v as string}</dd></div>
+                ))}
+              </dl>
+            </div>
+          )}
         </aside>
       </div>
 

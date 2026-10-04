@@ -22,7 +22,7 @@ import {
   Table2, HardDrive, File as FileIcon, CircleSlash, Info,
 } from 'lucide-react'
 import { useAuth } from '../../../context/AuthContext'
-import { gisvizApi } from '../../../connector/api'
+import { gisvizApi, type ColumnEdit, type ColumnKind, type StagedUpload } from '../../../connector/api'
 import AccessRestricted from '../../components/AccessRestricted'
 import type { DatasetSyncReport, ManagedDataset, ManagedDatasetMetadata, Region } from '../../../types/visuals'
 
@@ -98,6 +98,77 @@ function RegionSelect({ regions, value, onChange }: { regions: Region[]; value: 
   )
 }
 
+// ── Upload previewer (Compass-style): one column per card, edits shown on a live sample ──
+type Edit = { rename?: string; type?: ColumnKind; include?: boolean }
+const KIND_LABEL: Record<ColumnKind, string> = { text: 'Text', integer: 'Integer', decimal: 'Decimal', date: 'Date', datetime: 'Date & time', boolean: 'Yes / no' }
+
+function UploadPreviewer({ staged, view, edits, setEdit, refreshing }: {
+  staged: StagedUpload; view: StagedUpload; edits: Record<string, Edit>
+  setEdit: (source: string, e: Edit) => void; refreshing: boolean
+}) {
+  const bySource = new Map(view.columns.map(c => [c.source, c]))
+  const kept = staged.columns.filter(c => edits[c.source]?.include !== false)
+  const hasGeom = view.sample.some(r => r._gv_geom != null)
+  return (
+    <div className="rounded-lg border border-gisviz-border bg-gisviz-canvas">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 border-b border-gisviz-border text-[12px] text-gisviz-ink-soft">
+        <span><b className="text-gisviz-ink">{staged.source_file}</b> · {Number(view.rows).toLocaleString()} rows · {kept.length} of {staged.columns.length} columns kept · {fmtBytes(staged.bytes)}{hasGeom ? ' · geometry' : ''}</span>
+        <span className="flex items-center gap-1.5">{refreshing && <Loader2 size={12} className="animate-spin" />} Not live yet: review the columns, then <b className="text-gisviz-ink">Load data</b></span>
+      </div>
+      <div className="overflow-x-auto max-h-[420px] overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
+        <table className="text-left text-[12px] border-collapse">
+          <thead className="sticky top-0 z-10 bg-gisviz-paper">
+            <tr>
+              {staged.columns.map(c => {
+                const e = edits[c.source] ?? {}
+                const on = e.include !== false
+                const v = bySource.get(c.source)
+                return (
+                  <th key={c.source} className={`align-top border-b border-r border-gisviz-border px-2 py-2 min-w-[150px] font-normal ${on ? '' : 'opacity-50'}`}>
+                    <label className="flex items-center gap-1.5 mb-1.5 text-[11px] text-gisviz-ink-soft">
+                      <input type="checkbox" checked={on} className="accent-gisviz-accent"
+                             onChange={ev => setEdit(c.source, { ...e, include: ev.target.checked })} /> keep
+                    </label>
+                    <input value={e.rename ?? c.name} disabled={!on} aria-label={`Name of ${c.source}`}
+                           onChange={ev => setEdit(c.source, { ...e, rename: ev.target.value })}
+                           className="w-full mb-1.5 rounded border border-gisviz-border bg-gisviz-card px-1.5 py-1 font-mono text-[12px] text-gisviz-ink outline-none focus:ring-1 focus:ring-gisviz-accent" />
+                    <select value={e.type ?? c.kind} disabled={!on} aria-label={`Type of ${c.source}`}
+                            onChange={ev => setEdit(c.source, { ...e, type: ev.target.value as ColumnKind })}
+                            className="w-full rounded border border-gisviz-border bg-gisviz-card px-1 py-1 text-[12px] text-gisviz-ink">
+                      {staged.types.map(t => <option key={t} value={t}>{KIND_LABEL[t]}{t === c.kind ? ' (detected)' : ''}</option>)}
+                    </select>
+                    <div className="mt-1.5 flex flex-wrap gap-1 text-[10.5px] font-mono">
+                      {v && v.empty > 0 && <span className="rounded bg-gisviz-paper px-1 text-gisviz-ink-soft">{v.empty.toLocaleString()} empty</span>}
+                      {v && v.lost > 0 && <span className="rounded bg-gisviz-alert/10 px-1 text-gisviz-alert" title="values that cannot be converted become empty">{v.lost.toLocaleString()} lost</span>}
+                    </div>
+                  </th>
+                )
+              })}
+              {hasGeom && <th className="align-top border-b border-gisviz-border px-2 py-2 min-w-[140px] text-[11px] font-mono text-gisviz-ink-soft">geometry (kept)</th>}
+            </tr>
+          </thead>
+          <tbody className={refreshing ? 'opacity-60' : ''}>
+            {view.sample.map((r, i) => (
+              <tr key={i} className="border-b border-gisviz-border/50">
+                {staged.columns.map(c => {
+                  const v = bySource.get(c.source)
+                  const val = v ? r[v.name] : undefined
+                  return (
+                    <td key={c.source} className={`border-r border-gisviz-border/40 px-2 py-1 whitespace-nowrap max-w-[220px] truncate ${v ? 'text-gisviz-ink' : 'text-gisviz-ink-soft/50'}`}>
+                      {!v ? '—' : val === null || val === undefined ? <span className="text-gisviz-ink-soft italic">empty</span> : String(val)}
+                    </td>
+                  )
+                })}
+                {hasGeom && <td className="px-2 py-1 font-mono text-[11px] text-gisviz-ink-soft whitespace-nowrap max-w-[200px] truncate">{r._gv_geom ?? ''}</td>}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
 // ── Add / edit popup (same for both) ─────────────────────────────────
 function DatasetModal({ dataset, categories, regions, onClose, onDone }: {
   dataset: ManagedDataset | null
@@ -121,12 +192,45 @@ function DatasetModal({ dataset, categories, regions, onClose, onDone }: {
   // a replacement that would break published posts: nothing changed yet, the admin decides
   const [conflict, setConflict] = useState<{ message: string; broken_posts: BrokenPost[] } | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  // upload previewer: the staged file (as detected), the admin's column edits, and the sample with them applied
+  const [staged, setStaged] = useState<StagedUpload | null>(null)
+  const [edits, setEdits] = useState<Record<string, Edit>>({})
+  const [view, setView] = useState<StagedUpload | null>(null)
+  const [refreshing, setRefreshing] = useState(false)
+  const changes = useMemo<ColumnEdit[]>(() => Object.entries(edits).map(([column, e]) => {
+    const c: ColumnEdit = { column }
+    const orig = staged?.columns.find(x => x.source === column)
+    if (e.include === false) c.include = false
+    if (e.rename && e.rename !== orig?.name) c.rename = e.rename
+    if (e.type && e.type !== orig?.kind) c.type = e.type
+    return c
+  }).filter(c => Object.keys(c).length > 1), [edits, staged])
+  const changesKey = JSON.stringify(changes)
+  useEffect(() => {
+    if (!staged || !current) return
+    if (!changes.length) { setView(staged); return }
+    let live = true
+    setRefreshing(true)
+    const t = setTimeout(() => {
+      gisvizApi.sampleStagedDataset(current.dataset_id, changes)
+        .then(v => { if (live) { setView(v); setErr('') } })
+        .catch(e => { if (live) setErr(errText(e, 'Could not apply the column changes.')) })
+        .finally(() => { if (live) setRefreshing(false) })
+    }, 350)
+    return () => { live = false; clearTimeout(t) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [changesKey, staged])
+  const close = () => {
+    if (staged && current) gisvizApi.discardStagedDataset(current.dataset_id).catch(() => {})   // cancel: nothing goes live
+    onClose()
+  }
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !busy) onClose() }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !busy) close() }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [busy, onClose])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [busy, staged, current])
 
   const set = (k: keyof Form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
     setForm(f => ({ ...f, [k]: e.target.value }))
@@ -141,6 +245,7 @@ function DatasetModal({ dataset, categories, regions, onClose, onDone }: {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (staged && current) { await commit(current.dataset_id, false); return }      // step 3: go live
     if (!form.title.trim()) { setErr('A title is required.'); return }
     setBusy(true); setErr(''); setConflict(null)
     let code = current?.dataset_id
@@ -162,41 +267,52 @@ function DatasetModal({ dataset, categories, regions, onClose, onDone }: {
                                          : `Saved ${code}.` })
       return
     }
-    await upload(code!, created)
+    await stage(code!, created)                                                      // step 1: preview the file
   }
 
-  const upload = async (code: string, created = false) => {
+  const stage = async (code: string, created = false) => {
     if (!file) return
     setBusy(true); setErr(''); setConflict(null); setProgress(0)
     try {
-      const r = await gisvizApi.uploadDatasetData(code, file, setProgress)
+      const r = await gisvizApi.stageDatasetFile(code, file, setProgress)
+      setStaged(r); setView(r); setEdits({})
+    } catch (e3: any) {
+      setErr(`${created ? `Created ${code}, but the file could not be read. ` : ''}${file.name}: ${errText(e3, 'Upload failed.')}`)
+    } finally { setProgress(null); setBusy(false) }
+  }
+
+  const commit = async (code: string, force: boolean) => {
+    setBusy(true); setErr(''); setConflict(null)
+    try {
+      const r = await gisvizApi.commitStagedDataset(code, changes, force)
       const broken: BrokenPost[] = r.broken_posts || []
       onDone({
         kind: broken.length ? 'err' : 'ok',
-        text: `${created ? `Created ${code}. ` : ''}${file.name} (${fmtBytes(file.size)}) loaded as ${code}: ${Number(r.rows).toLocaleString()} rows, ${r.columns} columns${r.geometry_type ? `, ${r.geometry_type}` : ''}. Dataset is active.`
+        text: `${staged?.source_file ?? 'File'} (${fmtBytes(r.bytes ?? staged?.bytes)}) loaded as ${code}: ${Number(r.rows).toLocaleString()} rows, ${r.columns} columns${r.geometry_type ? `, ${r.geometry_type}` : ''}. Dataset is active.`
           + (broken.length ? ` ${broken.length === 1 ? '1 post now needs' : `${broken.length} posts now need`} a new chart: ${broken.map(b => `"${b.title}"`).join(', ')} — open each post and edit its visual.` : ''),
       })
     } catch (e3: any) {
       const d = e3?.response?.data?.detail
-      if (e3?.response?.status === 409 && d && Array.isArray(d.broken_posts)) {
-        setConflict({ message: d.message, broken_posts: d.broken_posts })     // nothing was replaced
-      } else {
-        // the record exists (created or saved); only the file failed: stay open to retry
-        setErr(`${created ? `Created ${code}, but the file was not loaded. ` : ''}${file.name}: ${errText(e3, 'Upload failed.')}`)
-      }
-      setProgress(null); setBusy(false)
+      if (e3?.response?.status === 409 && d && Array.isArray(d.broken_posts)) setConflict({ message: d.message, broken_posts: d.broken_posts })
+      else setErr(errText(e3, 'Could not load the data.'))
+      setBusy(false)
     }
   }
 
+  const cancelStaged = async () => {
+    if (current) await gisvizApi.discardStagedDataset(current.dataset_id).catch(() => {})
+    setStaged(null); setView(null); setEdits({}); setFile(null); setConflict(null)
+  }
+
   const isEdit = !!current
-  const action = isEdit ? (file ? 'Save & load file' : 'Save') : (file ? 'Create & load file' : 'Create dataset')
+  const action = staged ? 'Load data' : isEdit ? (file ? 'Save & preview file' : 'Save') : (file ? 'Create & preview file' : 'Create dataset')
 
   // rendered into <body> so the site's top bar cannot sit above it
   return createPortal(
     <div className="fixed inset-0 z-[1000] flex items-start sm:items-center justify-center p-4 overflow-y-auto" role="dialog" aria-modal="true">
-      <div className="absolute inset-0 bg-gisviz-black/20 backdrop-blur-sm" onClick={() => !busy && onClose()} />
+      <div className="absolute inset-0 bg-gisviz-black/20 backdrop-blur-sm" onClick={() => !busy && close()} />
       <form onSubmit={submit}
-            className="relative z-10 w-full max-w-2xl my-8 bg-gisviz-card border border-gisviz-border rounded-xl shadow-2xl">
+            className={`relative z-10 w-full ${staged ? 'max-w-5xl' : 'max-w-2xl'} my-8 bg-gisviz-card border border-gisviz-border rounded-xl shadow-2xl transition-[max-width]`}>
         <div className="flex items-start justify-between gap-4 px-6 pt-5 pb-4 border-b border-gisviz-border">
           <div>
             <h2 className="font-display text-[17px] font-bold text-gisviz-ink flex items-center gap-2">
@@ -208,7 +324,7 @@ function DatasetModal({ dataset, categories, regions, onClose, onDone }: {
                       : 'A code (ds_00001, ds_00002, …) is assigned automatically. Inactive until its data file is loaded.'}
             </p>
           </div>
-          <button type="button" onClick={onClose} disabled={busy} className="text-gisviz-ink-soft hover:text-gisviz-accent disabled:opacity-40"><X size={20} /></button>
+          <button type="button" onClick={close} disabled={busy} className="text-gisviz-ink-soft hover:text-gisviz-accent disabled:opacity-40"><X size={20} /></button>
         </div>
 
         <div className="px-6 py-5 grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -240,10 +356,17 @@ function DatasetModal({ dataset, categories, regions, onClose, onDone }: {
           {/* data file */}
           <div className="md:col-span-2">
             <label className={labelCls}>Data file {isEdit && current!.has_data && <span className="normal-case tracking-normal">· current: {Number(current!.row_count).toLocaleString()} rows, uploaded {fmtDate(current!.data_uploaded_at)}</span>}</label>
-            {progress !== null ? (
+            {staged && view ? (
+              <>
+                <UploadPreviewer staged={staged} view={view} edits={edits} refreshing={refreshing}
+                                 setEdit={(src, e) => setEdits(m => ({ ...m, [src]: e }))} />
+                <button type="button" onClick={cancelStaged} disabled={busy}
+                        className="mt-2 text-[12px] text-gisviz-ink-soft hover:text-gisviz-alert">Cancel this upload</button>
+              </>
+            ) : progress !== null ? (
               <div className="rounded-lg border border-gisviz-border bg-gisviz-canvas px-4 py-4">
                 <div className="flex justify-between text-[12px] text-gisviz-ink-soft mb-1.5">
-                  <span>{progress < 100 ? `Uploading ${file?.name}…` : `Converting and loading into gisviz.duckdb as ${current?.dataset_id}…`}</span>
+                  <span>{progress < 100 ? `Uploading ${file?.name}…` : `Reading ${file?.name}: detecting columns and types…`}</span>
                   <span>{progress}%</span>
                 </div>
                 <div className="h-1.5 rounded-full bg-gisviz-card overflow-hidden">
@@ -292,9 +415,9 @@ function DatasetModal({ dataset, categories, regions, onClose, onDone }: {
               ))}
             </ul>
             <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={() => { setConflict(null); setFile(null) }}
+              <button type="button" onClick={cancelStaged}
                       className="px-3 py-1.5 rounded-md border border-gisviz-border bg-gisviz-card text-[12.5px] font-semibold">Keep current data</button>
-              <button type="button" onClick={() => upload(current.dataset_id, true)} disabled={busy}
+              <button type="button" onClick={() => commit(current.dataset_id, true)} disabled={busy}
                       className="px-3 py-1.5 rounded-md border border-amber-600/60 bg-gisviz-card text-amber-700 text-[12.5px] font-semibold disabled:opacity-60">
                 Replace anyway
               </button>
@@ -309,9 +432,9 @@ function DatasetModal({ dataset, categories, regions, onClose, onDone }: {
         )}
 
         <div className="flex justify-end gap-3 px-6 py-4 border-t border-gisviz-border">
-          <button type="button" onClick={onClose} disabled={busy}
+          <button type="button" onClick={close} disabled={busy}
                   className="px-5 py-2 rounded-md text-[13px] border border-gisviz-border text-gisviz-ink-soft hover:bg-gisviz-rail disabled:opacity-50">Cancel</button>
-          <button type="submit" disabled={busy || (isEdit && !dirty && !file)}
+          <button type="submit" disabled={busy || refreshing || (isEdit && !dirty && !file && !staged)}
                   className="inline-flex items-center gap-2 bg-gisviz-accent text-[color:var(--accent-on)] px-6 py-2 rounded-md text-[13px] font-semibold shadow-sm hover:brightness-110 disabled:opacity-60">
             {busy && <Loader2 size={15} className="animate-spin" />} {action}
           </button>

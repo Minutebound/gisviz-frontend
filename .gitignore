@@ -1,4 +1,3 @@
-
 # ── Dependencies ──────────────────────────────────────────────────
 /node_modules
 /.pnp
@@ -46,3 +45,5 @@ next-env.d.ts
 # ── Docker ────────────────────────────────────────────────────────
 docker-data/
 *.pid
+# copied from node_modules/maplibre-gl by scripts/copy-maplibre-worker.mjs
+/public/maplibre/

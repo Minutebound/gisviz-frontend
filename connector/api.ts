@@ -1,6 +1,14 @@
 import axios from 'axios'
 import { FeedFilters, filtersToParams, Post } from '../types/gisviz'
 import type { DatasetSyncReport, ManagedDatasetMetadata, PublicDatasetRows, Region, VisualCatalog } from '../types/visuals'
+import type { PosterChoice, PosterDesign } from '../lib/poster'
+
+/** Upload previewer: a column of the staged upload, and an edit the admin applies to it. */
+export type StagedColumn = { source: string; name: string; sql_type: string; kind: ColumnKind; type: ColumnKind | null; empty: number; lost: number }
+export type ColumnKind = 'text' | 'integer' | 'decimal' | 'date' | 'datetime' | 'boolean'
+export type StagedUpload = { code: string; source_file: string; format: string; rows: number; bytes: number
+  columns: StagedColumn[]; sample: Record<string, any>[]; types: ColumnKind[] }
+export type ColumnEdit = { column: string; rename?: string; type?: ColumnKind; include?: boolean }
 
 export type FeaturedPost = {
   post_id: string; title: string; visual_image_path?: string | null; theme_color?: string | null
@@ -142,8 +150,12 @@ export const gisvizApi = {
       params: Object.fromEntries(Object.entries(p).filter(([, v]) => v != null && v !== '')),
     })).data,
 
+  // the preview of a visual with every presentation option (POST /visuals/datasets/{id}/spec)
+  buildVisualSpecFull: async (datasetId: string, body: Record<string, any>) =>
+    (await axiosInstance.post(`/visuals/datasets/${encodeURIComponent(datasetId)}/spec`, body)).data,
+
   // ── Datasets: public catalog (the /datasets page) — backend endpoints/datasets.py ──
-  listCatalog: async (p: { q?: string; category?: string; kind?: 'spatial' | 'tabular' | ''; skip?: number; limit?: number }) =>
+  listCatalog: async (p: { q?: string; category?: string; region?: string; kind?: 'spatial' | 'tabular' | ''; skip?: number; limit?: number }) =>
     (await axiosInstance.get('/datasets/', {
       params: Object.fromEntries(Object.entries(p).filter(([, v]) => v != null && v !== '')),
     })).data,
@@ -152,8 +164,8 @@ export const gisvizApi = {
     (await axiosInstance.get(`/datasets/${encodeURIComponent(datasetId)}`)).data,
 
   // first rows of a dataset for the post page's "View data" (403 unless the dataset's show_data is on)
-  fetchDatasetRows: async (datasetId: string, limit = 50): Promise<PublicDatasetRows> =>
-    (await axiosInstance.get(`/datasets/${encodeURIComponent(datasetId)}/rows`, { params: { limit } })).data,
+  fetchDatasetRows: async (datasetId: string, limit = 100, offset = 0): Promise<PublicDatasetRows> =>
+    (await axiosInstance.get(`/datasets/${encodeURIComponent(datasetId)}/rows`, { params: { limit, offset } })).data,
 
   // ── Uploads ───────────────────────────────────────────────────────────────
   uploadAvatar: async (file: File) => {
@@ -185,6 +197,22 @@ export const gisvizApi = {
     (await axiosInstance.put(`/datasets/manage/${encodeURIComponent(datasetId)}/status`, { active })).data,
 
   // force=true replaces the data even if published posts would break (the server answers 409 otherwise)
+  // Upload previewer (Compass-style): stage -> sample with column edits -> commit, or discard
+  stageDatasetFile: async (datasetId: string, file: File, onProgress?: (pct: number) => void): Promise<StagedUpload> => {
+    const fd = new FormData(); fd.append('file', file)
+    return (await axiosInstance.post(`/datasets/manage/${encodeURIComponent(datasetId)}/stage`, fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 0,
+      onUploadProgress: e => { if (onProgress && e.total) onProgress(Math.round((e.loaded / e.total) * 100)) },
+    })).data
+  },
+  sampleStagedDataset: async (datasetId: string, changes: ColumnEdit[], limit = 20): Promise<StagedUpload> =>
+    (await axiosInstance.post(`/datasets/manage/${encodeURIComponent(datasetId)}/stage/sample`, { changes, limit })).data,
+  commitStagedDataset: async (datasetId: string, changes: ColumnEdit[], force = false) =>
+    (await axiosInstance.post(`/datasets/manage/${encodeURIComponent(datasetId)}/stage/commit`, { changes, force }, { timeout: 0 })).data,
+  discardStagedDataset: async (datasetId: string) =>
+    (await axiosInstance.delete(`/datasets/manage/${encodeURIComponent(datasetId)}/stage`)).data,
+
   uploadDatasetData: async (datasetId: string, file: File, onProgress?: (pct: number) => void, force = false) => {
     const fd = new FormData(); fd.append('file', file)
     return (await axiosInstance.post(`/datasets/manage/${encodeURIComponent(datasetId)}/data`, fd, {
@@ -209,6 +237,14 @@ export const gisvizApi = {
     (await axiosInstance.get('/visuals/catalog', { params: all ? { all: true } : undefined })).data,
 
   // Regions table (misc DB). (listRegions further down is the feed's region facets.)
+  /** The poster design this post would get on publish: "auto" -> colour, texture and title font picked from the
+   *  topic; a design -> cleaned as publishing cleans it; "none" -> {mode: "none"}. */
+  previewBackdrop: async (body: {
+    title: string; description?: string; category_ids: number[]; keywords: string[]
+    region?: string; theme_color?: string | null; backdrop: PosterChoice
+  }): Promise<PosterDesign | { mode: 'none' }> =>
+    (await axiosInstance.post('/posts/backdrop/preview', body)).data,
+
   listRegionCatalog: async (all = false): Promise<Region[]> =>
     (await axiosInstance.get('/regions/', { params: { all, _t: Date.now() } })).data,
 

@@ -1,16 +1,23 @@
+# syntax=docker/dockerfile:1.7
 # ==========================================
 # 1. BASE STAGE (Debian Slim)
 # ==========================================
 FROM node:20-slim AS base
 WORKDIR /app
 
+# Only package files first: this layer (the slow npm install) is reused until package.json / lock change.
 COPY package*.json ./
 
-RUN npm cache clean --force && \
+# The npm download cache lives in a BuildKit cache mount, so it survives between builds: when package.json
+# changes only the new packages are downloaded. (No "npm cache clean" — that threw the cache away every time.)
+# `npm cache verify` drops damaged cache entries first (an interrupted build can leave some behind, and npm then
+# re-downloads them with "tarball data ... seems to be corrupted" on every build).
+RUN --mount=type=cache,target=/root/.npm \
+    npm cache verify >/dev/null && \
     npm config set fetch-retries 5 && \
     npm config set fetch-retry-mintimeout 20000 && \
     npm config set fetch-retry-maxtimeout 120000 && \
-    npm install --legacy-peer-deps
+    npm install --legacy-peer-deps --prefer-offline --no-audit --no-fund
 
 # ==========================================
 # 2. DEV STAGE (Local Windows PC)
@@ -36,7 +43,8 @@ ENV NEXT_PUBLIC_GA_ID=$NEXT_PUBLIC_GA_ID
 ENV NEXT_TELEMETRY_DISABLED=1
 
 COPY . .
-RUN npm run build
+# reuse Next's compile cache between builds too
+RUN --mount=type=cache,target=/app/.next/cache npm run build
 # ==========================================
 # 4. PROD STAGE (Ionos VPS - Debian Slim)
 # ==========================================

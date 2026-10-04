@@ -3,7 +3,9 @@
   "version": "0.0",
   "private": true,
   "scripts": {
+    "predev": "node scripts/copy-maplibre-worker.mjs",
     "dev": "next dev",
+    "prebuild": "node scripts/copy-maplibre-worker.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
@@ -11,7 +13,6 @@
   "dependencies": {
     "@protomaps/basemaps": "^5.7.2",
     "@tanstack/react-virtual": "^3.11.2",
-    "@types/d3": "^7.4.3",
     "axios": "^1.18.0",
     "d3": "^7.9.0",
     "lucide-react": "^0.469.0",
@@ -25,6 +26,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/d3": "^7.4.3",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

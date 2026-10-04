@@ -8,7 +8,11 @@ import { gisvizApi } from '../../../../connector/api'
 import { canPublish } from '../../../../lib/roles'
 import NoPublishAccess from '../../../components/post/NoPublishAccess'
 import DatasetVisualPicker from '../../../components/post/DataVisualPicker'
-import type { VisualChoice, DatasetCard } from '../../../../types/visuals'
+import { choiceFromSpec, toVisualParams, type VisualChoice, type DatasetCard } from '../../../../types/visuals'
+import RegionField from '../../../components/post/regionField'
+import type { VisualSpec } from '../../../components/InteractiveVisual'
+import PosterEditor from '../../../components/post/PosterEditor'
+import { toDesign, type PosterChoice } from '../../../../lib/poster'
 import { DEFAULT_ACCENT } from '../../../../lib/referenceData'
 
 export default function EditPostPage() {
@@ -32,6 +36,9 @@ export default function EditPostPage() {
   const [keywordInput, setKeywordInput] = useState('')
 
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>([])
+  const [region, setRegion] = useState('')                  // regions.code (misc DB), required
+  const [backdrop, setBackdrop] = useState<PosterChoice>('auto')
+  const [previewSpec, setPreviewSpec] = useState<VisualSpec | null>(null)   // the visual, for the poster preview          // background behind the visual: auto | none | motif
 
   const [customCategoryLabel, setCustomCategoryLabel]   = useState('')
   const [isSubmittingCustom, setIsSubmittingCustom]     = useState(false)
@@ -73,19 +80,13 @@ export default function EditPostPage() {
         setKeywords(postData.keywords.map((k: any) => k.word))
         setSelectedCategoryIds(postData.categories.map((c: any) => c.category_id))
 
-        // Rebuild the picker choice from the saved spec.
+        // Rebuild the picker choice (data + presentation options) from the saved spec.
         const spec = postData.visual_spec
-        if (postData.dataset_id && spec) {
-          const isMap = spec.kind === 'map'
-          setVisualChoice({
-            dataset_id: postData.dataset_id,
-            viz: isMap ? (spec.map_style === 'heat' ? 'map_heat' : 'map') : spec.chart_type,
-            x: isMap ? null : spec.x ?? null,
-            y: isMap ? spec.value_field ?? null : spec.y ?? null,
-            z: spec.z ?? null,
-            size: spec.size ?? null,
-            label_field: isMap ? spec.label_field ?? null : null,
-          } as VisualChoice)
+        if (postData.dataset_id && spec) setVisualChoice(choiceFromSpec(postData.dataset_id, spec))
+        setRegion(postData.region || '')
+        {
+          const b: any = postData.backdrop
+          setBackdrop(b?.mode === 'none' || b?.motif === 'none' ? 'none' : b?.mode === 'custom' ? toDesign(b)! : 'auto')
         }
         setThemeColor(postData.theme_color || spec?.accent || DEFAULT_ACCENT)
       } catch {
@@ -161,6 +162,7 @@ export default function EditPostPage() {
   if (!title.trim())                  { setErrorMsg('A title is required.'); return }
   if (!sourceName.trim())             { setErrorMsg('Data Source Name is required.'); return }
   if (selectedCategoryIds.length < 1) { setErrorMsg('Please select at least one category.'); return }
+  if (!region)                        { setErrorMsg('Please pick the region this post is about.'); return }
   if (keywords.length < 1)            { setErrorMsg('Please add at least one keyword.'); return }
   if (keywords.length > 3)            { setErrorMsg('You can only add up to 3 keywords.'); return }
 
@@ -176,17 +178,12 @@ export default function EditPostPage() {
       source_name: sourceName.trim(),
       source_url: sourceUrl?.trim() || null,
       dataset_id: visualChoice?.dataset_id,
-      visual_params: visualChoice ? {
-        viz: visualChoice.viz,
-        x: visualChoice.x ?? null,
-        y: visualChoice.y ?? null,
-        z: visualChoice.z ?? null,
-        size: visualChoice.size ?? null,
-        label_field: visualChoice.label_field ?? null,
-      } : undefined,
+      visual_params: visualChoice ? toVisualParams(visualChoice) : undefined,
       theme_color: themeColor,
       category_ids: selectedCategoryIds,
+      region,
       keywords,
+      backdrop,
     })
     router.push(`/post/${postId}`)
   } catch (err: any) {
@@ -242,6 +239,7 @@ export default function EditPostPage() {
             onChange={handleVisualChange}
             accent={themeColor}
             onAccentChange={setThemeColor}
+            onSpec={setPreviewSpec}
           />
         </div>
 
@@ -320,6 +318,8 @@ export default function EditPostPage() {
                 />
               </div>
             </div>
+
+            <RegionField value={region} onChange={setRegion} />
 
             {/* Categories */}
             <div>
@@ -413,6 +413,9 @@ export default function EditPostPage() {
             </div>
 
             {/* Submit */}
+            <PosterEditor value={backdrop} onChange={setBackdrop} spec={previewSpec} sources={[...(sourceName.trim() ? [{ label: sourceName.trim(), url: sourceUrl.trim() || null }] : [])]}
+                           inputs={{ title, description, category_ids: selectedCategoryIds, keywords, region, theme_color: themeColor, note }} />
+
             <div className="pt-6 border-t border-gisviz-border flex justify-end gap-4">
               <button
                 type="button"

@@ -9,7 +9,7 @@
  *
  * Call refreshCategories() after an admin edits categories so open components pick up the change.
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { gisvizApi } from '../connector/api'
 import type { Category } from '../types/gisviz'
 import type { Region, VisualCatalog } from '../types/visuals'
@@ -69,3 +69,61 @@ export function categoryColor(list: Category[], key?: string | null): string | u
   const k = key.toLowerCase()
   return list.find(c => c.slug === k || c.label.toLowerCase() === k)?.theme_color
 }
+
+/** The regions offered in the feed and datasets filters: Global + the continents (kind global | continent),
+ *  in the seed's order. Countries are sub-regions: picking a continent also matches content tagged with
+ *  any of its countries (the server expands it), so they are never listed in the filters. */
+export function topRegions(list: Region[]): Region[] {
+  return list.filter(r => r.kind === 'global' || r.kind === 'continent')
+             .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.name.localeCompare(b.name))
+}
+
+/** Countries grouped under their continent, for pickers where a post or dataset is tagged. */
+export function regionGroups(list: Region[]): { parent: Region; children: Region[] }[] {
+  return topRegions(list).map(parent => ({
+    parent,
+    children: list.filter(r => r.parent_code === parent.code && r.kind !== 'continent').sort((a, b) => a.name.localeCompare(b.name)),
+  }))
+}
+
+/**
+ * Country flags for labels (Visual Capitalist style chips): a label that is a country name or an ISO code
+ * ("Japan", "JPN", "jp") maps to its flag image and its 3-letter code, from the regions table (misc DB).
+ * Flags come from flagcdn.com (free, no key); anything that is not a country gets null.
+ */
+export function useFlags() {
+  const regions = useRegions()
+  const [bad, setBad] = useState<Set<string>>(() => new Set())     // flag images that failed (offline, blocked): not drawn
+  const index = useMemo(() => {
+    const m = new Map<string, { a2: string; a3: string }>()
+    for (const r of regions) {
+      if (r.kind !== 'country' || !r.iso_a2) continue
+      const v = { a2: r.iso_a2.toLowerCase(), a3: (r.iso_a3 || r.iso_a2).toUpperCase() }
+      for (const k of [r.name, r.iso_a2, r.iso_a3, r.code]) if (k) m.set(k.trim().toLowerCase(), v)
+    }
+    for (const [alias, name] of COUNTRY_ALIASES) { const v = m.get(name); if (v && !m.has(alias)) m.set(alias, v) }
+    return m
+  }, [regions])
+  return useMemo(() => {
+    const find = (label: unknown) => (label == null ? undefined : index.get(String(label).replace(/\*+$/, '').trim().toLowerCase()))
+    return {
+      /** flag image URL (40 px wide), or null */
+      flag: (label: unknown) => { const v = find(label); const u = v ? `https://flagcdn.com/w40/${v.a2}.png` : null; return u && !bad.has(u) ? u : null },
+      /** onError of a flag <image>: stop drawing that flag */
+      failed: (url: string) => setBad(b => (b.has(url) ? b : new Set(b).add(url))),
+      /** ISO 3166 alpha-3 code ("JPN"), or null */
+      code: (label: unknown) => find(label)?.a3 ?? null,
+      any: index.size > 0,
+    }
+  }, [index, bad])
+}
+
+/** Everyday names that differ from the ISO short names in the regions table. */
+const COUNTRY_ALIASES: [string, string][] = [
+  ['usa', 'united states'], ['us', 'united states'], ['united states of america', 'united states'], ['u.s.', 'united states'],
+  ['uk', 'united kingdom'], ['britain', 'united kingdom'], ['great britain', 'united kingdom'],
+  ['korea', 'south korea'], ['republic of korea', 'south korea'], ['korea, republic of', 'south korea'],
+  ['russian federation', 'russia'], ['viet nam', 'vietnam'], ['turkey', 'türkiye'], ['czech republic', 'czechia'],
+  ['hong kong sar', 'hong kong'], ['macau', 'macao'], ['ivory coast', "côte d'ivoire"], ['cote d\'ivoire', "côte d'ivoire"],
+  ['democratic republic of the congo', 'dr congo'], ['uae', 'united arab emirates'], ['holland', 'netherlands'],
+]

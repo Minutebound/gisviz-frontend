@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { 
-  Loader2, Inbox, Plus, ChevronDown, Globe2, BarChart2, Check, Flame, Clock, Search, Eye, Award
+  Loader2, Inbox, Plus, ChevronDown, BarChart2, Check, Flame, Clock, Search, Eye, Award
 } from 'lucide-react'
 import { useAuth } from '../../../context/AuthContext'
 import { canPublish as canPublishRole } from '../../../lib/roles'
@@ -16,9 +16,10 @@ import {
   filtersToParams,
   filtersFromParams,
 } from '../../../types/gisviz'
-import { FOR_YOU, useCategories, useRegions, useVisualCatalog } from '../../../lib/referenceData'
+import { FOR_YOU, useCategories, useVisualCatalog } from '../../../lib/referenceData'
+import RegionFilter from '../RegionFilter'
 import CategoryBar from './CategoryBar'
-import FeedCard, { HeroCard, FeedCardSkeleton, mediaUrl } from './FeedCard'
+import FeedCard, { FeedCardSkeleton, mediaUrl } from './FeedCard'
 import type { FeaturedPost } from '../../../connector/api'
 import FeedRail, { MobileFeaturedPublishers, MobileTrendingTags } from './FeedRail'
 import ShareModal from '../SharePost'
@@ -44,11 +45,9 @@ export default function FeedStream() {
 
   // ── UI Overlay State ──
   const [sortOpen, setSortOpen] = useState(false)
-  const [regionOpen, setRegionOpen] = useState(false)
   const [chartTypeOpen, setChartTypeOpen] = useState(false)
   
   const sortRef = useRef<HTMLDivElement>(null)
-  const regionRef = useRef<HTMLDivElement>(null)
   const chartTypeRef = useRef<HTMLDivElement>(null)
 
   const canPublish = isAuthenticated && canPublishRole(user)
@@ -57,7 +56,6 @@ export default function FeedStream() {
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (sortRef.current && !sortRef.current.contains(e.target as Node)) setSortOpen(false)
-      if (regionRef.current && !regionRef.current.contains(e.target as Node)) setRegionOpen(false)
       if (chartTypeRef.current && !chartTypeRef.current.contains(e.target as Node)) setChartTypeOpen(false)
     }
     document.addEventListener('mousedown', handleClickOutside)
@@ -171,20 +169,7 @@ export default function FeedStream() {
 
   // filter options from the database (lib/referenceData.ts) — nothing hard-coded
   const dbCategories = useCategories()
-  const dbRegions = useRegions()
   const catalog = useVisualCatalog()
-  const regionOptions = useMemo(() => {
-    const kids = new Map<string, typeof dbRegions>()
-    dbRegions.forEach(r => { if (r.parent_code) kids.set(r.parent_code, [...(kids.get(r.parent_code) || []), r]) })
-    const out: { value: string; label: string; depth: number }[] = [{ value: '', label: 'All regions', depth: 0 }]
-    const walk = (r: (typeof dbRegions)[number], depth: number) => {
-      out.push({ value: r.code, label: r.name, depth })
-      ;(kids.get(r.code) || []).forEach(k => walk(k, depth + 1))
-    }
-    const codes = new Set(dbRegions.map(r => r.code))
-    dbRegions.filter(r => !r.parent_code || !codes.has(r.parent_code)).forEach(r => walk(r, 0))
-    return out
-  }, [dbRegions])
   const chartTypeOptions = useMemo(() => {
     const out: { value: string; label: string; group?: string }[] = [{ value: '', label: 'All visuals' }]
     catalog.categories.forEach(cat => catalog.types.filter(t => t.category === cat.code)
@@ -192,15 +177,11 @@ export default function FeedStream() {
     return out
   }, [catalog])
 
-  const [hero, ...rest] = posts
-  const showHero = filters.sort === 'trending' && !!hero && !filters.chart_type && !filters.region && !filters.search
-
-  const selectedRegion = regionOptions.find(r => r.value === (filters.region ?? '')) || regionOptions[0]
   const selectedChartType = chartTypeOptions.find(c => c.value === (filters.chart_type ?? '')) || chartTypeOptions[0]
   const activeCategory = dbCategories.find(c => c.slug === (filters.category ?? '')) || FOR_YOU
 
   // Dynamic indices for interleaving mobile rails
-  const displayPosts = showHero ? rest : posts
+  const displayPosts = posts                                   // one card design for every post in the stream
   const mobilePubIndex = displayPosts.length <= 5 ? 0 : 1
   const mobileTagIndex = displayPosts.length <= 5 ? 2 : 4
 
@@ -294,7 +275,7 @@ export default function FeedStream() {
             <div className="relative lg:hidden shrink-0" ref={sortRef}>
               <button
                 type="button"
-                onClick={() => { setSortOpen(!sortOpen); setRegionOpen(false); setChartTypeOpen(false); }}
+                onClick={() => { setSortOpen(!sortOpen); setChartTypeOpen(false); }}
                 className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-[8px] border border-gisviz-border bg-gisviz-paper text-[13px] font-medium text-gisviz-ink hover:border-gisviz-border-strong transition-all shadow-sm"
               >
                 {filters.sort === 'trending' ? <Flame size={14} className="text-gisviz-ink-soft" /> : <Clock size={14} className="text-gisviz-ink-soft" />}
@@ -313,40 +294,12 @@ export default function FeedStream() {
               )}
             </div>
 
-            <div className="relative shrink-0" ref={regionRef}>
-              <button
-                type="button"
-                onClick={() => { setRegionOpen(!regionOpen); setSortOpen(false); setChartTypeOpen(false); }}
-                className={`inline-flex items-center gap-1.5 h-9 px-3.5 rounded-[8px] border text-[13px] font-medium transition-all shadow-sm ${
-                  filters.region ? 'border-gisviz-accent text-gisviz-accent bg-gisviz-accent/5' : 'border-gisviz-border bg-gisviz-paper text-gisviz-ink hover:border-gisviz-border-strong'
-                }`}
-              >
-                <Globe2 size={14} className={filters.region ? 'text-gisviz-accent' : 'text-gisviz-ink-soft'} />
-                <span className="max-w-[90px] sm:max-w-[140px] truncate">{selectedRegion.label}</span>
-                <ChevronDown size={14} className="text-gisviz-ink-soft shrink-0" />
-              </button>
-              {regionOpen && (
-                <div className="absolute left-0 mt-2 w-60 max-h-[60vh] overflow-y-auto rounded-xl border border-gisviz-border bg-gisviz-card shadow-lg py-1.5 z-50 animate-in fade-in slide-in-from-top-1 duration-150">
-                  <div className="px-3 py-1.5 text-[10.5px] font-mono uppercase tracking-wider text-gisviz-ink-soft border-b border-gisviz-border mb-1">Region Filter</div>
-                  {regionOptions.map(reg => {
-                    const active = (filters.region ?? '') === reg.value
-                    return (
-                      <button key={reg.value || 'all'} type="button" onClick={() => { applyFilters({ ...filters, region: reg.value }); setRegionOpen(false); }}
-                        style={{ paddingLeft: 12 + Math.min(reg.depth, 3) * 12 }}
-                        className={`w-full text-left pr-3 py-2 text-[13px] text-gisviz-ink hover:bg-gisviz-canvas hover:text-gisviz-accent flex items-center justify-between gap-2 transition-colors ${reg.depth <= 1 ? 'font-medium' : 'font-normal text-gisviz-ink-soft'}`}>
-                        <span className={active ? 'font-semibold text-gisviz-accent' : ''}>{reg.label}</span>
-                        {active && <Check size={14} className="text-gisviz-accent shrink-0" />}
-                      </button>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
+            <RegionFilter value={filters.region ?? ''} onChange={code => applyFilters({ ...filters, region: code })} />
 
             <div className="relative shrink-0" ref={chartTypeRef}>
               <button
                 type="button"
-                onClick={() => { setChartTypeOpen(!chartTypeOpen); setSortOpen(false); setRegionOpen(false); }}
+                onClick={() => { setChartTypeOpen(!chartTypeOpen); setSortOpen(false); }}
                 className={`inline-flex items-center gap-1.5 h-9 px-3.5 rounded-[8px] border text-[13px] font-medium transition-all shadow-sm ${
                   filters.chart_type ? 'border-gisviz-accent text-gisviz-accent bg-gisviz-accent/5' : 'border-gisviz-border bg-gisviz-paper text-gisviz-ink hover:border-gisviz-border-strong'
                 }`}
@@ -443,17 +396,6 @@ export default function FeedStream() {
             {!loading && !error && posts.length > 0 && (
               <div className="grid grid-cols-1 gap-6 w-full">
                 
-                {/* Hero Render */}
-                {showHero && (
-                  <HeroCard
-                    post={hero}
-                    onLike={onLike}
-                    onBookmark={onBookmark}
-                    onShare={setSharing}
-                    busy={busyId === hero.post_id}
-                  />
-                )}
-
                 {/* Interleaved Mapping */}
                 {displayPosts.map((p, idx) => (
                   <React.Fragment key={p.post_id}>

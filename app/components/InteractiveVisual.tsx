@@ -17,21 +17,22 @@
  * play/pause swaps them in without rebuilding the map.
  */
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useTheme } from 'next-themes'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import type { GeoJSONSource, Map as MLMap, MapLayerMouseEvent, Popup } from 'maplibre-gl'
-import D3Chart from './visuals/D3Chart'
-import { useVisualCatalog } from '../../lib/referenceData'
+import * as d3 from 'd3'
+import { createPortal } from 'react-dom'
+import D3Chart, { PALETTE, type D3ChartType, type ReferenceLine } from './visuals/D3Chart'
+import { PosterContext } from './visuals/VisualBackdrop'
+import { gisvizApi } from '../../connector/api'
 import {
-  AlertTriangle, BarChart3, Loader2, Map as MapIcon, Maximize2, Minimize2, Pause, Play, Table2,
+  AlertTriangle, BarChart3, ChevronDown, Filter, Loader2, Map as MapIcon, Maximize2, Minimize2, Pause, Play, Table2, Tag,
 } from 'lucide-react'
 
 /* ═══════════════════ Types: the post's `visual_spec` ═══════════════════ */
 
-export type ChartType =
-  | 'line' | 'area' | 'bar' | 'hbar' | 'stacked' | 'scatter'
-  | 'bubble' | 'histogram' | 'donut' | 'treemap' | 'heatmap'
+export type ChartType = D3ChartType
 export type Row = Record<string, unknown>
 
 export interface GeoFeature {
@@ -45,7 +46,21 @@ export interface GeoFeatureCollection {
   features: GeoFeature[]
 }
 
-export interface ChartSpec {
+/** Presentation ("story") options shared by charts and maps, set when publishing. */
+export interface StoryOptions {
+  /** Catalog code of the chosen visual type (misc DB visual_types), e.g. "hbar" or "choropleth". */
+  visual_type?: string
+  title?: string
+  subtitle?: string
+  /** Friendly name of the measure (axis title, tooltips). */
+  y_label?: string
+  /** Labels the reader can filter by (a dropdown); `default` = pre-selected labels (null = all). */
+  label_filter?: { field: string; default?: string[] | null }
+  /** Labels drawn on the map / points from the start (readers toggle them with the "Labels" button). */
+  show_labels?: boolean
+}
+
+export interface ChartSpec extends StoryOptions {
   kind: 'chart'
   /** Post theme colour (#rrggbb). Overrides the site accent for this visual only. */
   accent?: string
@@ -64,16 +79,27 @@ export interface ChartSpec {
   fields?: string[]
   /** Chart types the viewer can switch between. Defaults to [chart_type]. */
   allowed_types?: ChartType[]
+  /** Story layer: colour bars by this category column (with a legend), e.g. "continent". */
+  color_by?: string
+  /** Optional fixed colours per group, e.g. { "Asia": "#d62f3a" }. */
+  colors?: Record<string, string>
+  /** Reference lines, e.g. [{ "stat": "mean", "label": "OECD average", "mode": "divider" }]. */
+  reference_lines?: ReferenceLine[]
+  /** Scatter / bubble: the column naming each point (tooltip title, point labels). */
+  label_field?: string
 }
 
-export interface MapSpec {
+export interface MapSpec extends StoryOptions {
   kind: 'map'
   /** Post theme colour (#rrggbb). Overrides the site accent for this visual only. */
   accent?: string
   /** Inline GeoJSON FeatureCollection, or a URL returning one. */
   data: GeoFeatureCollection | string
-  /** 'heat' draws point density with MapLibre's heatmap layer; 'auto' picks by geometry. */
-  map_style?: 'auto' | 'heat'
+  /** auto: by geometry · heat: point density · bubble: circles sized by value (polygons at their centre) ·
+   *  hexbin: points summed into hexagons · cartogram: Dorling circles (D3) · connection: origin→destination lines */
+  map_style?: 'auto' | 'heat' | 'bubble' | 'hexbin' | 'cartogram' | 'connection'
+  /** Connection map: the destination name column (label_field is the origin). */
+  target_field?: string
   /** Numeric property that drives colour (and point size). */
   value_field: string
   /** Property used as the popup title, e.g. "name". */
@@ -118,6 +144,8 @@ const fallbackStyle = (dark: boolean) => ({
   sources: {},
   layers: [{ id: 'bg', type: 'background' as const, paint: { 'background-color': dark ? '#0c1611' : '#eef2ef' } }],
 })
+/** No basemap: the data's own shapes drawn straight on the poster (transparent canvas). */
+const BARE_STYLE = { version: 8 as const, sources: {}, layers: [] as never[] }
 const SRC = 'gv-src'
 
 const toNum = (v: unknown): number | null => {
@@ -286,6 +314,82 @@ function colorExpr(field: string, st: FieldStats, ramp: string[]): Expr {
   return ['case', ['==', ['typeof', v], 'number'], scale, NULL_COLOR]
 }
 
+/** Bubble map: area ~ value (radius ~ sqrt), 5–34 px. */
+function bubbleExpr(field: string, st: FieldStats): Expr {
+  const v = ['get', field]
+  const lo = Math.sqrt(Math.max(0, st.lo)), hi = Math.sqrt(Math.max(0, st.hi))
+  const scale = hi === lo ? 14 : ['interpolate', ['linear'], ['sqrt', ['max', v, 0]], lo, 5, hi, 34]
+  return ['case', ['==', ['typeof', v], 'number'], scale, 4]
+}
+
+function widthExpr(field: string, st: FieldStats): Expr {
+  const v = ['get', field]
+  return st.lo === st.hi ? 3 : ['interpolate', ['linear'], ['coalesce', v, st.lo], st.lo, 1.2, st.hi, 9]
+}
+
+/** Polygons / lines -> a point at their centre (bubble map), properties kept. */
+function centroidFc(fc: GeoFeatureCollection): GeoFeatureCollection {
+  return { ...fc, features: fc.features.map(f => (!f.geometry || f.geometry.type === 'Point' ? f
+    : { ...f, geometry: { type: 'Point', coordinates: d3.geoCentroid(f as any) } })) as GeoFeature[] }
+}
+
+/** Where a feature's label goes: the point, the centre of its biggest polygon, or the middle of a line. */
+function labelAnchor(f: GeoFeature): [number, number] | null {
+  const g = f.geometry as { type: string; coordinates: any } | null
+  if (!g) return null
+  if (g.type === 'Point') return g.coordinates
+  if (g.type === 'MultiPoint') return g.coordinates?.[0] ?? null
+  if (g.type === 'Polygon' || g.type === 'MultiPolygon') {
+    const polys: any[] = g.type === 'Polygon' ? [g.coordinates] : g.coordinates
+    let best = polys[0], bestA = -1
+    for (const p of polys) {
+      const a = Math.abs(d3.geoArea({ type: 'Polygon', coordinates: p } as any))
+      if (a > bestA && a < 2 * Math.PI) { best = p; bestA = a }       // (a wound-the-wrong-way ring covers the globe)
+    }
+    const c = d3.geoCentroid({ type: 'Polygon', coordinates: best } as any)
+    return Number.isFinite(c[0]) ? c : null
+  }
+  const line: any[] = g.type === 'LineString' ? g.coordinates : g.type === 'MultiLineString' ? g.coordinates?.[0] : []
+  return line?.length ? line[Math.floor(line.length / 2)] : null
+}
+
+const LABEL_MAX = 300
+
+/** Points -> regular hexagons (Web Mercator, so they look even), each with the sum of `field` (or a count). */
+function hexbinFc(fc: GeoFeatureCollection, field: string, sumName: string): GeoFeatureCollection {
+  const R = Math.PI / 180
+  const toY = (lat: number) => Math.log(Math.tan(Math.PI / 4 + (Math.max(-85, Math.min(85, lat)) * R) / 2)) / R
+  const toLat = (y: number) => (2 * Math.atan(Math.exp(y * R)) - Math.PI / 2) / R
+  const pts: [number, number, number | null][] = []
+  for (const f of fc.features) {
+    const g = f.geometry as { type: string; coordinates: any } | null
+    const c = g?.type === 'Point' ? g.coordinates : g?.type === 'MultiPoint' ? g.coordinates?.[0] : null
+    if (c) pts.push([c[0], toY(c[1]), toNum(f.properties?.[field])])
+  }
+  if (!pts.length) return { type: 'FeatureCollection', features: [] }
+  const [x0, x1] = d3.extent(pts, p => p[0]) as [number, number], [y0, y1] = d3.extent(pts, p => p[1]) as [number, number]
+  const size = Math.max(0.01, Math.max(x1 - x0, y1 - y0) / 46)            // ~46 cells across the data
+  const sum = pts.some(p => p[2] !== null)
+  const cells = new Map<string, { q: number; r: number; v: number; n: number }>()
+  for (const [px, py, v] of pts) {
+    let q = ((Math.sqrt(3) / 3) * px - py / 3) / size, r = ((2 / 3) * py) / size
+    let rx = Math.round(q), rz = Math.round(r), ry = Math.round(-q - r)
+    const dx = Math.abs(rx - q), dz = Math.abs(rz - r), dy = Math.abs(ry + q + r)
+    if (dx > dy && dx > dz) rx = -ry - rz; else if (dy <= dz) rz = -rx - ry
+    q = rx; r = rz
+    const k = `${q},${r}`
+    const c = cells.get(k) ?? { q, r, v: 0, n: 0 }
+    c.v += v ?? 0; c.n += 1; cells.set(k, c)
+  }
+  const features = [...cells.values()].map((c, i) => {
+    const cx = size * Math.sqrt(3) * (c.q + c.r / 2), cy = size * 1.5 * c.r
+    const ring = d3.range(7).map(k => { const a = (Math.PI / 180) * (60 * k - 30); return [cx + size * Math.cos(a), toLat(cy + size * Math.sin(a))] })
+    return { type: 'Feature', id: i, geometry: { type: 'Polygon', coordinates: [ring] },
+             properties: { [sumName]: sum ? Math.round(c.v * 100) / 100 : c.n, points: c.n } }
+  })
+  return { type: 'FeatureCollection', features } as GeoFeatureCollection
+}
+
 function radiusExpr(field: string, st: FieldStats): Expr {
   const v = ['get', field]
   const scale = st.lo === st.hi ? 9 : ['interpolate', ['linear'], v, st.lo, 6, st.hi, 24]
@@ -333,8 +437,19 @@ function popupHtml(props: Row, c: PopupCtx) {
   return `${title}${when}${rows}${spark}`
 }
 
-function MapView({ fc, field, fields, labelField, basemap, accent, dark, domainRows, historyOf, currentT, heat }: {
+function MapView({ fc, field, fields, labelField, basemap, accent, dark, domainRows, historyOf, currentT, heat, bubble, lineWidth, showLabels,
+  baseMode = 'streets', legendHost }: {
   heat?: boolean
+  /** streets = basemap tiles; none = only the data on a transparent canvas; auto = none for polygons, else streets. */
+  baseMode?: 'auto' | 'streets' | 'none'
+  /** On a poster: the legend goes there (top right of the visual) instead of over the map. */
+  legendHost?: HTMLElement | null
+  /** Draw each place's name + value on the map (overlapping labels are skipped, biggest values first). */
+  showLabels?: boolean
+  /** Bubble map: circle area follows the value (bigger range). */
+  bubble?: boolean
+  /** Connection map: line width follows the value too. */
+  lineWidth?: boolean
   fc: GeoFeatureCollection; field: string; fields: string[]
   labelField?: string; basemap: string; accent: string; dark: boolean
   /** Every period's rows (time series), so the colour scale doesn't shift as time moves. */
@@ -348,6 +463,7 @@ function MapView({ fc, field, fields, labelField, basemap, accent, dark, domainR
   const hoverIdRef = useRef<number | undefined>(undefined)
   const [ready, setReady] = useState(false)
   const kind = useMemo(() => detectKind(fc), [fc])
+  const bare = baseMode === 'none' || (baseMode === 'auto' && kind === 'polygon')
 
   const ramp = useMemo(
     () => [
@@ -382,13 +498,15 @@ function MapView({ fc, field, fields, labelField, basemap, accent, dark, domainR
       // Client-only import: maplibre touches `window` at load time.
       const mod = await import('maplibre-gl')
       const ml = (mod as unknown as { default?: typeof mod }).default ?? mod
+      // the worker is served from /public (scripts/copy-maplibre-worker.mjs): bundling hides MapLibre's own copy
+      if (typeof (ml as any).setWorkerUrl === 'function') (ml as any).setWorkerUrl(`${window.location.origin}/maplibre/maplibre-gl-worker.mjs`)
       const el = containerRef.current
       if (disposed || !el) return
 
       const bb = bbox(live.current.fc)
       map = new ml.Map({
         container: el,
-        style: basemap,
+        style: bare ? BARE_STYLE : basemap,
         ...(bb
           ? { bounds: bb, fitBoundsOptions: { padding: 40, maxZoom: 11 } }
           : { center: [0, 20] as [number, number], zoom: 1.5 }),
@@ -404,10 +522,14 @@ function MapView({ fc, field, fields, labelField, basemap, accent, dark, domainR
       map.on('error', () => {
         if (!map || fellBack || map.isStyleLoaded()) return
         fellBack = true
-        map.setStyle(fallbackStyle(dark))
+        // 'load' never fires when the first style failed: add the data once the fallback style is in
+        // (listen first: an inline style can finish loading inside setStyle)
+        map.once('style.load', () => setTimeout(setup, 0))
+        map.setStyle(legendHost !== undefined ? BARE_STYLE : fallbackStyle(dark), { diff: false })   // poster: just the data
+        setTimeout(() => { if (map?.isStyleLoaded()) setup() }, 300)
       })
 
-      map.addControl(new ml.NavigationControl({ showCompass: false }), 'top-right')
+      map.addControl(new ml.NavigationControl({ showCompass: false }), legendHost !== undefined ? 'bottom-right' : 'top-right')
 
       ro = new ResizeObserver(() => map?.resize())
       ro.observe(el)
@@ -417,8 +539,11 @@ function MapView({ fc, field, fields, labelField, basemap, accent, dark, domainR
       })
       popupRef.current = popup
 
-      map.on('load', () => {
-        if (!map || disposed) return
+      // add the data layers once, on whichever comes first: the basemap loading, or the offline fallback style
+      let added = false
+      function setup() {
+        if (!map || disposed || added) return
+        added = true
         const { field: f, stats: st, ramp: rp } = live.current
         const color = colorExpr(f, st[f], rp)
         const hovered: Expr = ['boolean', ['feature-state', 'hover'], false]
@@ -450,7 +575,7 @@ function MapView({ fc, field, fields, labelField, basemap, accent, dark, domainR
             ...(heat ? { minzoom: 7 } : {}),
             paint: {
               'circle-color': color,
-              'circle-radius': radiusExpr(f, st[f]),
+              'circle-radius': bubble ? bubbleExpr(f, st[f]) : radiusExpr(f, st[f]),
               'circle-opacity': heat ? ['interpolate', ['linear'], ['zoom'], 7, 0, 10, 0.88] : 0.88,
               'circle-stroke-width': ['case', hovered, 2.5, 1],
               'circle-stroke-color': ['case', hovered, '#14201b', '#ffffff'],
@@ -474,7 +599,9 @@ function MapView({ fc, field, fields, labelField, basemap, accent, dark, domainR
           map.addLayer({
             id: 'gv-line', type: 'line', source: SRC,
             layout: { 'line-cap': 'round', 'line-join': 'round' },
-            paint: { 'line-color': color, 'line-width': ['case', hovered, 6, 3.5] },
+            paint: lineWidth
+              ? { 'line-color': color, 'line-opacity': 0.75, 'line-width': ['case', hovered, ['+', widthExpr(f, st[f]), 2.5], widthExpr(f, st[f])] }
+              : { 'line-color': color, 'line-width': ['case', hovered, 6, 3.5] },
           })
           hit = 'gv-line'
         }
@@ -506,7 +633,8 @@ function MapView({ fc, field, fields, labelField, basemap, accent, dark, domainR
         map.on('click', hit, show) // touch: tap to inspect
         map.on('mouseleave', hit, clear)
         setReady(true)
-      })
+      }
+      map.on('load', setup)
     })()
 
     return () => {
@@ -520,7 +648,7 @@ function MapView({ fc, field, fields, labelField, basemap, accent, dark, domainR
     }
     // Geometry type and basemap rebuild the map; data changes go through setData below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [kind, basemap, labelField, heat])
+  }, [kind, basemap, bare, labelField, heat, bubble, lineWidth])
 
   // New period (or new data): swap the source data in place, no map rebuild.
   useEffect(() => {
@@ -540,7 +668,7 @@ function MapView({ fc, field, fields, labelField, basemap, accent, dark, domainR
     const color = colorExpr(field, stats[field], ramp)
     if (kind === 'point') {
       map.setPaintProperty('gv-point', 'circle-color', color)
-      map.setPaintProperty('gv-point', 'circle-radius', radiusExpr(field, stats[field]))
+      map.setPaintProperty('gv-point', 'circle-radius', bubble ? bubbleExpr(field, stats[field]) : radiusExpr(field, stats[field]))
     } else if (kind === 'polygon') {
       map.setPaintProperty('gv-fill', 'fill-color', color)
     } else {
@@ -551,7 +679,65 @@ function MapView({ fc, field, fields, labelField, basemap, accent, dark, domainR
     if (popupRef.current?.isOpen() && props) popupRef.current.setHTML(popupHtml(props, live.current.ctx))
   }, [field, stats, ramp, ready, kind])
 
+  /* ── labels on the map: HTML tags that follow the map (no font glyphs needed, so they work on any basemap) ── */
+  useEffect(() => {
+    const map = mapRef.current
+    if (!ready || !map || !showLabels) return
+    // inside the canvas container: above the map, below popups and the zoom buttons
+    const host = document.createElement('div')
+    host.className = 'gv-lbls'
+    host.setAttribute('aria-hidden', 'true')
+    map.getCanvasContainer().appendChild(host)
+    const centred = kind !== 'point' || !!bubble                 // on the shape / bubble; small dots: just above
+    const items = fc.features.map(f => {
+      const at = labelAnchor(f)
+      const props = f.properties ?? {}
+      const v = toNum(props[field])
+      const name = labelField && props[labelField] != null && props[labelField] !== '' ? String(props[labelField]) : ''
+      return at && (name || v !== null) ? { at, name, v } : null
+    }).filter((x): x is { at: [number, number]; name: string; v: number | null } => !!x)
+      .sort((a, b) => (b.v ?? -Infinity) - (a.v ?? -Infinity)).slice(0, LABEL_MAX)
+    const els = items.map(it => {
+      const el = document.createElement('div')
+      el.className = 'gv-lbl'
+      if (it.name) { const n = document.createElement('span'); n.textContent = truncate(it.name, 28); el.appendChild(n) }
+      if (it.v !== null) { const b = document.createElement('b'); b.textContent = compact(it.v); el.appendChild(b) }
+      host.appendChild(el)
+      return el
+    })
+    const sizes = els.map(el => [el.offsetWidth, el.offsetHeight])   // measured once
+    const place = () => {
+      const W = host.clientWidth, H = host.clientHeight
+      const taken: number[][] = []
+      items.forEach((it, i) => {
+        const el = els[i], [w, h] = sizes[i]
+        const p = map.project(it.at)
+        const x = p.x - w / 2, y = centred ? p.y - h / 2 : p.y - h - 6
+        const clash = x < 0 || y < 0 || x + w > W || y + h > H
+          || taken.some(([a, b, c, d]) => x < c && x + w > a && y < d && y + h > b)
+        if (clash) { el.style.visibility = 'hidden'; return }
+        taken.push([x - 2, y - 1, x + w + 2, y + h + 1])
+        el.style.visibility = 'visible'
+        el.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`
+      })
+    }
+    place()
+    map.on('move', place)
+    map.on('resize', place)
+    return () => { map.off('move', place); map.off('resize', place); host.remove() }
+  }, [showLabels, ready, fc, field, labelField, kind, bubble])
+
   const st = stats[field] ?? { lo: 0, hi: 0, breaks: [0, 0, 0, 0, 0] }
+  // the colour key: five steps of the post colour (on a poster it sits top right of the visual, no box)
+  const legend = (
+    <div className="w-[200px]">
+      <div className="mb-1.5 truncate font-mono text-[11px] font-semibold text-gisviz-ink">{field}</div>
+      <div className="flex h-2 overflow-hidden rounded-full">{ramp.map(c => <span key={c} className="flex-1" style={{ background: c }} />)}</div>
+      <div className="mt-1 flex justify-between font-mono text-[10.5px] text-gisviz-ink-soft">
+        <span>{compact(st.breaks[0])}</span><span>{compact(st.breaks[2])}</span><span>{compact(st.breaks[4])}</span>
+      </div>
+    </div>
+  )
 
   return (
     <div className="relative w-full h-full">
@@ -565,17 +751,18 @@ function MapView({ fc, field, fields, labelField, basemap, accent, dark, domainR
         .gv-pop-active{color:var(--accent);font-weight:600}
         .gv-pop-val{font-family:var(--font-mono)}
         .gv-pop-spark{display:block;margin-top:6px}
+        .gv-lbls{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+        .gv-lbl{position:absolute;left:0;top:0;visibility:hidden;display:flex;flex-direction:column;align-items:center;white-space:nowrap;line-height:1.1;font:600 11px/1.1 var(--font-sans);color:var(--ink);text-shadow:0 0 3px var(--card),0 0 3px var(--card),0 0 2px var(--card)}
+        .gv-lbl b{font:700 11px/1.1 var(--font-mono);color:var(--ink)}
         .gv-pop-axis{display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:10px;color:var(--ink-soft);margin-top:-2px}
       `}</style>
       {/* h-full, not absolute inset-0: maplibre CSS forces position:relative on this node */}
       <div ref={containerRef} className="h-full w-full" />
-      <div className="absolute left-3 bottom-3 z-10 w-[200px] rounded-[10px] border border-gisviz-border bg-gisviz-card/95 px-3 py-2 shadow-sm backdrop-blur-sm">
-        <div className="mb-1.5 truncate font-mono text-[11px] font-semibold text-gisviz-ink">{field}</div>
-        <div className="h-2 rounded-full" style={{ background: `linear-gradient(to right, ${ramp.join(',')})` }} />
-        <div className="mt-1 flex justify-between font-mono text-[10.5px] text-gisviz-ink-soft">
-          <span>{compact(st.breaks[0])}</span><span>{compact(st.breaks[2])}</span><span>{compact(st.breaks[4])}</span>
+      {legendHost ? createPortal(legend, legendHost) : legendHost === undefined ? (
+        <div className="absolute left-3 bottom-3 z-10 w-[200px] rounded-[10px] border border-gisviz-border bg-gisviz-card/95 px-3 py-2 shadow-sm backdrop-blur-sm">
+          {legend}
         </div>
-      </div>
+      ) : null}
     </div>
   )
 }
@@ -583,6 +770,143 @@ function MapView({ fc, field, fields, labelField, basemap, accent, dark, domainR
 /* ═══════════════════ Data table ═══════════════════ */
 
 const TABLE_LIMIT = 500
+const DATASET_PAGE = 100
+
+/** The whole dataset behind a visual (every column), a page at a time — GET /datasets/{id}/rows. */
+function DatasetTable({ datasetId }: { datasetId: string }) {
+  const [offset, setOffset] = useState(0)
+  const [page, setPage] = useState<{ columns: string[]; rows: Row[]; total: number } | null>(null)
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  useEffect(() => {
+    let live = true
+    setBusy(true); setError('')
+    gisvizApi.fetchDatasetRows(datasetId, DATASET_PAGE, offset)
+      .then(r => { if (live) setPage({ columns: r.columns, rows: r.rows, total: r.total_rows }) })
+      .catch(e => { if (live) setError(e?.response?.status === 403 ? 'The data of this dataset is not published.' : 'Could not load the data.') })
+      .finally(() => { if (live) setBusy(false) })
+    return () => { live = false }
+  }, [datasetId, offset])
+  if (error) return <p className="px-4 py-6 text-[13px] text-gisviz-ink-soft">{error}</p>
+  if (!page) return <div className="flex h-full items-center justify-center"><Loader2 className="animate-spin text-gisviz-accent" size={24} /></div>
+  const last = Math.min(offset + DATASET_PAGE, page.total)
+  return (
+    <div className="flex h-full flex-col">
+      <div className="min-h-0 flex-1 overflow-auto" style={{ scrollbarWidth: 'thin' }}>
+        <table className="w-full border-collapse text-[13px]">
+          <thead className="sticky top-0 z-10 bg-gisviz-paper">
+            <tr>{page.columns.map(c => (
+              <th key={c} className="whitespace-nowrap border-b border-gisviz-border px-3 py-2 text-left font-mono text-[11.5px] font-semibold uppercase tracking-wide text-gisviz-ink-soft">{c}</th>
+            ))}</tr>
+          </thead>
+          <tbody className={busy ? 'opacity-50' : ''}>
+            {page.rows.map((r, i) => (
+              <tr key={offset + i} className="border-b border-gisviz-border/50 hover:bg-gisviz-paper/60">
+                {page.columns.map(c => (
+                  <td key={c} className={`whitespace-nowrap px-3 py-1.5 text-gisviz-ink ${toNum(r[c]) !== null ? 'text-right font-mono text-[12.5px]' : ''}`}>
+                    {truncate(fmt(r[c]), 60)}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="flex items-center justify-between gap-3 border-t border-gisviz-border bg-gisviz-paper/40 px-3 py-2 text-[12px] text-gisviz-ink-soft">
+        <span className="font-mono">{page.total ? `${(offset + 1).toLocaleString()}–${last.toLocaleString()} of ${page.total.toLocaleString()} rows` : 'No rows'}</span>
+        <span className="flex gap-1.5">
+          <button type="button" disabled={offset === 0 || busy} onClick={() => setOffset(o => Math.max(0, o - DATASET_PAGE))}
+            className="h-7 rounded-md border border-gisviz-border bg-gisviz-card px-2.5 disabled:opacity-40">Previous</button>
+          <button type="button" disabled={last >= page.total || busy} onClick={() => setOffset(o => o + DATASET_PAGE)}
+            className="h-7 rounded-md border border-gisviz-border bg-gisviz-card px-2.5 disabled:opacity-40">Next</button>
+        </span>
+      </div>
+    </div>
+  )
+}
+
+/** Dropdown of the visual's labels (e.g. countries): the reader picks which ones are shown. */
+/** Poster filter: one chip per label / group (bottom right of the poster). Click = show only that; click more to add. */
+function PosterChips({ labels, selected, onChange, colors, accent }: {
+  labels: string[]; selected: Set<string> | null; onChange: (s: Set<string> | null) => void
+  colors?: Record<string, string>; accent: string
+}) {
+  const pal = [accent, ...PALETTE]
+  const toggle = (l: string) => {
+    if (!selected) { onChange(new Set([l])); return }
+    const next = new Set(selected)
+    if (next.has(l)) next.delete(l); else next.add(l)
+    onChange(next.size === 0 || next.size === labels.length ? null : next)
+  }
+  const chip = 'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px] font-semibold transition-all'
+  return (
+    <>
+      <button type="button" onClick={() => onChange(null)}
+              className={`${chip} ${!selected ? 'border-transparent bg-gisviz-ink text-gisviz-card' : 'border-current/30 bg-gisviz-card/80 text-gisviz-ink hover:bg-gisviz-card'}`}>
+        All
+      </button>
+      {labels.map((l, i) => {
+        const on = !selected || selected.has(l)
+        const c = colors ? colors[l] ?? pal[i % pal.length] : accent      // one theme colour per post; groups keep theirs
+        return (
+          <button key={l} type="button" onClick={() => toggle(l)} aria-pressed={!!selected && selected.has(l)}
+                  className={`${chip} bg-gisviz-card/85 text-gisviz-ink ${on ? 'border-gisviz-border' : 'border-transparent opacity-45'} hover:opacity-100`}>
+            <span className="h-2.5 w-2.5 rounded-full" style={{ background: c }} />{l}
+          </button>
+        )
+      })}
+    </>
+  )
+}
+
+function LabelFilter({ labels, selected, onChange }: {
+  labels: string[]; selected: Set<string> | null; onChange: (s: Set<string> | null) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [q, setQ] = useState('')
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!open) return
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [open])
+  const count = selected ? labels.filter(l => selected.has(l)).length : labels.length
+  const shown = labels.filter(l => l.toLowerCase().includes(q.trim().toLowerCase()))
+  const toggle = (l: string) => {
+    const next = new Set(selected ?? labels)
+    if (next.has(l)) next.delete(l); else next.add(l)
+    onChange(next.size === labels.length ? null : next)
+  }
+  return (
+    <div className="relative" ref={ref}>
+      <button type="button" onClick={() => setOpen(o => !o)} aria-expanded={open}
+        className={`inline-flex h-8 items-center gap-1.5 rounded-[8px] border px-3 text-[12.5px] font-medium ${
+          selected ? 'border-gisviz-accent/50 bg-gisviz-accent/10 text-gisviz-accent' : 'border-gisviz-border bg-gisviz-card text-gisviz-ink'}`}>
+        <Filter size={13} /> {selected ? `${count} of ${labels.length}` : `All ${labels.length}`} <ChevronDown size={13} />
+      </button>
+      {open && (
+        <div className="absolute left-0 top-full z-30 mt-1.5 w-64 rounded-xl border border-gisviz-border bg-gisviz-card p-2 shadow-lg">
+          <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search labels" autoFocus
+            className="mb-1.5 w-full rounded-md border border-gisviz-border bg-gisviz-canvas px-2.5 py-1.5 text-[12.5px] text-gisviz-ink outline-none focus:ring-1 focus:ring-gisviz-accent" />
+          <div className="mb-1.5 flex gap-1.5 text-[12px]">
+            <button type="button" onClick={() => onChange(null)} className="rounded-md border border-gisviz-border px-2 py-1 hover:border-gisviz-accent">All</button>
+            <button type="button" onClick={() => onChange(new Set())} className="rounded-md border border-gisviz-border px-2 py-1 hover:border-gisviz-accent">None</button>
+          </div>
+          <div className="max-h-64 overflow-y-auto">
+            {shown.map(l => (
+              <label key={l} className="flex cursor-pointer items-center gap-2 rounded-md px-1.5 py-1 text-[12.5px] text-gisviz-ink hover:bg-gisviz-paper">
+                <input type="checkbox" checked={!selected || selected.has(l)} onChange={() => toggle(l)} className="accent-gisviz-accent" />
+                <span className="truncate">{l}</span>
+              </label>
+            ))}
+            {!shown.length && <p className="px-1.5 py-2 text-[12px] text-gisviz-ink-soft">No match.</p>}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 function DataTable({ rows }: { rows: Row[] }) {
   const shown = rows.slice(0, TABLE_LIMIT)
@@ -635,11 +959,6 @@ function DataTable({ rows }: { rows: Row[] }) {
 
 /* ═══════════════════ Main component ═══════════════════ */
 
-/** Chart-type names come from the visual catalog in the DB; the code is shown until it loads. */
-function typeLabel(types: { renderer_code: string; name: string }[], code: string): string {
-  const t = types.find(x => x.renderer_code === code)
-  return t ? t.name.replace(/\s*\(.*\)\s*$/, '') : code
-}
 
 /** CSVs often give numbers as strings; coerce the colour fields so MapLibre sees real numbers. */
 function normalizeFc(fc: GeoFeatureCollection, fields: string[]): GeoFeatureCollection {
@@ -658,15 +977,21 @@ function normalizeFc(fc: GeoFeatureCollection, fields: string[]): GeoFeatureColl
   }
 }
 
-export default function InteractiveVisual({ spec, height = 520, className = '' }: {
+export default function InteractiveVisual({ spec, height = 520, className = '', datasetId, showData = true }: {
   spec: VisualSpec
   height?: number
   className?: string
+  /** The dataset behind the visual: the Data tab then shows the whole dataset (every column). */
+  datasetId?: string | null
+  /** false hides the Data tab (the dataset's "show data" switch is off). */
+  showData?: boolean
 }) {
-  const catalogTypes = useVisualCatalog().types       // names of chart types (misc DB)
   const probeRef = useRef<HTMLSpanElement>(null)
   const siteAccent = useAccentHex(probeRef)
-  const accent = spec.accent && /^#[0-9a-f]{6}$/i.test(spec.accent) ? spec.accent : siteAccent
+  const poster = useContext(PosterContext)
+  const hexOk = (c?: string): c is string => !!c && /^#[0-9a-f]{6}$/i.test(c)
+  // one theme colour per post: on a poster the poster's colour wins
+  const accent = hexOk(poster.accent) ? poster.accent : hexOk(spec.accent) ? spec.accent : siteAccent
   const { resolvedTheme } = useTheme()
   const main = useSpecData<Row[] | GeoFeatureCollection>(spec.data)
   const time = spec.kind === 'map' ? spec.time : undefined
@@ -685,6 +1010,10 @@ export default function InteractiveVisual({ spec, height = 520, className = '' }
   const [field, setField] = useState(defaultField)
   const [chartType, setChartType] = useState<ChartType>(spec.kind === 'chart' ? spec.chart_type : 'line')
   const [expanded, setExpanded] = useState(false)
+  /* ── labels on / off (names + values on the map or beside the points; hover still works) ── */
+  const canLabel = spec.kind === 'map' ? spec.map_style !== 'cartogram' : spec.chart_type === 'scatter' || spec.chart_type === 'bubble'
+  const [labelsOn, setLabelsOn] = useState(!!spec.show_labels)
+  useEffect(() => { setLabelsOn(!!spec.show_labels) }, [spec.show_labels])
 
   useEffect(() => {
     setField(defaultField)
@@ -695,6 +1024,7 @@ export default function InteractiveVisual({ spec, height = 520, className = '' }
   useEffect(() => {
     if (!expanded) return
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setExpanded(false) }
+    window.scrollTo({ top: 0 })                      // the top nav is not sticky: bring it into view
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     window.addEventListener('keydown', onKey)
@@ -781,6 +1111,22 @@ export default function InteractiveVisual({ spec, height = 520, className = '' }
     return times.map(t => ({ t, row: byT?.get(String(t)) ?? {} }))
   }, [time, times, lookup])
 
+  /* ── label filter (dropdown): which labels (e.g. countries) are shown ── */
+  const filterField = spec.label_filter?.field
+  const allLabels = useMemo<string[]>(() => {
+    if (!filterField) return []
+    const vals = spec.kind === 'chart'
+      ? (Array.isArray(main.value) ? (main.value as Row[]).map(r => r[filterField]) : [])
+      : (fc?.features ?? []).map(f => f.properties?.[filterField])
+    return [...new Set(vals.filter(v => v != null && v !== '').map(String))]
+  }, [filterField, spec.kind, main.value, fc])
+  const [picked, setPicked] = useState<Set<string> | null>(null)
+  useEffect(() => {
+    const d = spec.label_filter?.default
+    setPicked(d && d.length ? new Set(d.map(String)) : null)
+  }, [spec.label_filter?.default, filterField])
+  const keep = useCallback((v: unknown) => !picked || picked.has(String(v)), [picked])
+
   /* ── rows for the Data tab ── */
   const rows = useMemo<Row[] | null>(() => {
     if (spec.kind === 'chart') return Array.isArray(main.value) ? (main.value as Row[]) : null
@@ -793,8 +1139,46 @@ export default function InteractiveVisual({ spec, height = 520, className = '' }
     return fc.features.map(f => f.properties ?? {})
   }, [spec, main.value, fc, time, series])
 
+  /* ── on a poster: filter chips at the poster's bottom right (by colour group when there is one) ── */
+  const groupField = spec.kind === 'chart' && spec.color_by && spec.color_by !== filterField ? spec.color_by : undefined
+  const chipField = groupField ?? filterField
+  const groupLabels = useMemo<string[]>(() => (groupField && Array.isArray(main.value)
+    ? [...new Set((main.value as Row[]).map(r => r[groupField]).filter(v => v != null && v !== '').map(String))] : []), [groupField, main.value])
+  const chipLabels = groupField ? groupLabels : allLabels
+  const [pickedGroups, setPickedGroups] = useState<Set<string> | null>(null)
+  const chipPicked = groupField ? pickedGroups : picked
+  const setChipPicked = groupField ? setPickedGroups : setPicked
+  const chipsOnPoster = poster.inPoster && !!poster.chipHost && !!chipField && chipLabels.length > 1 && chipLabels.length <= 16
+
+  const chartRows = useMemo(() => {
+    if (!rows || spec.kind !== 'chart') return rows
+    let out = rows
+    if (filterField && picked) out = out.filter(r => keep(r[filterField]))
+    if (groupField && pickedGroups) out = out.filter(r => pickedGroups.has(String(r[groupField])))
+    return out
+  }, [rows, filterField, picked, keep, spec.kind, groupField, pickedGroups])
+  const mapFc = useMemo(() => (viewFc && filterField && picked
+    ? { ...viewFc, features: viewFc.features.filter(f => keep(f.properties?.[filterField])) } : viewFc),
+    [viewFc, filterField, picked, keep])
+  const hasDataTab = !datasetId || showData
+
+  /* ── map styles that reshape the features before drawing ── */
+  const mapStyle = spec.kind === 'map' ? spec.map_style ?? 'auto' : 'auto'
+  const hexName = mapStyle === 'hexbin' ? (fields.length && field !== 'count' && (fc?.features ?? []).some(f => toNum(f.properties?.[field]) !== null) ? `${field} (total)` : 'points') : ''
+  const shownFc = useMemo<GeoFeatureCollection | null>(() => {
+    if (!mapFc) return null
+    if (mapStyle === 'bubble') return centroidFc(mapFc)
+    if (mapStyle === 'hexbin') return hexbinFc(mapFc, field, hexName)
+    if (mapStyle === 'connection' && spec.kind === 'map') {
+      const a = spec.label_field, b = spec.target_field
+      return { ...mapFc, features: mapFc.features.map(f => ({ ...f, properties: { ...(f.properties ?? {}),
+        route: [a ? f.properties?.[a] : null, b ? f.properties?.[b] : null].filter(v => v != null && v !== '').join(' → ') || 'Connection' } })) }
+    }
+    return mapFc
+  }, [mapFc, mapStyle, field, hexName, spec])
+
   const basemap = spec.kind === 'map'
-    ? spec.basemap_style ?? (resolvedTheme === 'dark' ? BASEMAP_DARK : BASEMAP_LIGHT)
+    ? spec.basemap_style ?? ((poster.inPoster ? poster.dark : resolvedTheme === 'dark') ? BASEMAP_DARK : BASEMAP_LIGHT)
     : BASEMAP_LIGHT
 
   const loading = main.loading || seriesState.loading
@@ -806,54 +1190,63 @@ export default function InteractiveVisual({ spec, height = 520, className = '' }
     `inline-flex items-center gap-1.5 h-8 px-3 rounded-[6px] text-[12.5px] font-semibold transition-colors ${
       active ? 'bg-gisviz-card text-gisviz-ink shadow-sm' : 'text-gisviz-ink-soft hover:text-gisviz-ink'}`
 
+  // on a poster only the chart / map is shown: no card, no title; the controls go under the poster
+  const bareOnPoster = poster.inPoster && !expanded
+  const toolsOut = bareOnPoster && !!poster.toolsHost
+  const wrap = (bar: React.ReactNode) => (toolsOut ? createPortal(
+    <div className="rounded-[12px] border border-gisviz-border bg-gisviz-card shadow-sm">{bar}</div>, poster.toolsHost!) : bar)
+
   return (
     <div
       className={expanded
-        ? 'fixed inset-0 z-[100] flex flex-col bg-gisviz-card'
+        ? 'fixed inset-x-0 bottom-0 top-[72px] z-[90] flex flex-col bg-gisviz-card border-t border-gisviz-border'   /* below the top nav (72px, z-100) */
+        : bareOnPoster ? `relative ${className}`
         : `rounded-[16px] border border-gisviz-border bg-gisviz-card shadow-sm overflow-hidden ${className}`}
     >
+      {chipsOnPoster && createPortal(
+        <PosterChips labels={chipLabels} selected={chipPicked} onChange={setChipPicked}
+                     colors={groupField && spec.kind === 'chart' ? spec.colors : undefined} accent={accent} />, poster.chipHost!)}
       <span ref={probeRef} aria-hidden className="hidden text-gisviz-accent" />
 
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-gisviz-border bg-gisviz-paper/40 px-3 py-2.5 sm:px-4">
+      {(spec.title || spec.subtitle) && (!poster.inPoster || expanded) && (
+        <div className="px-4 pt-4 pb-3 sm:px-5 border-b border-gisviz-border/60">
+          {spec.title && <h3 className="font-display text-[19px] sm:text-[22px] font-bold leading-tight text-gisviz-ink">{spec.title}</h3>}
+          {spec.subtitle && <p className="mt-1 text-[13.5px] text-gisviz-ink-soft leading-relaxed">{spec.subtitle}</p>}
+        </div>
+      )}
+
+      {/* Toolbar (under the poster when on one) */}
+      {wrap(<div className={`flex flex-wrap items-center gap-2 px-3 py-2.5 sm:px-4 ${toolsOut ? '' : 'border-b border-gisviz-border bg-gisviz-paper/40'}`}>
         <div className="inline-flex rounded-[8px] border border-gisviz-border bg-gisviz-paper p-0.5">
           <button type="button" onClick={() => setView('visual')} className={segBtn(view === 'visual')}>
             {spec.kind === 'map' ? <MapIcon size={14} /> : <BarChart3 size={14} />}
             {spec.kind === 'map' ? 'Map' : 'Chart'}
           </button>
-          <button type="button" onClick={() => setView('table')} className={segBtn(view === 'table')}>
-            <Table2 size={14} /> Data
-          </button>
+          {hasDataTab && (
+            <button type="button" onClick={() => setView('table')} className={segBtn(view === 'table')}>
+              <Table2 size={14} /> Data
+            </button>
+          )}
         </div>
 
-        {view === 'visual' && allowedTypes.length > 1 && (
-          <div className="inline-flex gap-1">
-            {allowedTypes.map(t => (
-              <button key={t} type="button" onClick={() => setChartType(t)}
-                className={`h-8 rounded-full border px-3 text-[12.5px] font-medium transition-colors ${
-                  chartType === t
-                    ? 'border-gisviz-accent/40 bg-gisviz-accent/10 text-gisviz-accent'
-                    : 'border-gisviz-border bg-gisviz-card text-gisviz-ink-soft hover:text-gisviz-ink'}`}>
-                {typeLabel(catalogTypes, t)}
-              </button>
-            ))}
-          </div>
+        {/* one visual per post: no chart-type or measure switching; readers filter the labels instead */}
+        {view === 'visual' && filterField && allLabels.length > 1 && !(chipsOnPoster && !groupField) && (
+          <LabelFilter labels={allLabels} selected={picked} onChange={setPicked} />
         )}
 
-        {view === 'visual' && fields.length > 1 && (
-          <label className="inline-flex items-center gap-2 text-[12.5px] text-gisviz-ink-soft">
-            <span className="hidden sm:inline">Column</span>
-            <select value={field} onChange={e => setField(e.target.value)}
-              className="h-8 rounded-[8px] border border-gisviz-border bg-gisviz-card px-2 font-mono text-[12.5px] text-gisviz-ink focus:outline-none focus:ring-1 focus:ring-gisviz-accent">
-              {fields.map(f => <option key={f} value={f}>{f}</option>)}
-            </select>
-          </label>
+        {view === 'visual' && canLabel && (
+          <button type="button" onClick={() => setLabelsOn(v => !v)} aria-pressed={labelsOn}
+            title={labelsOn ? 'Hide labels' : 'Show labels'}
+            className={`inline-flex h-8 items-center gap-1.5 rounded-[8px] border px-2.5 text-[12.5px] font-semibold transition-colors ${
+              labelsOn ? 'border-gisviz-accent bg-gisviz-accent/10 text-gisviz-accent' : 'border-gisviz-border bg-gisviz-paper text-gisviz-ink-soft hover:text-gisviz-ink'}`}>
+            <Tag size={13} /> Labels <span className="font-mono text-[10.5px] opacity-80">{labelsOn ? 'ON' : 'OFF'}</span>
+          </button>
         )}
 
         <div className="ml-auto flex items-center gap-3">
-          {rows && (
+          {rows && view === 'visual' && (
             <span className="hidden font-mono text-[11.5px] text-gisviz-ink-soft sm:inline">
-              {rows.length.toLocaleString()} rows
+              {(spec.kind === 'chart' ? chartRows?.length ?? 0 : mapFc?.features.length ?? 0).toLocaleString()} shown
             </span>
           )}
           <button type="button" onClick={() => setExpanded(v => !v)}
@@ -862,7 +1255,7 @@ export default function InteractiveVisual({ spec, height = 520, className = '' }
             {expanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
           </button>
         </div>
-      </div>
+      </div>)}
 
       {/* Body */}
       <div className={expanded ? 'relative min-h-0 flex-1' : 'relative'} style={expanded ? undefined : { height }}>
@@ -878,19 +1271,30 @@ export default function InteractiveVisual({ spec, height = 520, className = '' }
             {error && <p className="font-mono text-[12px] text-gisviz-ink-soft">{error}</p>}
           </div>
         )}
-        {rows && !badData && view === 'table' && <DataTable rows={rows} />}
+        {view === 'table' && datasetId && showData && <DatasetTable datasetId={datasetId} />}
+        {rows && !badData && view === 'table' && !datasetId && <DataTable rows={rows} />}
         {rows && !badData && view === 'visual' && spec.kind === 'chart' && (
           <div className="h-full px-2 pt-3 pb-1 sm:px-4">
-            <D3Chart rows={rows} type={chartType} x={spec.x} y={field} z={spec.z} size={spec.size} accent={accent} />
+            <D3Chart rows={chartRows ?? []} type={chartType} x={spec.x} y={field} z={spec.z} size={spec.size} accent={accent} fields={spec.fields}
+                     colorBy={spec.color_by} colors={spec.colors} refLines={spec.reference_lines} yLabel={spec.y_label}
+                     labelField={spec.label_field} showLabels={canLabel && labelsOn} legendHost={bareOnPoster ? poster.legendHost : undefined} />
           </div>
         )}
-        {viewFc && !badData && view === 'visual' && spec.kind === 'map' && (
-          <MapView fc={viewFc} field={field} fields={fields} labelField={spec.label_field}
-                   basemap={basemap} accent={accent} dark={resolvedTheme === 'dark'}
+        {mapFc && !badData && view === 'visual' && spec.kind === 'map' && mapStyle === 'cartogram' && (
+          <div className="h-full px-2 pt-2 pb-1 sm:px-4">
+            <D3Chart rows={[]} geo={mapFc} type="cartogram" x={spec.label_field ?? ''} y={field} accent={accent} yLabel={spec.y_label} />
+          </div>
+        )}
+        {shownFc && !badData && view === 'visual' && spec.kind === 'map' && mapStyle !== 'cartogram' && (
+          <MapView fc={shownFc} field={mapStyle === 'hexbin' ? hexName : field} fields={mapStyle === 'hexbin' ? [hexName] : fields}
+                   labelField={mapStyle === 'hexbin' ? undefined : mapStyle === 'connection' ? 'route' : spec.label_field}
+                   bubble={mapStyle === 'bubble'} lineWidth={mapStyle === 'connection'}
+                   basemap={basemap} accent={accent} dark={poster.inPoster ? poster.dark : resolvedTheme === 'dark'}
+                   baseMode={bareOnPoster ? poster.mapBase : 'streets'} legendHost={bareOnPoster ? poster.legendHost : undefined}
                    domainRows={series ?? undefined}
                    historyOf={time ? historyOf : undefined}
                    currentT={currentT}
-                   heat={spec.map_style === 'heat'} />
+                   heat={spec.map_style === 'heat'} showLabels={canLabel && labelsOn} />
         )}
       </div>
 

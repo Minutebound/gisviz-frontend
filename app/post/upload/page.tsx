@@ -7,8 +7,12 @@ import { useAuth } from '../../../context/AuthContext'
 import { canPublish } from '../../../lib/roles'
 import NoPublishAccess from '../../components/post/NoPublishAccess'
 import { gisvizApi } from '../../../connector/api'
+import RegionField from '../../components/post/regionField'
+import type { VisualSpec } from '../../components/InteractiveVisual'
+import PosterEditor from '../../components/post/PosterEditor'
+import { type PosterChoice } from '../../../lib/poster'
 import DatasetVisualPicker from '../../components/post/DataVisualPicker'
-import type { DatasetCard, VisualChoice } from '../../../types/visuals'
+import { toVisualParams, type DatasetCard, type VisualChoice } from '../../../types/visuals'
 import { DEFAULT_ACCENT, categoryColor, useCategories } from '../../../lib/referenceData'
 
 export default function UploadPage() {
@@ -29,6 +33,9 @@ export default function UploadPage() {
   const [keywordInput, setKeywordInput] = useState('')
   
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>([])
+  const [region, setRegion] = useState('')                  // regions.code (misc DB), required
+  const [backdrop, setBackdrop] = useState<PosterChoice>('auto')
+  const [previewSpec, setPreviewSpec] = useState<VisualSpec | null>(null)   // the visual, for the poster preview          // background behind the visual: auto | none | motif
   
   const [customCategoryLabel, setCustomCategoryLabel] = useState('')
   const [isSubmittingCustom, setIsSubmittingCustom] = useState(false)
@@ -78,6 +85,7 @@ export default function UploadPage() {
     setDescription(d => d || card.description || '')
     setSourceName(s => s || card.source_name || '')
     setSourceUrl(u => u || card.source_url || '')
+    setRegion(r => r || card.region || '')                    // the dataset's region, until the publisher picks one
   }
 
   const addCategory = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -154,6 +162,7 @@ export default function UploadPage() {
     if (!title.trim())                  { setErrorMsg('A title is required.'); return }
     if (!sourceName.trim())             { setErrorMsg('Data Source Name is required.'); return }
     if (selectedCategoryIds.length < 1) { setErrorMsg('Please select at least one category.'); return }
+    if (!region)                        { setErrorMsg('Please pick the region this post is about.'); return }
     if (keywords.length < 1)            { setErrorMsg('Please add at least one keyword.'); return }
     if (keywords.length > 3)            { setErrorMsg('You can only add up to 3 keywords.'); return }
 
@@ -168,17 +177,12 @@ export default function UploadPage() {
         source_name: sourceName.trim(),
         source_url: sourceUrl?.trim() || null,
         dataset_id: visualChoice.dataset_id,
-        visual_params: {
-          viz: visualChoice.viz,
-          x: visualChoice.x ?? null,
-          y: visualChoice.y ?? null,
-          z: visualChoice.z ?? null,
-          size: visualChoice.size ?? null,
-          label_field: visualChoice.label_field ?? null,
-        },
+        visual_params: toVisualParams(visualChoice),
         theme_color: themeColor,
         category_ids: selectedCategoryIds,
+        region,
         keywords,
+        backdrop,
       })
       router.push(`/post/${postRes.post_id}`)
     } catch (err: any) {
@@ -231,6 +235,7 @@ export default function UploadPage() {
               initialDatasetId={presetDataset}
               accent={themeColor}
               onAccentChange={c => { setThemeTouched(true); setThemeColor(c) }}
+              onSpec={setPreviewSpec}
             />
           </div>
         )}
@@ -305,6 +310,8 @@ export default function UploadPage() {
                 />
               </div>
             </div>
+
+            <RegionField value={region} onChange={setRegion} />
 
             {/* Categories — now requires at least 1 */}
             <div>
@@ -395,6 +402,9 @@ export default function UploadPage() {
             </div>
 
             {/* Submit */}
+            <PosterEditor value={backdrop} onChange={setBackdrop} spec={previewSpec} sources={[...(sourceName.trim() ? [{ label: sourceName.trim(), url: sourceUrl.trim() || null }] : [])]}
+                           inputs={{ title, description, category_ids: selectedCategoryIds, keywords, region, theme_color: themeColor, note }} />
+
             <div className="pt-6 border-t border-gisviz-border flex justify-end gap-4">
               <button type="button" onClick={() => router.back()} disabled={isLoading} className="px-6 py-2.5 rounded-md font-mono text-[12px] border border-gisviz-border text-gisviz-ink-soft hover:bg-gisviz-rail transition-colors">
                 Cancel

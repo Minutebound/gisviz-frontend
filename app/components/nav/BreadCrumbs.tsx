@@ -114,7 +114,7 @@ export default function GlobalSubNav() {
 
   return (
     <div className={`w-full border-b border-gisviz-border/60 z-40 ${mobileOnly ? 'sm:hidden' : ''}`}>
-      <div className="mx-auto max-w-6xl px-4 sm:px-8 lg:px-[72px] h-11 flex items-center">
+      <div className="mx-auto max-w-7xl px-4 sm:px-8 lg:px-[72px] h-11 flex items-center">
         
         <nav 
           className="flex items-center gap-1.5 sm:gap-2 text-[12.5px] font-medium text-gisviz-ink-soft overflow-x-auto whitespace-nowrap"
