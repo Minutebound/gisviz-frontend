@@ -4,9 +4,10 @@ import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { 
-  Loader2, Inbox, Plus, ChevronDown, Globe2, BarChart2, Check, Flame, Clock, Search
+  Loader2, Inbox, Plus, ChevronDown, Globe2, BarChart2, Check, Flame, Clock, Search, Eye, Award
 } from 'lucide-react'
 import { useAuth } from '../../../context/AuthContext'
+import { canPublish as canPublishRole } from '../../../lib/roles'
 import { gisvizApi } from '../../../connector/api'
 import {
   Post,
@@ -14,16 +15,16 @@ import {
   DEFAULT_FILTERS,
   filtersToParams,
   filtersFromParams,
-  REGIONS,
-  CHART_TYPES,
-  CATEGORIES
 } from '../../../types/gisviz'
+import { FOR_YOU, useCategories, useRegions, useVisualCatalog } from '../../../lib/referenceData'
 import CategoryBar from './CategoryBar'
-import FeedCard, { HeroCard, FeedCardSkeleton } from './FeedCard'
+import FeedCard, { HeroCard, FeedCardSkeleton, mediaUrl } from './FeedCard'
+import type { FeaturedPost } from '../../../connector/api'
 import FeedRail, { MobileFeaturedPublishers, MobileTrendingTags } from './FeedRail'
 import ShareModal from '../SharePost'
 
 const PAGE_SIZE = 12
+const featuredCache = new Map<string, Promise<FeaturedPost | null>>()
 
 export default function FeedStream() {
   const router = useRouter()
@@ -50,7 +51,7 @@ export default function FeedStream() {
   const regionRef = useRef<HTMLDivElement>(null)
   const chartTypeRef = useRef<HTMLDivElement>(null)
 
-  const canPublish = isAuthenticated && ['admin', 'editor', 'publisher'].includes(user?.role_name || user?.role)
+  const canPublish = isAuthenticated && canPublishRole(user)
 
   // ── Click Outside Handler for Dropdowns ──
   useEffect(() => {
@@ -156,12 +157,47 @@ export default function FeedStream() {
     finally { setBusyId(null) }
   }
 
+  // banner's editor's pick: the most-viewed active post of the selected category (or overall)
+  const [featured, setFeatured] = useState<FeaturedPost | null>(null)
+  useEffect(() => {
+    let live = true
+    const key = filters.category || ''
+    if (!featuredCache.has(key)) {
+      featuredCache.set(key, gisvizApi.fetchFeaturedPost(key || undefined).catch(() => { featuredCache.delete(key); return null }))
+    }
+    featuredCache.get(key)!.then(p => { if (live) setFeatured(p) })
+    return () => { live = false }
+  }, [filters.category])
+
+  // filter options from the database (lib/referenceData.ts) — nothing hard-coded
+  const dbCategories = useCategories()
+  const dbRegions = useRegions()
+  const catalog = useVisualCatalog()
+  const regionOptions = useMemo(() => {
+    const kids = new Map<string, typeof dbRegions>()
+    dbRegions.forEach(r => { if (r.parent_code) kids.set(r.parent_code, [...(kids.get(r.parent_code) || []), r]) })
+    const out: { value: string; label: string; depth: number }[] = [{ value: '', label: 'All regions', depth: 0 }]
+    const walk = (r: (typeof dbRegions)[number], depth: number) => {
+      out.push({ value: r.code, label: r.name, depth })
+      ;(kids.get(r.code) || []).forEach(k => walk(k, depth + 1))
+    }
+    const codes = new Set(dbRegions.map(r => r.code))
+    dbRegions.filter(r => !r.parent_code || !codes.has(r.parent_code)).forEach(r => walk(r, 0))
+    return out
+  }, [dbRegions])
+  const chartTypeOptions = useMemo(() => {
+    const out: { value: string; label: string; group?: string }[] = [{ value: '', label: 'All visuals' }]
+    catalog.categories.forEach(cat => catalog.types.filter(t => t.category === cat.code)
+      .forEach(t => out.push({ value: t.code, label: t.name, group: cat.name })))   // catalog code: unique (several map types share one renderer)
+    return out
+  }, [catalog])
+
   const [hero, ...rest] = posts
   const showHero = filters.sort === 'trending' && !!hero && !filters.chart_type && !filters.region && !filters.search
 
-  const selectedRegion = REGIONS.find(r => r.value === (filters.region ?? '')) || REGIONS[0]
-  const selectedChartType = CHART_TYPES.find(c => c.value === (filters.chart_type ?? '')) || CHART_TYPES[0]
-  const activeCategory = CATEGORIES.find(c => c.slug === (filters.category ?? '')) || CATEGORIES[0]
+  const selectedRegion = regionOptions.find(r => r.value === (filters.region ?? '')) || regionOptions[0]
+  const selectedChartType = chartTypeOptions.find(c => c.value === (filters.chart_type ?? '')) || chartTypeOptions[0]
+  const activeCategory = dbCategories.find(c => c.slug === (filters.category ?? '')) || FOR_YOU
 
   // Dynamic indices for interleaving mobile rails
   const displayPosts = showHero ? rest : posts
@@ -177,14 +213,15 @@ export default function FeedStream() {
         
         {/* ── FULL WIDTH TOP SECTION ── */}
         
-        {/* 1A. Full-Width Dynamic Category Banner (Desktop & Tablet Only) */}
-        <div className="hidden sm:block w-full relative rounded-[20px] overflow-hidden border border-gisviz-border bg-gisviz-card shadow-sm shrink-0">
-          <div 
-            className="absolute top-0 right-0 bottom-0 w-full md:w-2/3 pointer-events-none" 
-            style={{ background: `linear-gradient(to left, transparent, ${activeCategory.theme_color}26)` }}
+        {/* 1. Category banner (tablet & desktop only; phones show just the category bar).
+               Left: the category from the DB. Right: editor's pick = its most-viewed post. */}
+        <div className="hidden sm:grid grid-cols-1 md:grid-cols-2 w-full relative rounded-[20px] overflow-hidden border border-gisviz-border bg-gisviz-card shadow-sm shrink-0">
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{ background: `linear-gradient(to right, ${activeCategory.theme_color}1f, transparent 60%)` }}
           />
-          <div className="relative p-6 md:p-8 lg:p-10">
-            <span 
+          <div className="relative p-6 md:p-8 lg:p-10 flex flex-col justify-center">
+            <span
               className="font-mono text-[11.5px] uppercase tracking-[0.14em] font-bold mb-2.5 block"
               style={{ color: activeCategory.theme_color }}
             >
@@ -193,30 +230,41 @@ export default function FeedStream() {
             <h1 className="font-display text-[32px] lg:text-[42px] font-bold tracking-[-0.03em] text-gisviz-ink mb-2 leading-tight">
               {activeCategory.label}
             </h1>
-            <p className="text-[15px] lg:text-[16px] text-gisviz-ink-soft max-w-2xl leading-relaxed">
-              {activeCategory.description}
-            </p>
+            {activeCategory.description && (
+              <p className="text-[15px] lg:text-[16px] text-gisviz-ink-soft max-w-xl leading-relaxed">
+                {activeCategory.description}
+              </p>
+            )}
           </div>
+
+          {featured ? (
+            <Link href={`/post/${featured.post_id}`}
+              className="group relative hidden md:block min-h-[220px] overflow-hidden border-l border-gisviz-border">
+              {mediaUrl(featured.visual_image_path)
+                ? <img src={mediaUrl(featured.visual_image_path)!} alt=""
+                       className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]" />
+                : <div className="absolute inset-0" style={{ background: `linear-gradient(135deg, ${featured.theme_color || activeCategory.theme_color}33, ${featured.theme_color || activeCategory.theme_color}0d)` }} />}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
+              <div className="absolute left-0 right-0 bottom-0 p-5 lg:p-6">
+                <span className="inline-flex items-center gap-1.5 mb-2 px-2.5 py-1 rounded-full text-[11px] font-mono font-bold uppercase tracking-wider text-white"
+                      style={{ background: featured.theme_color || activeCategory.theme_color }}>
+                  <Award size={12} /> Editor&apos;s pick
+                </span>
+                <h2 className="font-display text-[18px] lg:text-[21px] font-bold leading-snug text-white line-clamp-2 group-hover:underline decoration-white/50 underline-offset-4">
+                  {featured.title}
+                </h2>
+                <p className="mt-1.5 flex items-center gap-3 text-[12.5px] text-white/80">
+                  <span className="inline-flex items-center gap-1"><Eye size={13} /> {featured.views_count.toLocaleString()} {featured.views_count === 1 ? 'view' : 'views'}</span>
+                  {featured.publisher_handle && <span>@{featured.publisher_handle}</span>}
+                </p>
+              </div>
+            </Link>
+          ) : (
+            <div className="relative hidden md:block min-h-[220px]"
+                 style={{ background: `linear-gradient(to left, ${activeCategory.theme_color}26, transparent)` }} />
+          )}
         </div>
 
-        {/* 1B. Compact Mobile Category Header (Mobile Only) */}
-        <div className="sm:hidden flex flex-col gap-2.5 shrink-0">
-          <div className="flex items-center">
-            <span 
-              className="inline-flex px-3 py-1.5 rounded-[8px] font-display text-[18px] font-bold text-gisviz-ink tracking-tight border shadow-sm"
-              style={{ 
-                background: `linear-gradient(to right, ${activeCategory.theme_color}33, ${activeCategory.theme_color}1A)`,
-                borderColor: `${activeCategory.theme_color}40`
-              }}
-            >
-              {activeCategory.label}
-            </span>
-          </div>
-          <p className="text-[13.5px] text-gisviz-ink-soft leading-relaxed">
-            {activeCategory.description}
-          </p>
-        </div>
-        
         {/* ── Header Controls (Filters, Search & Publish) ── */}
         <header className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 pb-4 border-b border-gisviz-border/60 shrink-0">
           
@@ -278,12 +326,14 @@ export default function FeedStream() {
                 <ChevronDown size={14} className="text-gisviz-ink-soft shrink-0" />
               </button>
               {regionOpen && (
-                <div className="absolute left-0 mt-2 w-48 rounded-xl border border-gisviz-border bg-gisviz-card shadow-lg py-1.5 z-50 animate-in fade-in slide-in-from-top-1 duration-150">
+                <div className="absolute left-0 mt-2 w-60 max-h-[60vh] overflow-y-auto rounded-xl border border-gisviz-border bg-gisviz-card shadow-lg py-1.5 z-50 animate-in fade-in slide-in-from-top-1 duration-150">
                   <div className="px-3 py-1.5 text-[10.5px] font-mono uppercase tracking-wider text-gisviz-ink-soft border-b border-gisviz-border mb-1">Region Filter</div>
-                  {REGIONS.map(reg => {
+                  {regionOptions.map(reg => {
                     const active = (filters.region ?? '') === reg.value
                     return (
-                      <button key={reg.value} type="button" onClick={() => { applyFilters({ ...filters, region: reg.value }); setRegionOpen(false); }} className="w-full text-left px-3 py-2 text-[13px] font-medium text-gisviz-ink hover:bg-gisviz-canvas hover:text-gisviz-accent flex items-center justify-between gap-2 transition-colors">
+                      <button key={reg.value || 'all'} type="button" onClick={() => { applyFilters({ ...filters, region: reg.value }); setRegionOpen(false); }}
+                        style={{ paddingLeft: 12 + Math.min(reg.depth, 3) * 12 }}
+                        className={`w-full text-left pr-3 py-2 text-[13px] text-gisviz-ink hover:bg-gisviz-canvas hover:text-gisviz-accent flex items-center justify-between gap-2 transition-colors ${reg.depth <= 1 ? 'font-medium' : 'font-normal text-gisviz-ink-soft'}`}>
                         <span className={active ? 'font-semibold text-gisviz-accent' : ''}>{reg.label}</span>
                         {active && <Check size={14} className="text-gisviz-accent shrink-0" />}
                       </button>
@@ -306,15 +356,19 @@ export default function FeedStream() {
                 <ChevronDown size={14} className="text-gisviz-ink-soft shrink-0" />
               </button>
               {chartTypeOpen && (
-                <div className="absolute right-0 sm:left-0 mt-2 w-52 rounded-xl border border-gisviz-border bg-gisviz-card shadow-lg py-1.5 z-50 animate-in fade-in slide-in-from-top-1 duration-150">
+                <div className="absolute right-0 sm:left-0 mt-2 w-60 max-h-[60vh] overflow-y-auto rounded-xl border border-gisviz-border bg-gisviz-card shadow-lg py-1.5 z-50 animate-in fade-in slide-in-from-top-1 duration-150">
                   <div className="px-3 py-1.5 text-[10.5px] font-mono uppercase tracking-wider text-gisviz-ink-soft border-b border-gisviz-border mb-1">Visualization Type</div>
-                  {CHART_TYPES.map(chart => {
+                  {chartTypeOptions.map((chart, i) => {
                     const active = (filters.chart_type ?? '') === chart.value
+                    const newGroup = chart.group && chart.group !== chartTypeOptions[i - 1]?.group
                     return (
-                      <button key={chart.value} type="button" onClick={() => { applyFilters({ ...filters, chart_type: chart.value }); setChartTypeOpen(false); }} className="w-full text-left px-3 py-2 text-[13px] font-medium text-gisviz-ink hover:bg-gisviz-canvas hover:text-gisviz-accent flex items-center justify-between gap-2 transition-colors">
+                      <React.Fragment key={chart.value || 'all'}>
+                      {newGroup && <div className="px-3 pt-2 pb-1 text-[10.5px] font-mono uppercase tracking-wider text-gisviz-ink-soft">{chart.group}</div>}
+                      <button type="button" onClick={() => { applyFilters({ ...filters, chart_type: chart.value }); setChartTypeOpen(false); }} className="w-full text-left px-3 py-2 text-[13px] font-medium text-gisviz-ink hover:bg-gisviz-canvas hover:text-gisviz-accent flex items-center justify-between gap-2 transition-colors">
                         <span className={active ? 'font-semibold text-gisviz-accent' : ''}>{chart.label}</span>
                         {active && <Check size={14} className="text-gisviz-accent shrink-0" />}
                       </button>
+                      </React.Fragment>
                     )
                   })}
                 </div>

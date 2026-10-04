@@ -1,7 +1,8 @@
 'use client'
 
 import React, { useEffect, useRef } from 'react'
-import { FeedFilters, CATEGORIES } from '../../../types/gisviz'
+import { FeedFilters } from '../../../types/gisviz'
+import { FOR_YOU, useCategories } from '../../../lib/referenceData'
 
 interface CategoryBarProps {
   filters: FeedFilters
@@ -11,6 +12,7 @@ interface CategoryBarProps {
 export default function CategoryBar({ filters, onChange }: CategoryBarProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const activeRef = useRef<HTMLButtonElement>(null)
+  const categories = [FOR_YOU, ...useCategories()]      // from the posts DB
 
   // Smoothly center the active category item
   useEffect(() => {
@@ -32,7 +34,7 @@ export default function CategoryBar({ filters, onChange }: CategoryBarProps) {
         >
           <style dangerouslySetInnerHTML={{ __html: `div::-webkit-scrollbar { display: none; }`}} />
 
-          {CATEGORIES.map(cat => {
+          {categories.map(cat => {
             const active = (filters.category ?? '') === cat.slug
             const isAll = cat.slug === ''
 

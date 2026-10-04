@@ -13,6 +13,7 @@ import {
   Download,
 } from 'lucide-react'
 import { useAuth } from '../../../context/AuthContext'
+import { refreshCategories } from '../../../lib/referenceData'
 import { gisvizApi } from '../../../connector/api'
 import AccessRestricted from '../../components/AccessRestricted'
 import AccessControlPanel from './AccessControlPanel'
@@ -238,7 +239,7 @@ export default function AdminControlPage() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CATEGORIES — unchanged from your current file
+// CATEGORIES — label, slug, colour and description all live in the posts DB
 // ─────────────────────────────────────────────────────────────────────────────
 function CategoriesPanel({ onError }: { onError: (e: string) => void }) {
   const [cats, setCats]           = useState<any[]>([])
@@ -251,6 +252,10 @@ function CategoriesPanel({ onError }: { onError: (e: string) => void }) {
   const [newLabel, setNewLabel]   = useState('')
   const [newSlug, setNewSlug]     = useState('')
   const [showAdd, setShowAdd]     = useState(false)
+  const [editColor, setEditColor] = useState('#06ba24')
+  const [editDesc, setEditDesc]   = useState('')
+  const [newColor, setNewColor]   = useState('#06ba24')
+  const [newDesc, setNewDesc]     = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -265,7 +270,7 @@ function CategoriesPanel({ onError }: { onError: (e: string) => void }) {
 
   const act = async (key: string, fn: () => Promise<any>) => {
     setBusy(key)
-    try { await fn(); await load() }
+    try { await fn(); await load(); refreshCategories() }       // refresh the site-wide category list too
     catch (e: any) { onError(e.response?.data?.detail || 'Action failed') }
     finally { setBusy(null) }
   }
@@ -297,8 +302,18 @@ function CategoriesPanel({ onError }: { onError: (e: string) => void }) {
               <input value={newSlug} onChange={e => setNewSlug(e.target.value)} placeholder="remote-sensing"
                 className="w-full bg-gisviz-canvas border border-gisviz-border rounded px-3 py-1.5 text-[12px] font-mono text-gisviz-ink focus:ring-1 focus:ring-gisviz-accent outline-none" />
             </div>
+            <div className="w-full sm:w-auto">
+              <label className="block text-[12px] font-mono text-gisviz-ink-soft mb-1 uppercase">Colour</label>
+              <input type="color" value={newColor} onChange={e => setNewColor(e.target.value)}
+                className="h-[30px] w-14 bg-gisviz-canvas border border-gisviz-border rounded cursor-pointer" />
+            </div>
+            <div className="basis-full">
+              <label className="block text-[12px] font-mono text-gisviz-ink-soft mb-1 uppercase">Description</label>
+              <input value={newDesc} onChange={e => setNewDesc(e.target.value)} placeholder="Shown on the feed when this category is selected"
+                className="w-full bg-gisviz-canvas border border-gisviz-border rounded px-3 py-1.5 text-[12px] font-mono text-gisviz-ink focus:ring-1 focus:ring-gisviz-accent outline-none" />
+            </div>
             <button
-              onClick={() => act('create', async () => { await gisvizApi.createCategory(newLabel, newSlug); setNewLabel(''); setNewSlug(''); setShowAdd(false) })}
+              onClick={() => act('create', async () => { await gisvizApi.createCategory(newLabel, newSlug, { theme_color: newColor, description: newDesc }); setNewLabel(''); setNewSlug(''); setNewDesc(''); setShowAdd(false) })}
               disabled={busy === 'create' || !newLabel || !newSlug}
               className="flex items-center gap-1 px-4 py-1.5 bg-gisviz-accent text-gisviz-white rounded text-[12px] font-mono font-bold disabled:opacity-50 hover:bg-opacity-90 transition-colors">
               {busy === 'create' ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Create
@@ -310,12 +325,14 @@ function CategoriesPanel({ onError }: { onError: (e: string) => void }) {
             <thead><tr className="border-b border-gisviz-border">
               <th className="text-left px-6 py-3 text-gisviz-ink-soft uppercase tracking-wider">Label</th>
               <th className="text-left px-4 py-3 text-gisviz-ink-soft uppercase tracking-wider hidden sm:table-cell">Slug</th>
+              <th className="text-left px-4 py-3 text-gisviz-ink-soft uppercase tracking-wider">Colour</th>
               <th className="text-right px-4 py-3 text-gisviz-ink-soft uppercase tracking-wider hidden md:table-cell">Uses</th>
               <th className="px-4 py-3 w-24"></th>
             </tr></thead>
             <tbody className="divide-y divide-gisviz-border/50">
               {cats.map(cat => (
-                <tr key={cat.category_id} className="hover:bg-gisviz-canvas/30 transition-colors">
+                <React.Fragment key={cat.category_id}>
+                <tr className="hover:bg-gisviz-canvas/30 transition-colors">
                   <td className="px-6 py-3">
                     {editId === cat.category_id
                       ? <input value={editLabel} onChange={e => setEditLabel(e.target.value)} className="w-full bg-gisviz-canvas border border-gisviz-accent rounded px-2 py-1 text-[12px] font-mono outline-none" />
@@ -326,12 +343,20 @@ function CategoriesPanel({ onError }: { onError: (e: string) => void }) {
                       ? <input value={editSlug} onChange={e => setEditSlug(e.target.value)} className="w-full bg-gisviz-canvas border border-gisviz-accent rounded px-2 py-1 text-[12px] font-mono outline-none" />
                       : cat.slug}
                   </td>
+                  <td className="px-4 py-3">
+                    {editId === cat.category_id
+                      ? <input type="color" value={editColor} onChange={e => setEditColor(e.target.value)} className="h-7 w-12 bg-gisviz-canvas border border-gisviz-accent rounded cursor-pointer" />
+                      : <span className="inline-flex items-center gap-2 text-gisviz-ink-soft">
+                          <span className="inline-block h-4 w-4 rounded-full border border-gisviz-border" style={{ background: cat.theme_color || 'transparent' }} />
+                          {cat.theme_color || '—'}
+                        </span>}
+                  </td>
                   <td className="px-4 py-3 text-right text-gisviz-ink-soft hidden md:table-cell">{cat.usage_count}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-1">
                       {editId === cat.category_id ? (
                         <>
-                          <button onClick={() => act(String(cat.category_id), async () => { await gisvizApi.updateCategory(cat.category_id, editLabel, editSlug); setEditId(null) })}
+                          <button onClick={() => act(String(cat.category_id), async () => { await gisvizApi.updateCategory(cat.category_id, editLabel, editSlug, { theme_color: editColor, description: editDesc }); setEditId(null) })}
                             disabled={busy === String(cat.category_id)}
                             className="p-1.5 rounded bg-gisviz-accent text-gisviz-white hover:bg-opacity-90 disabled:opacity-50 transition-colors">
                             {busy === String(cat.category_id) ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
@@ -341,7 +366,7 @@ function CategoriesPanel({ onError }: { onError: (e: string) => void }) {
                           </button>
                         </>
                       ) : (
-                        <button onClick={() => { setEditId(cat.category_id); setEditLabel(cat.label); setEditSlug(cat.slug) }}
+                        <button onClick={() => { setEditId(cat.category_id); setEditLabel(cat.label); setEditSlug(cat.slug); setEditColor(cat.theme_color || '#06ba24'); setEditDesc(cat.description || '') }}
                           className="p-1.5 rounded text-gisviz-ink-soft hover:text-gisviz-accent hover:bg-gisviz-canvas transition-colors">
                           <Edit2 size={14} />
                         </button>
@@ -350,6 +375,15 @@ function CategoriesPanel({ onError }: { onError: (e: string) => void }) {
                     </div>
                   </td>
                 </tr>
+                {editId === cat.category_id && (
+                  <tr className="bg-gisviz-canvas/30">
+                    <td colSpan={5} className="px-6 pb-3">
+                      <input value={editDesc} onChange={e => setEditDesc(e.target.value)} placeholder="Description (shown on the feed)"
+                        className="w-full bg-gisviz-canvas border border-gisviz-accent rounded px-2 py-1 text-[12px] font-mono outline-none" />
+                    </td>
+                  </tr>
+                )}
+                </React.Fragment>
               ))}
             </tbody>
           </table>

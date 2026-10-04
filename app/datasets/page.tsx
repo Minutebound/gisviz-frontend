@@ -5,15 +5,14 @@ import Link from 'next/link'
 import {
   Search,
   ChevronDown,
-  Terminal,
+  Info,
   ArrowUpRight,
   Loader2,
-  PlusCircle,
   Settings2,
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { gisvizApi } from '../../connector/api'
-import { canManageDatasets, canPublish } from '../../lib/roles'
+import { canManageDatasets } from '../../lib/roles'
 import type { CatalogDetail, CatalogPage, DatasetCard as Card } from '../../types/visuals'
 
 const PAGE_SIZE = 20
@@ -44,22 +43,30 @@ function FormatBadge({ format }: { format?: string | null }) {
 const fmtDate = (s?: string | null) =>
   s ? new Date(s).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '—'
 
+const fmtBytes = (n?: number | null) => {
+  if (n === null || n === undefined) return '—'
+  if (n < 1024) return `${n} B`
+  if (n < 1048576) return `${(n / 1024).toFixed(0)} KB`
+  if (n < 1073741824) return `${(n / 1048576).toFixed(1)} MB`
+  return `${(n / 1073741824).toFixed(2)} GB`
+}
+
 const fmtBbox = (b?: number[] | null) =>
   b && b.length === 4 ? `[${b.map(v => Number(v).toFixed(3)).join(', ')}]` : 'Not spatial'
 
-function DatasetCard({ dataset, publisher }: { dataset: Card; publisher: boolean }) {
+function DatasetCard({ dataset }: { dataset: Card }) {
   const [expanded, setExpanded] = useState(false)
   const [detail, setDetail] = useState<CatalogDetail | null>(null)
   const [detailError, setDetailError] = useState('')
   const isSpatial = !!dataset.geometry_type
 
-  // columns + post count are loaded the first time the schema is opened
+  // this dataset's columns + post count are fetched only when its Metadata button is clicked
   useEffect(() => {
     if (!expanded || detail) return
     let cancelled = false
     gisvizApi.fetchCatalogDataset(dataset.dataset_id)
       .then((r: CatalogDetail) => { if (!cancelled) setDetail(r) })
-      .catch(() => { if (!cancelled) setDetailError('Could not load the schema.') })
+      .catch(() => { if (!cancelled) setDetailError('Could not load the metadata.') })
     return () => { cancelled = true }
   }, [expanded, detail, dataset.dataset_id])
 
@@ -73,6 +80,7 @@ function DatasetCard({ dataset, publisher }: { dataset: Card; publisher: boolean
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-2.5 mb-2">
             <FormatBadge format={dataset.format} />
+            <span className="text-[12px] font-mono text-gisviz-ink-soft">{isSpatial ? (dataset.crs || 'EPSG:4326') : 'Tabular'}</span>
             {dataset.category && (
               <>
                 <span className="text-[12px] text-gisviz-border-strong">·</span>
@@ -108,8 +116,8 @@ function DatasetCard({ dataset, publisher }: { dataset: Card; publisher: boolean
               onClick={() => setExpanded(!expanded)}
               className="inline-flex items-center gap-1.5 font-medium text-gisviz-ink hover:text-gisviz-accent transition-colors"
             >
-              <Terminal size={14} />
-              {expanded ? 'Hide Schema' : 'View Schema'}
+              <Info size={14} />
+              {expanded ? 'Hide Metadata' : 'Metadata'}
               <ChevronDown size={14} className={`transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} />
             </button>
           </div>
@@ -125,26 +133,28 @@ function DatasetCard({ dataset, publisher }: { dataset: Card; publisher: boolean
               <span className="block text-[10.5px] uppercase tracking-wider text-gisviz-ink-soft/70">Geometry</span>
               <span className="font-semibold text-gisviz-ink">{dataset.geometry_type || 'None'}</span>
             </div>
+            <div>
+              <span className="block text-[10.5px] uppercase tracking-wider text-gisviz-ink-soft/70">Size</span>
+              <span className="font-semibold text-gisviz-ink">{fmtBytes(dataset.file_size_bytes)}</span>
+            </div>
           </div>
 
           <div className="shrink-0 min-w-[140px] flex justify-end">
-            {publisher ? (
-              <Link
-                href={`/post/upload?dataset=${encodeURIComponent(dataset.dataset_id)}`}
-                className="inline-flex items-center gap-2 h-9 px-4 rounded-[8px] bg-gisviz-accent text-[13px] font-semibold text-[color:var(--accent-on)] hover:brightness-105 transition-all shadow-sm"
-              >
-                Create Post <PlusCircle size={14} className="opacity-70" />
-              </Link>
-            ) : sourceHref ? (
+            {sourceHref ? (
               <a
                 href={sourceHref}
                 target="_blank"
                 rel="noopener noreferrer"
+                title={`Open the source of this data${dataset.source_name ? ` (${dataset.source_name})` : ''}`}
                 className="inline-flex items-center gap-2 h-9 px-4 rounded-[8px] bg-gisviz-accent text-[13px] font-semibold text-[color:var(--accent-on)] hover:brightness-105 transition-all shadow-sm"
               >
-                View Source <ArrowUpRight size={14} className="opacity-70" />
+                Access Data <ArrowUpRight size={14} className="opacity-70" />
               </a>
-            ) : null}
+            ) : (
+              <span className="inline-flex items-center h-9 px-4 rounded-[8px] border border-gisviz-border text-[12.5px] text-gisviz-ink-soft" title="No public source link for this dataset">
+                No source link
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -154,7 +164,7 @@ function DatasetCard({ dataset, publisher }: { dataset: Card; publisher: boolean
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
             <div className="lg:col-span-3">
               <h4 className="font-semibold text-gisviz-ink mb-3 font-mono text-[11px] uppercase tracking-wider">
-                Schema Definition
+                Columns
               </h4>
               <div className="rounded-lg border border-gisviz-border bg-gisviz-card overflow-hidden shadow-sm">
                 <table className="w-full text-left border-collapse">
@@ -175,7 +185,7 @@ function DatasetCard({ dataset, publisher }: { dataset: Card; publisher: boolean
                     {detail && detail.columns.length === 0 && (
                       <tr>
                         <td colSpan={3} className="px-4 py-4 text-center text-gisviz-ink-soft italic">
-                          Schema definition not provided for this dataset.
+                          No column information for this dataset.
                         </td>
                       </tr>
                     )}
@@ -203,6 +213,10 @@ function DatasetCard({ dataset, publisher }: { dataset: Card; publisher: boolean
                   <dd className="font-mono text-[11.5px] text-gisviz-ink bg-gisviz-card border border-gisviz-border rounded-md px-2.5 py-1.5 break-all">
                     {fmtBbox(dataset.bbox)}
                   </dd>
+                </div>
+                <div>
+                  <dt className="text-[11.5px] text-gisviz-ink-soft mb-1">File Size</dt>
+                  <dd className="text-[13px] text-gisviz-ink font-medium">{fmtBytes(dataset.file_size_bytes)}</dd>
                 </div>
                 <div>
                   <dt className="text-[11.5px] text-gisviz-ink-soft mb-1">Dataset ID</dt>
@@ -237,7 +251,6 @@ function DatasetCard({ dataset, publisher }: { dataset: Card; publisher: boolean
 
 export default function DatasetsPage() {
   const { user } = useAuth() as any
-  const publisher = !!user && canPublish(user)
   const manager = !!user && canManageDatasets(user)
 
   const [activeTab, setActiveTab] = useState<Tab>('all')
@@ -284,19 +297,19 @@ export default function DatasetsPage() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-5xl px-4 sm:px-6 lg:px-8 pt-8 pb-16">
-      <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 border-b border-gisviz-border">
+    <main className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8 pt-8 pb-16">
+      <header className="flex flex-col gap-5 pb-6 border-b border-gisviz-border">
         <div>
           <h1 className="font-display text-[30px] font-bold tracking-[-0.03em] text-gisviz-ink mt-1">
             Datasets
           </h1>
           <p className="text-[14.5px] text-gisviz-ink-soft mt-1 max-w-xl">
-            Access varieties of data.
+            Access geospatial layers in standard formats.
           </p>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-          <div className="relative w-full sm:w-[280px]">
+        <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3">
+          <div className="relative w-full sm:flex-1 sm:min-w-[220px]">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gisviz-ink-soft" />
             <input
               type="text"
@@ -331,7 +344,7 @@ export default function DatasetsPage() {
                     : 'text-gisviz-ink-soft hover:text-gisviz-ink'
                 }`}
               >
-                {tab === 'all' ? 'All' : tab === 'spatial' ? 'Spatial' : 'Tabular'}
+                {tab === 'all' ? 'All Sources' : tab === 'spatial' ? 'Spatial' : 'Tabular'}
               </button>
             ))}
           </div>
@@ -358,7 +371,7 @@ export default function DatasetsPage() {
 
         <div className={`flex flex-col gap-3 transition-opacity ${loading && items.length ? 'opacity-60' : ''}`}>
           {items.map(dataset => (
-            <DatasetCard key={dataset.dataset_id} dataset={dataset} publisher={publisher} />
+            <DatasetCard key={dataset.dataset_id} dataset={dataset} />
           ))}
         </div>
 

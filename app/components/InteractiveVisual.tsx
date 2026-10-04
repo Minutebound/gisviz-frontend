@@ -22,6 +22,7 @@ import { useTheme } from 'next-themes'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import type { GeoJSONSource, Map as MLMap, MapLayerMouseEvent, Popup } from 'maplibre-gl'
 import D3Chart from './visuals/D3Chart'
+import { useVisualCatalog } from '../../lib/referenceData'
 import {
   AlertTriangle, BarChart3, Loader2, Map as MapIcon, Maximize2, Minimize2, Pause, Play, Table2,
 } from 'lucide-react'
@@ -195,8 +196,13 @@ function useSpecData<T>(data: T | string): Loaded<T> {
     let cancelled = false
     setState({ value: null, error: null, loading: true })
     fetch(data)
-      .then(r => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      .then(async r => {
+        if (!r.ok) {
+          // show the server's reason (e.g. "Unknown column 'x' for x" after the dataset file was replaced)
+          let detail = ''
+          try { const j = await r.json(); detail = typeof j?.detail === 'string' ? j.detail : '' } catch { /* not JSON */ }
+          throw new Error(detail || `HTTP ${r.status}`)
+        }
         return r.json()
       })
       .then(json => { if (!cancelled) setState({ value: json as T, error: null, loading: false }) })
@@ -629,9 +635,10 @@ function DataTable({ rows }: { rows: Row[] }) {
 
 /* ═══════════════════ Main component ═══════════════════ */
 
-const TYPE_LABEL: Record<ChartType, string> = {
-  line: 'Line', area: 'Area', bar: 'Bar', hbar: 'Horizontal bar', stacked: 'Stacked', scatter: 'Scatter',
-  bubble: 'Bubble', histogram: 'Histogram', donut: 'Donut', treemap: 'Treemap', heatmap: 'Heatmap',
+/** Chart-type names come from the visual catalog in the DB; the code is shown until it loads. */
+function typeLabel(types: { renderer_code: string; name: string }[], code: string): string {
+  const t = types.find(x => x.renderer_code === code)
+  return t ? t.name.replace(/\s*\(.*\)\s*$/, '') : code
 }
 
 /** CSVs often give numbers as strings; coerce the colour fields so MapLibre sees real numbers. */
@@ -656,6 +663,7 @@ export default function InteractiveVisual({ spec, height = 520, className = '' }
   height?: number
   className?: string
 }) {
+  const catalogTypes = useVisualCatalog().types       // names of chart types (misc DB)
   const probeRef = useRef<HTMLSpanElement>(null)
   const siteAccent = useAccentHex(probeRef)
   const accent = spec.accent && /^#[0-9a-f]{6}$/i.test(spec.accent) ? spec.accent : siteAccent
@@ -826,7 +834,7 @@ export default function InteractiveVisual({ spec, height = 520, className = '' }
                   chartType === t
                     ? 'border-gisviz-accent/40 bg-gisviz-accent/10 text-gisviz-accent'
                     : 'border-gisviz-border bg-gisviz-card text-gisviz-ink-soft hover:text-gisviz-ink'}`}>
-                {TYPE_LABEL[t]}
+                {typeLabel(catalogTypes, t)}
               </button>
             ))}
           </div>

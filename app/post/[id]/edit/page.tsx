@@ -9,7 +9,7 @@ import { canPublish } from '../../../../lib/roles'
 import NoPublishAccess from '../../../components/post/NoPublishAccess'
 import DatasetVisualPicker from '../../../components/post/DataVisualPicker'
 import type { VisualChoice, DatasetCard } from '../../../../types/visuals'
-import { CATEGORIES } from '../../../../types/gisviz'
+import { DEFAULT_ACCENT } from '../../../../lib/referenceData'
 
 export default function EditPostPage() {
   const params = useParams()
@@ -40,7 +40,7 @@ export default function EditPostPage() {
 
   // The visual comes from a dataset: the picker is preloaded with the post's current choice.
   const [visualChoice, setVisualChoice] = useState<VisualChoice | null>(null)
-  const [themeColor, setThemeColor]     = useState<string>(CATEGORIES[0].theme_color)
+  const [themeColor, setThemeColor]     = useState<string>(DEFAULT_ACCENT)
 
   // ── Init ────────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -87,7 +87,7 @@ export default function EditPostPage() {
             label_field: isMap ? spec.label_field ?? null : null,
           } as VisualChoice)
         }
-        setThemeColor(postData.theme_color || spec?.accent || CATEGORIES[0].theme_color)
+        setThemeColor(postData.theme_color || spec?.accent || DEFAULT_ACCENT)
       } catch {
         setErrorMsg('Failed to load post data.')
       } finally {

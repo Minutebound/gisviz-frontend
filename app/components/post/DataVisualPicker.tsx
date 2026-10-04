@@ -20,7 +20,7 @@ import { Database, Loader2, Search, Sparkles, X } from 'lucide-react'
 import { gisvizApi } from '../../../connector/api'
 import { resolveSpec } from '../../../lib/visualSpec'
 import InteractiveVisual, { type VisualSpec } from '../InteractiveVisual'
-import { CATEGORIES } from '../../../types/gisviz'
+import { DEFAULT_ACCENT, useCategories } from '../../../lib/referenceData'
 import { VIZ_NEEDS, isMapViz } from '../../../types/visuals'
 import type {
   DatasetCard, SuggestResponse, VisualChoice, VizOption, VizType,
@@ -36,16 +36,19 @@ interface Props {
   initialDatasetId?: string
 }
 
-/** Preset theme colours: one per category, plus the site green. */
-export const THEME_PRESETS: { label: string; color: string }[] = CATEGORIES.map(c => ({
-  label: c.slug ? c.label : 'Default', color: c.theme_color,
-}))
 
 const selectCls =
   'w-full bg-gisviz-canvas border border-gisviz-border rounded-md px-3 py-2 text-gisviz-ink text-[12px] font-mono focus:ring-2 focus:ring-gisviz-accent outline-none'
 const labelCls = 'block text-[11px] font-mono text-gisviz-ink-soft mb-1.5 uppercase tracking-wider'
 
 export default function DatasetVisualPicker({ value, onChange, accent, onAccentChange, initialDatasetId }: Props) {
+  // preset theme colours: the site accent plus one per category colour in the DB (duplicates dropped)
+  const categories = useCategories()
+  const themePresets = useMemo(() => {
+    const seen = new Set<string>()
+    return [{ label: 'Default', color: DEFAULT_ACCENT }, ...categories.map(c => ({ label: c.label, color: c.theme_color }))]
+      .filter(p => { const k = p.color.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true })
+  }, [categories])
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<DatasetCard[]>([])
   const [open, setOpen] = useState(false)
@@ -313,7 +316,7 @@ export default function DatasetVisualPicker({ value, onChange, accent, onAccentC
             <div>
               <label className={labelCls}>Theme colour</label>
               <div className="flex flex-wrap items-center gap-2">
-                {THEME_PRESETS.map(p => (
+                {themePresets.map(p => (
                   <button
                     key={p.label}
                     type="button"

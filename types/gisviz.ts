@@ -29,44 +29,17 @@ export interface Post {
   publisher: Publisher
 }
 
-export const REGIONS = [
-  { value: 'global', label: 'Global' },
-  { value: 'north-america', label: 'North America' },
-  { value: 'europe', label: 'Europe' },
-  { value: 'asia-pacific', label: 'Asia-Pacific' },
-  { value: 'latin-america', label: 'Latin America' },
-  { value: 'middle-east-africa', label: 'Middle East & Africa' },
-] as const
-
-export const CHART_TYPES = [
-  { value: '', label: 'All Charts' },
-  { value: 'choropleth', label: 'Choropleth' },
-  { value: 'heatmap', label: 'Heatmap' },
-  { value: 'hexbin', label: 'Hexbin / Grid' },
-  { value: 'point-cluster', label: 'Point & Cluster' },
-  { value: 'bubble', label: 'Proportional Symbol' },
-  { value: 'flow', label: 'Flow & Network' },
-  { value: '3d-elevation', label: '3D & Extrusion' },
-  { value: 'bivariate', label: 'Bivariate' },
-] as const
-
+/** A post/dataset category. Loaded from the posts DB (GET /categories) via lib/referenceData.ts —
+ *  regions, chart types and categories are never hard-coded in the frontend. */
 export interface Category {
+  category_id?: number
   slug: string
   label: string
   description: string
-  theme_color: string // Database-driven Hex Code
+  theme_color: string // #rrggbb from the DB (site accent when unset)
+  sort_order?: number
 }
 
-export const CATEGORIES: Category[] = [
-  { slug: '', label: 'For You', description: 'Discover trending interactive visualizations, open datasets, and spatial analysis from the global cartography community.', theme_color: '#06ba24' }, // default accent
-  { slug: 'climate', label: 'Climate', description: 'Explore global temperature anomalies, carbon emissions, sea-level rise forecasts, and climate impact models.', theme_color: '#f97316' }, // orange
-  { slug: 'infrastructure', label: 'Infrastructure', description: 'Map critical networks spanning energy grids, transport hubs, telecommunications, and civic facilities.', theme_color: '#3b82f6' }, // blue
-  { slug: 'demographics', label: 'Demographics', description: 'Visualize population distributions, census metrics, socioeconomic trends, and human geography.', theme_color: '#a855f7' }, // purple
-  { slug: 'transport', label: 'Transport', description: 'Track mobility patterns, logistics flows, transit networks, and global supply chain telemetry.', theme_color: '#10b981' }, // emerald
-  { slug: 'environment', label: 'Environment', description: 'Monitor ecosystems, land use changes, hydrological basins, and conservation efforts.', theme_color: '#22c55e' }, // green
-  { slug: 'economy', label: 'Economy', description: 'Analyze global trade routes, real estate markets, financial zones, and macroeconomic indicators.', theme_color: '#6366f1' }, // indigo
-  { slug: 'urban-planning', label: 'Urban Planning', description: 'Inspect zoning boundaries, smart city metrics, urban expansion, and parcel-level civic data.', theme_color: '#f43f5e' }, // rose
-]
 
 export interface FeedFilters {
   search?: string

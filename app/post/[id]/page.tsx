@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -13,8 +13,8 @@ import { useAuth } from '../../../context/AuthContext'
 import { gisvizApi } from '../../../connector/api'
 import ShareModal from '../../components/SharePost'
 import InteractiveVisual, { type VisualSpec } from '../../components/InteractiveVisual'
-import { DEMO_SPECS, type DemoKind } from '../../components/VisualDemos'
 import { resolveSpec } from '../../../lib/visualSpec'
+import DatasetDataPanel from '../../components/post/DatasetDataPanel'
 
 const RAW_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://'
 const API_BASE_URL = RAW_API_URL.replace('/api/v0', '').replace(/\/$/, '')
@@ -55,13 +55,6 @@ export default function PostDetail() {
   const [replyingTo, setReplyingTo] = useState<{ id: string; handle: string } | null>(null)
   const [isShareModalOpen, setIsShareModalOpen] = useState(false)
 
-  // Testing hook: /post/<id>?demo=map | chart | africa forces a sample interactive visual.
-  const [demoKind, setDemoKind] = useState<DemoKind | null>(null)
-  useEffect(() => {
-    const d = new URLSearchParams(window.location.search).get('demo')
-    setDemoKind(d && d in DEMO_SPECS ? (d as DemoKind) : null)
-  }, [postId])
-
   useEffect(() => {
     if (!postId || authLoading) return
     setIsLoading(true)
@@ -87,6 +80,16 @@ export default function PostDetail() {
     }
     load()
   }, [postId, isAuthenticated, authLoading])
+
+  // Count this visit once per page open (the server counts each visitor once a day, in the analytics DB).
+  const viewedRef = useRef<string | null>(null)
+  const [viewCount, setViewCount] = useState<number | null>(null)
+  useEffect(() => {
+    if (!postId || authLoading || viewedRef.current === postId) return
+    viewedRef.current = postId
+    setViewCount(null)
+    gisvizApi.recordPostView(postId).then(r => setViewCount(r.views_count)).catch(() => {})
+  }, [postId, authLoading])
 
   const handleLike = async () => {
     if (!isAuthenticated) { router.push('/auth'); return }
@@ -222,13 +225,13 @@ export default function PostDetail() {
   // Interactive visual wins over the static image when present.
   // Priority: ?demo=… (testing) → post.visual_spec (from backend) → static image.
   const visualSpec: VisualSpec | null =
-    (demoKind ? DEMO_SPECS[demoKind] : null) ?? resolveSpec(post.visual_spec as VisualSpec | undefined) ?? null
+    resolveSpec(post.visual_spec as VisualSpec | undefined) ?? null
   const visualTypeLabel = visualSpec
     ? (visualSpec.kind === 'map' ? 'map' : visualSpec.chart_type)
     : post.chart_type
 
   return (
-    <main className="mx-auto w-full max-w-5xl px-4 sm:px-8 lg:px-[72px] pt-4 sm:pt-6 pb-14">
+    <main className="mx-auto w-full max-w-6xl px-4 sm:px-8 lg:px-[72px] pt-4 sm:pt-6 pb-14">
 
       <div className="flex flex-col lg:flex-row gap-8 xl:gap-14 items-start mt-4">
 
@@ -338,7 +341,7 @@ export default function PostDetail() {
               </span>
               <span className="w-1 h-1 rounded-full bg-gisviz-border" />
               <span className="flex items-center gap-1.5">
-                <FileText size={14} /> {post.views_count || 0} Views
+                <FileText size={14} /> {Math.max(viewCount ?? 0, post.views_count ?? 0).toLocaleString()} {Math.max(viewCount ?? 0, post.views_count ?? 0) === 1 ? 'View' : 'Views'}
               </span>
             </div>
           </header>
@@ -438,6 +441,11 @@ export default function PostDetail() {
                 </table>
               </div>
             </div>
+          )}
+
+          {/* 3b. the dataset's rows — only when an admin switched "Show data" on; loaded on click */}
+          {post.dataset?.show_data && post.dataset_id && (
+            <DatasetDataPanel datasetId={post.dataset_id} totalRows={post.dataset.row_count} />
           )}
 
           {/* 4. Large Description & Document Flow (Separate Container) */}

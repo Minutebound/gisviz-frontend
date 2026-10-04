@@ -1,5 +1,12 @@
 import axios from 'axios'
 import { FeedFilters, filtersToParams, Post } from '../types/gisviz'
+import type { DatasetSyncReport, ManagedDatasetMetadata, PublicDatasetRows, Region, VisualCatalog } from '../types/visuals'
+
+export type FeaturedPost = {
+  post_id: string; title: string; visual_image_path?: string | null; theme_color?: string | null
+  views_count: number; total_likes_count: number; share_slug: string; publisher_handle?: string | null
+}
+export type CategoryExtra = { description?: string; theme_color?: string; sort_order?: number }
 
 // ── Base URL ──────────────────────────────────────────────────────────────────
 //
@@ -50,7 +57,8 @@ axiosInstance.interceptors.response.use(
   (error) => {
     const isDeleteMe =
       error.config?.method === 'delete' && error.config?.url?.endsWith('/users/me')
-    if (error.response?.status === 401 && !isDeleteMe && typeof window !== 'undefined') {
+    const isLogout = error.config?.url?.endsWith('/auth/logout')
+    if (error.response?.status === 401 && !isDeleteMe && !isLogout && typeof window !== 'undefined') {
       localStorage.removeItem('gisviz_token')
       localStorage.removeItem('gisviz_handle')
       window.location.href = '/auth'
@@ -118,9 +126,10 @@ export const gisvizApi = {
   deactivateAccount: async (currentPassword: string) =>
     (await axiosInstance.delete('/users/me', { data: { current_password: currentPassword } })).data,
 
-  // ── Visuals (DuckDB-backed dataset catalog) ───────────────────────────────
+  // ── Visuals: charts/maps built from a dataset (backend endpoints/visuals.py) ──
+  // dataset picker search (publishers) — backend endpoints/datasets.py
   searchDatasets: async (q: string, limit = 12) =>
-    (await axiosInstance.get('/visuals/datasets', { params: { q, limit } })).data,
+    (await axiosInstance.get('/datasets/search', { params: { q, limit } })).data,
 
   suggestVisual: async (datasetId: string) =>
     (await axiosInstance.get(`/visuals/datasets/${encodeURIComponent(datasetId)}/suggest`)).data,
@@ -133,14 +142,18 @@ export const gisvizApi = {
       params: Object.fromEntries(Object.entries(p).filter(([, v]) => v != null && v !== '')),
     })).data,
 
-  // Public dataset catalog (the /datasets page)
+  // ── Datasets: public catalog (the /datasets page) — backend endpoints/datasets.py ──
   listCatalog: async (p: { q?: string; category?: string; kind?: 'spatial' | 'tabular' | ''; skip?: number; limit?: number }) =>
-    (await axiosInstance.get('/visuals/catalog', {
+    (await axiosInstance.get('/datasets/', {
       params: Object.fromEntries(Object.entries(p).filter(([, v]) => v != null && v !== '')),
     })).data,
 
   fetchCatalogDataset: async (datasetId: string) =>
-    (await axiosInstance.get(`/visuals/catalog/${encodeURIComponent(datasetId)}`)).data,
+    (await axiosInstance.get(`/datasets/${encodeURIComponent(datasetId)}`)).data,
+
+  // first rows of a dataset for the post page's "View data" (403 unless the dataset's show_data is on)
+  fetchDatasetRows: async (datasetId: string, limit = 50): Promise<PublicDatasetRows> =>
+    (await axiosInstance.get(`/datasets/${encodeURIComponent(datasetId)}/rows`, { params: { limit } })).data,
 
   // ── Uploads ───────────────────────────────────────────────────────────────
   uploadAvatar: async (file: File) => {
@@ -152,30 +165,55 @@ export const gisvizApi = {
 
   // ── Dataset management (admin, /admin/datasets) ─────────────────────────
   listManagedDatasets: async (q = '', status = '') =>
-    (await axiosInstance.get('/visuals/manage/datasets', {
+    (await axiosInstance.get('/datasets/manage', {
       params: Object.fromEntries(Object.entries({ q, status }).filter(([, v]) => v)),
     })).data,
 
   createDataset: async (meta: Record<string, any>) =>
-    (await axiosInstance.post('/visuals/manage/datasets', meta)).data,
+    (await axiosInstance.post('/datasets/manage', meta)).data,
 
   saveDatasetMeta: async (datasetId: string, meta: Record<string, any>) =>
-    (await axiosInstance.put(`/visuals/manage/datasets/${encodeURIComponent(datasetId)}`, meta)).data,
+    (await axiosInstance.put(`/datasets/manage/${encodeURIComponent(datasetId)}`, meta)).data,
+
+  setDatasetShowData: async (datasetId: string, show: boolean) =>
+    (await axiosInstance.put(`/datasets/manage/${encodeURIComponent(datasetId)}/show-data`, { show })).data,
+
+  datasetMetadata: async (datasetId: string): Promise<ManagedDatasetMetadata> =>
+    (await axiosInstance.get(`/datasets/manage/${encodeURIComponent(datasetId)}/metadata`)).data,
 
   setDatasetActive: async (datasetId: string, active: boolean) =>
-    (await axiosInstance.put(`/visuals/manage/datasets/${encodeURIComponent(datasetId)}/status`, { active })).data,
+    (await axiosInstance.put(`/datasets/manage/${encodeURIComponent(datasetId)}/status`, { active })).data,
 
-  uploadDatasetData: async (datasetId: string, file: File, onProgress?: (pct: number) => void) => {
+  // force=true replaces the data even if published posts would break (the server answers 409 otherwise)
+  uploadDatasetData: async (datasetId: string, file: File, onProgress?: (pct: number) => void, force = false) => {
     const fd = new FormData(); fd.append('file', file)
-    return (await axiosInstance.post(`/visuals/manage/datasets/${encodeURIComponent(datasetId)}/data`, fd, {
+    return (await axiosInstance.post(`/datasets/manage/${encodeURIComponent(datasetId)}/data`, fd, {
+      params: force ? { force: true } : undefined,
       headers: { 'Content-Type': 'multipart/form-data' },
       timeout: 0,
       onUploadProgress: e => { if (onProgress && e.total) onProgress(Math.round((e.loaded / e.total) * 100)) },
     })).data
   },
 
+  previewDataset: async (datasetId: string, limit = 50) =>
+    (await axiosInstance.get(`/datasets/manage/${encodeURIComponent(datasetId)}/preview`, { params: { limit } })).data,
+
+  datasetSyncStatus: async (): Promise<DatasetSyncReport> =>
+    (await axiosInstance.get('/datasets/manage/sync', { params: { _t: Date.now() } })).data,
+
+  fixDatasetSync: async (dropOrphans = false): Promise<DatasetSyncReport> =>
+    (await axiosInstance.post('/datasets/manage/sync', null, { params: { drop_orphans: dropOrphans } })).data,
+
+  // Visual catalog (misc DB): the 7 categories + chart/map types. all=true includes disabled / not-built types.
+  getVisualCatalog: async (all = false): Promise<VisualCatalog> =>
+    (await axiosInstance.get('/visuals/catalog', { params: all ? { all: true } : undefined })).data,
+
+  // Regions table (misc DB). (listRegions further down is the feed's region facets.)
+  listRegionCatalog: async (all = false): Promise<Region[]> =>
+    (await axiosInstance.get('/regions/', { params: { all, _t: Date.now() } })).data,
+
   deleteDataset: async (datasetId: string) =>
-    (await axiosInstance.delete(`/visuals/manage/datasets/${encodeURIComponent(datasetId)}`)).data,
+    (await axiosInstance.delete(`/datasets/manage/${encodeURIComponent(datasetId)}`)).data,
 
   reportMissingVisual: async (postId: string) =>
     (await axiosInstance.post(`/posts/${postId}/missing-visual`)).data,
@@ -186,6 +224,13 @@ export const gisvizApi = {
       headers: { 'Content-Type': 'multipart/form-data' },
     })).data
   },
+
+  /** End this session on the server (sessions never expire otherwise). */
+  logout: async (token: string) =>
+    (await axiosInstance.post('/auth/logout', null, { headers: { Authorization: `Bearer ${token}` } })).data,
+
+  /** End every session of this account on every device. */
+  logoutAll: async () => (await axiosInstance.post('/auth/logout-all')).data,
 
   changePassword: async (payload: { current_password: string; new_password: string }) =>
     (await axiosInstance.put('/auth/change-password', payload)).data,
@@ -202,6 +247,18 @@ export const gisvizApi = {
 
   fetchUserPosts: async (handle: string, skip = 0, limit = 50) =>
     (await axiosInstance.get(`/posts/user/${handle}`, { params: { skip, limit } })).data,
+
+  // feed banner: the most-viewed active post (overall or in one category); null when there is none
+  fetchFeaturedPost: async (category?: string): Promise<FeaturedPost | null> =>
+    (await axiosInstance.get('/posts/featured', { params: category ? { category } : undefined })).data,
+
+  // count a view of a post page (once per visitor per day on the server); returns the new total
+  recordPostView: async (postId: string): Promise<{ views_count: number; counted: boolean }> =>
+    (await axiosInstance.post(`/posts/${encodeURIComponent(postId)}/view`)).data,
+
+  // tags used by the most active posts, optionally within one category (categories.slug)
+  fetchTrendingKeywords: async (category?: string, limit = 10): Promise<{ word: string; posts: number }[]> =>
+    (await axiosInstance.get('/posts/keywords/trending', { params: { limit, ...(category ? { category } : {}) } })).data,
 
   getPopularPublishers: async (limit = 15, currentUserId?: string) => {
     const params: any = { limit }
@@ -332,11 +389,12 @@ export const gisvizApi = {
     (await axiosInstance.put(`/users/${userId}/status`, null, { params: { is_active: isActive } })).data,
 
   // ── Admin — Categories ────────────────────────────────────────────────────
-  createCategory: async (label: string, slug: string) =>
-    (await axiosInstance.post('/categories', { label, slug })).data,
+  // extra: description, theme_color (#rrggbb, '' clears), sort_order — all stored in the posts DB
+  createCategory: async (label: string, slug: string, extra: CategoryExtra = {}) =>
+    (await axiosInstance.post('/categories', { label, slug, ...extra })).data,
 
-  updateCategory: async (categoryId: number, label: string, slug: string) =>
-    (await axiosInstance.put(`/categories/${categoryId}`, { label, slug })).data,
+  updateCategory: async (categoryId: number, label: string, slug: string, extra: CategoryExtra = {}) =>
+    (await axiosInstance.put(`/categories/${categoryId}`, { label, slug, ...extra })).data,
 
   deleteCategory: async (categoryId: number) =>
     (await axiosInstance.delete(`/categories/${categoryId}`)).data,

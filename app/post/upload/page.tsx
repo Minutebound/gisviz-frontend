@@ -9,7 +9,7 @@ import NoPublishAccess from '../../components/post/NoPublishAccess'
 import { gisvizApi } from '../../../connector/api'
 import DatasetVisualPicker from '../../components/post/DataVisualPicker'
 import type { DatasetCard, VisualChoice } from '../../../types/visuals'
-import { CATEGORIES } from '../../../types/gisviz'
+import { DEFAULT_ACCENT, categoryColor, useCategories } from '../../../lib/referenceData'
 
 export default function UploadPage() {
   const router = useRouter()
@@ -38,7 +38,8 @@ export default function UploadPage() {
   // Posts are built from a dataset (no image uploads): pick one, the visual type and the theme colour.
   const [visualChoice, setVisualChoice] = useState<VisualChoice | null>(null)
   // Post theme colour: follows the first category until the publisher picks one manually.
-  const [themeColor, setThemeColor] = useState<string>(CATEGORIES[0].theme_color)
+  const dbCategories = useCategories()        // colours come from the DB categories
+  const [themeColor, setThemeColor] = useState<string>(DEFAULT_ACCENT)
   const [themeTouched, setThemeTouched] = useState(false)
   const [presetDataset, setPresetDataset] = useState<string | undefined>()
   useEffect(() => {
@@ -64,17 +65,16 @@ export default function UploadPage() {
     }
   }
 
-  // When a dataset is picked, pre-fill any empty fields from its catalog card.
+  // When a dataset is picked, pre-fill empty description/source fields from its catalog card.
   const handleVisualChange = (choice: VisualChoice | null, card?: DatasetCard) => {
     setVisualChoice(choice)
     if (!card) return
     // suggested theme colour: the dataset's category colour, until the publisher picks one
     if (!themeTouched && card.category) {
-      const cat = card.category.toLowerCase()
-      const match = CATEGORIES.find(c => c.slug && (c.slug === cat || c.label.toLowerCase() === cat))
-      if (match) setThemeColor(match.theme_color)
+      const color = categoryColor(dbCategories, card.category)
+      if (color) setThemeColor(color)
     }
-    setTitle(t => t || card.title)
+    // the post title is the publisher's own; it is never taken from the dataset
     setDescription(d => d || card.description || '')
     setSourceName(s => s || card.source_name || '')
     setSourceUrl(u => u || card.source_url || '')
@@ -88,9 +88,8 @@ export default function UploadPage() {
         return
       }
       if (selectedCategoryIds.length === 0 && !themeTouched) {
-        const slug = availableCategories.find(c => c.category_id === id)?.slug
-        const match = CATEGORIES.find(c => c.slug && c.slug === slug)
-        if (match) setThemeColor(match.theme_color)
+        const color = categoryColor(dbCategories, availableCategories.find(c => c.category_id === id)?.slug)
+        if (color) setThemeColor(color)
       }
       setSelectedCategoryIds(prev => [...prev, id])
     }

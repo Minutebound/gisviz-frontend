@@ -41,10 +41,12 @@ export default function GlobalSubNav() {
   }, [pathname, dynamicData?.id])
 
   if (!pathname) return null
+  if (pathname === '/') return null          // the feed has no breadcrumb
 
   // On these pages the bar is shown on mobile only (hidden from the sm breakpoint up, as before).
   const mobileOnly =
-    pathname === '/' || pathname === '/auth' || pathname === '/services' || pathname.startsWith('/legal')
+    pathname === '/' || pathname === '/auth' || pathname === '/services' ||
+    pathname === '/datasets' || pathname.startsWith('/legal')
 
   // ── Route Logic Directory ──
   const crumbs: { label: string; href?: string }[] = []
@@ -122,6 +124,7 @@ export default function GlobalSubNav() {
           
           <Link href="/" className="flex items-center gap-1.5 hover:text-gisviz-accent transition-colors shrink-0">
             <Home size={14} className="mb-[1px]" />
+            <span className={crumbs.length === 0 ? 'text-gisviz-ink font-semibold' : 'hidden sm:inline'}>Feed</span>
           </Link>
 
           {crumbs.map((crumb, index) => {
