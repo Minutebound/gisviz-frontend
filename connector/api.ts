@@ -1,6 +1,7 @@
 import axios from 'axios'
 import { FeedFilters, filtersToParams, Post } from '../types/gisviz'
 import type { DatasetSyncReport, ManagedDatasetMetadata, PublicDatasetRows, Region, VisualCatalog } from '../types/visuals'
+import type { AccessDetails, Licence, MyOrgs, OrgCard, SharedWithMe, Visibility } from '../types/access'
 import type { PosterChoice, PosterDesign } from '../lib/poster'
 
 /** Upload previewer: a column of the staged upload, and an edit the admin applies to it. */
@@ -110,6 +111,21 @@ async function cached<T>(key: string, ttlMs: number, fn: () => Promise<T>): Prom
   return data
 }
 
+/** A post was created, edited or deleted: drop cached feeds and tell open pages (profile, feed) to reload,
+ *  so they show the new poster image straight away. Other tabs hear it through localStorage. */
+export const POSTS_CHANGED = 'gv:posts-changed'
+export function postsChanged(postId?: string) {
+  _cache.clear()
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new CustomEvent(POSTS_CHANGED, { detail: { postId } }))
+  try { localStorage.setItem(POSTS_CHANGED, String(Date.now())) } catch { /* private mode */ }
+}
+async function changed<T>(p: Promise<T>, postId?: string): Promise<T> {
+  const r = await p
+  postsChanged(postId)
+  return r
+}
+
 
 // ════════════════════════════════════════════════════════════════════════════════
 export const gisvizApi = {
@@ -136,8 +152,45 @@ export const gisvizApi = {
 
   // ── Visuals: charts/maps built from a dataset (backend endpoints/visuals.py) ──
   // dataset picker search (publishers) — backend endpoints/datasets.py
-  searchDatasets: async (q: string, limit = 12) =>
-    (await axiosInstance.get('/datasets/search', { params: { q, limit } })).data,
+  // pipeline: batch (standard posts) | stream (live posts); private datasets shared with me are included
+  searchDatasets: async (q: string, limit = 12, pipeline?: 'batch' | 'stream') =>
+    (await axiosInstance.get('/datasets/search', { params: { q, limit, ...(pipeline ? { pipeline } : {}) } })).data,
+
+  listLicences: async (): Promise<Licence[]> =>
+    cached('licences', 3_600_000, async () => (await axiosInstance.get('/datasets/licences')).data),
+
+  // ── Access: visibility + sharing of posts and datasets (backend endpoints/access.py) ──
+  fetchAccess: async (kind: 'post' | 'dataset', id: string): Promise<AccessDetails> =>
+    (await axiosInstance.get(`/access/${kind}/${encodeURIComponent(id)}`)).data,
+  setVisibility: async (kind: 'post' | 'dataset', id: string, visibility: Visibility) =>
+    (await axiosInstance.put(`/access/${kind}/${encodeURIComponent(id)}/visibility`, { visibility })).data,
+  shareWith: async (kind: 'post' | 'dataset', id: string, handle: string) =>
+    (await axiosInstance.post(`/access/${kind}/${encodeURIComponent(id)}/grants`, { handle })).data,
+  revokeShare: async (kind: 'post' | 'dataset', id: string, shareId: string) =>
+    (await axiosInstance.delete(`/access/${kind}/${encodeURIComponent(id)}/grants/${shareId}`)).data,
+  fetchSharedWithMe: async (): Promise<SharedWithMe> =>
+    (await axiosInstance.get('/access/shared-with-me')).data,
+
+  // ── Organisations (backend endpoints/orgs.py) ──
+  fetchMyOrgs: async (): Promise<MyOrgs> => (await axiosInstance.get('/orgs/mine')).data,
+  createOrg: async (name: string): Promise<OrgCard> => (await axiosInstance.post('/orgs', { name })).data,
+  leaveOrgAccount: async () => (await axiosInstance.delete('/orgs/mine')).data,
+  adminListOrgs: async (status?: string): Promise<OrgCard[]> =>
+    (await axiosInstance.get('/orgs', { params: status ? { status } : {} })).data,
+  adminReviewOrg: async (orgId: string, status: 'verified' | 'rejected' | 'pending'): Promise<OrgCard> =>
+    (await axiosInstance.put(`/orgs/${orgId}/status`, { status })).data,
+
+  // ── GDPR (backend endpoints/users.py) ──
+  exportMyData: async (): Promise<Blob> =>
+    (await axiosInstance.get('/users/me/export', { responseType: 'blob' })).data,
+  eraseMyAccount: async (currentPassword: string) =>
+    (await axiosInstance.post('/users/me/erase', { current_password: currentPassword, confirm: 'DELETE' })).data,
+
+  // ── Stream datasets (admin) ──
+  rotateIngestKey: async (datasetId: string): Promise<{ ingest_key: string; endpoint: string; header: string }> =>
+    (await axiosInstance.post(`/datasets/manage/${encodeURIComponent(datasetId)}/ingest-key`)).data,
+  revokeIngestKey: async (datasetId: string) =>
+    (await axiosInstance.delete(`/datasets/manage/${encodeURIComponent(datasetId)}/ingest-key`)).data,
 
   suggestVisual: async (datasetId: string) =>
     (await axiosInstance.get(`/visuals/datasets/${encodeURIComponent(datasetId)}/suggest`)).data,
@@ -155,7 +208,7 @@ export const gisvizApi = {
     (await axiosInstance.post(`/visuals/datasets/${encodeURIComponent(datasetId)}/spec`, body)).data,
 
   // ── Datasets: public catalog (the /datasets page) — backend endpoints/datasets.py ──
-  listCatalog: async (p: { q?: string; category?: string; region?: string; kind?: 'spatial' | 'tabular' | ''; skip?: number; limit?: number }) =>
+  listCatalog: async (p: { q?: string; category?: string; region?: string; kind?: 'spatial' | 'tabular' | ''; pipeline?: 'batch' | 'stream' | ''; skip?: number; limit?: number }) =>
     (await axiosInstance.get('/datasets/', {
       params: Object.fromEntries(Object.entries(p).filter(([, v]) => v != null && v !== '')),
     })).data,
@@ -322,14 +375,20 @@ export const gisvizApi = {
   searchPosts: async (q: string, skip = 0, limit = 25) =>
     (await axiosInstance.get('/posts/search', { params: { q, skip, limit } })).data,
 
+  /** the post's image: a screenshot the publisher dropped / pasted in the editor (ThumbnailDrop) */
+  uploadPostImage: async (postId: string, image: File) => {
+    const fd = new FormData(); fd.append('file', image)
+    return (await changed(axiosInstance.put(`/posts/${postId}/image`, fd, { headers: { 'Content-Type': 'multipart/form-data' } }), postId)).data as { visual_image_path: string }
+  },
+
   createPost: async (payload: any) =>
-    (await axiosInstance.post('/posts', payload)).data,
+    (await changed(axiosInstance.post('/posts', payload))).data,
 
   updatePost: async (postId: any, payload: any) =>
-    (await axiosInstance.put(`/posts/${postId}`, payload)).data,
+    (await changed(axiosInstance.put(`/posts/${postId}`, payload), String(postId))).data,
 
   deletePost: async (postId: string) =>
-    (await axiosInstance.delete(`/posts/${postId}`)).data,
+    (await changed(axiosInstance.delete(`/posts/${postId}`), postId)).data,
 
   reportPost: async (postId: string, reason: string, details: string) => {
     const fullReason = details ? `${reason}: ${details}` : reason
@@ -450,7 +509,7 @@ export const gisvizApi = {
   },
 
   adminDeletePost: async (postId: any) =>
-    (await axiosInstance.delete(`/posts/${postId}`)).data,
+    (await changed(axiosInstance.delete(`/posts/${postId}`), String(postId))).data,
 
   adminSetPostStatus: async (postId: string, isActive: boolean) =>
     (await axiosInstance.put(`/posts/${postId}/status`, null, {
@@ -468,7 +527,7 @@ export const gisvizApi = {
   adminFetchOverview: async () =>
     (await axiosInstance.get('/admin/analytics/overview')).data,
 
-  adminFetchTopPosts: async (by: 'likes' | 'bookmarks' | 'comments' = 'likes', limit = 10) =>
+  adminFetchTopPosts: async (by: 'likes' | 'bookmarks' | 'comments' | 'views' = 'likes', limit = 10) =>
     (await axiosInstance.get('/admin/analytics/top-posts', { params: { by, limit } })).data,
 
   adminFetchTopUsers: async (by: 'followers' | 'posts' = 'followers', limit = 10) =>
@@ -542,15 +601,15 @@ export const gisvizApi = {
       .catch(console.error)
   },
 
-  // ── Admin — Historical trends (analytics_db / snapshots) ──────────────────
+  // ── Admin — Daily history (analytics DB, captured hourly by the snapshot job) ──
   adminFetchTrendsDaily: async (days = 90) =>
     (await axiosInstance.get('/admin/analytics/trends/daily', { params: { days } })).data,
 
   adminFetchCategoryTrends: async (days = 30) =>
     (await axiosInstance.get('/admin/analytics/trends/categories', { params: { days } })).data,
 
-  adminFetchEtlStatus: async (limit = 10) =>
-    (await axiosInstance.get('/admin/analytics/etl-status', { params: { limit } })).data,
+  adminFetchSnapshotRuns: async (limit = 10) =>
+    (await axiosInstance.get('/admin/analytics/snapshot-runs', { params: { limit } })).data,
 
   // ── Admin — Audit trail (admin_db, live/permanent) ────────────────────────
   adminFetchAuditActions: async (opts: {

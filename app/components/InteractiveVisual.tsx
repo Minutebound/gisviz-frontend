@@ -58,6 +58,8 @@ export interface StoryOptions {
   label_filter?: { field: string; default?: string[] | null }
   /** Labels drawn on the map / points from the start (readers toggle them with the "Labels" button). */
   show_labels?: boolean
+  /** Live post (stream dataset): the data is re-read every refresh_seconds. */
+  live?: { refresh_seconds: number; updated_at?: string | null }
 }
 
 export interface ChartSpec extends StoryOptions {
@@ -210,12 +212,28 @@ function useAccentHex(probe: React.RefObject<HTMLElement | null>, fallback = '#f
 
 type Loaded<T> = { value: T | null; error: string | null; loading: boolean }
 
-function useSpecData<T>(data: T | string): Loaded<T> {
+function useSpecData<T>(data: T | string, refreshMs = 0): Loaded<T> & { fetchedAt: number | null } {
   const [state, setState] = useState<Loaded<T>>(() =>
     typeof data === 'string'
       ? { value: null, error: null, loading: true }
       : { value: data, error: null, loading: false },
   )
+  const [fetchedAt, setFetchedAt] = useState<number | null>(null)
+  // live posts: re-read the data in the background (the chart keeps showing the last data meanwhile)
+  useEffect(() => {
+    if (typeof data !== 'string' || !refreshMs) return
+    let alive = true
+    const tick = () => {
+      if (document.visibilityState === 'hidden') return          // no polling in background tabs
+      const url = `${data}${data.includes('?') ? '&' : '?'}_r=${Date.now()}`
+      fetch(url)
+        .then(r => (r.ok ? r.json() : null))
+        .then(json => { if (alive && json != null) { setState({ value: json as T, error: null, loading: false }); setFetchedAt(Date.now()) } })
+        .catch(() => {})
+    }
+    const id = window.setInterval(tick, Math.max(5000, refreshMs))
+    return () => { alive = false; window.clearInterval(id) }
+  }, [data, refreshMs])
   useEffect(() => {
     if (typeof data !== 'string') {
       setState({ value: data, error: null, loading: false })
@@ -233,11 +251,11 @@ function useSpecData<T>(data: T | string): Loaded<T> {
         }
         return r.json()
       })
-      .then(json => { if (!cancelled) setState({ value: json as T, error: null, loading: false }) })
+      .then(json => { if (!cancelled) { setState({ value: json as T, error: null, loading: false }); setFetchedAt(Date.now()) } })
       .catch((e: Error) => { if (!cancelled) setState({ value: null, error: e.message, loading: false }) })
     return () => { cancelled = true }
   }, [data])
-  return state
+  return { ...state, fetchedAt }
 }
 
 function useElementSize<T extends HTMLElement>() {
@@ -773,7 +791,7 @@ const TABLE_LIMIT = 500
 const DATASET_PAGE = 100
 
 /** The whole dataset behind a visual (every column), a page at a time — GET /datasets/{id}/rows. */
-function DatasetTable({ datasetId }: { datasetId: string }) {
+export function DatasetTable({ datasetId }: { datasetId: string }) {
   const [offset, setOffset] = useState(0)
   const [page, setPage] = useState<{ columns: string[]; rows: Row[]; total: number } | null>(null)
   const [error, setError] = useState('')
@@ -977,7 +995,7 @@ function normalizeFc(fc: GeoFeatureCollection, fields: string[]): GeoFeatureColl
   }
 }
 
-export default function InteractiveVisual({ spec, height = 520, className = '', datasetId, showData = true }: {
+export default function InteractiveVisual({ spec, height = 520, className = '', datasetId, showData = true, tools = 'full' }: {
   spec: VisualSpec
   height?: number
   className?: string
@@ -985,6 +1003,10 @@ export default function InteractiveVisual({ spec, height = 520, className = '', 
   datasetId?: string | null
   /** false hides the Data tab (the dataset's "show data" switch is off). */
   showData?: boolean
+  /** full: Chart | Data tabs, filter, labels, count, fullscreen (post editor).
+   *  reader: only what a reader needs on the post page (filter, labels, live, fullscreen); the data has its own
+   *  section at the bottom of the post page. */
+  tools?: 'full' | 'reader'
 }) {
   const probeRef = useRef<HTMLSpanElement>(null)
   const siteAccent = useAccentHex(probeRef)
@@ -993,7 +1015,8 @@ export default function InteractiveVisual({ spec, height = 520, className = '', 
   // one theme colour per post: on a poster the poster's colour wins
   const accent = hexOk(poster.accent) ? poster.accent : hexOk(spec.accent) ? spec.accent : siteAccent
   const { resolvedTheme } = useTheme()
-  const main = useSpecData<Row[] | GeoFeatureCollection>(spec.data)
+  const liveMs = spec.live?.refresh_seconds ? spec.live.refresh_seconds * 1000 : 0
+  const main = useSpecData<Row[] | GeoFeatureCollection>(spec.data, liveMs)
   const time = spec.kind === 'map' ? spec.time : undefined
   const seriesState = useSpecData<Row[]>(time ? time.series : EMPTY_ROWS)
 
@@ -1020,15 +1043,19 @@ export default function InteractiveVisual({ spec, height = 520, className = '', 
     if (spec.kind === 'chart') setChartType(spec.chart_type)
   }, [spec, defaultField])
 
-  // Fullscreen: Esc closes, page scroll locked.
+  // Fullscreen: the visual covers the whole window (top nav and footer hidden); Esc closes, page scroll locked.
   useEffect(() => {
     if (!expanded) return
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setExpanded(false) }
-    window.scrollTo({ top: 0 })                      // the top nav is not sticky: bring it into view
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
+    document.documentElement.classList.add('gv-fullscreen')
     window.addEventListener('keydown', onKey)
-    return () => { document.body.style.overflow = prev; window.removeEventListener('keydown', onKey) }
+    return () => {
+      document.body.style.overflow = prev
+      document.documentElement.classList.remove('gv-fullscreen')
+      window.removeEventListener('keydown', onKey)
+    }
   }, [expanded])
 
   /* ── geometry ── */
@@ -1160,7 +1187,8 @@ export default function InteractiveVisual({ spec, height = 520, className = '', 
   const mapFc = useMemo(() => (viewFc && filterField && picked
     ? { ...viewFc, features: viewFc.features.filter(f => keep(f.properties?.[filterField])) } : viewFc),
     [viewFc, filterField, picked, keep])
-  const hasDataTab = !datasetId || showData
+  const reader = tools === 'reader'
+  const hasDataTab = !reader && (!datasetId || showData)
 
   /* ── map styles that reshape the features before drawing ── */
   const mapStyle = spec.kind === 'map' ? spec.map_style ?? 'auto' : 'auto'
@@ -1194,12 +1222,14 @@ export default function InteractiveVisual({ spec, height = 520, className = '', 
   const bareOnPoster = poster.inPoster && !expanded
   const toolsOut = bareOnPoster && !!poster.toolsHost
   const wrap = (bar: React.ReactNode) => (toolsOut ? createPortal(
-    <div className="rounded-[12px] border border-gisviz-border bg-gisviz-card shadow-sm">{bar}</div>, poster.toolsHost!) : bar)
+    reader ? bar : <div className="rounded-[12px] border border-gisviz-border bg-gisviz-card shadow-sm">{bar}</div>, poster.toolsHost!) : bar)
+  // reader controls on a poster: a slim row of small buttons, no bar around them
+  const slim = reader && toolsOut
 
-  return (
+  const body = (
     <div
       className={expanded
-        ? 'fixed inset-x-0 bottom-0 top-[72px] z-[90] flex flex-col bg-gisviz-card border-t border-gisviz-border'   /* below the top nav (72px, z-100) */
+        ? 'fixed inset-0 z-[300] flex flex-col bg-gisviz-card'      /* the whole window: above the top nav and the footer */
         : bareOnPoster ? `relative ${className}`
         : `rounded-[16px] border border-gisviz-border bg-gisviz-card shadow-sm overflow-hidden ${className}`}
     >
@@ -1216,8 +1246,8 @@ export default function InteractiveVisual({ spec, height = 520, className = '', 
       )}
 
       {/* Toolbar (under the poster when on one) */}
-      {wrap(<div className={`flex flex-wrap items-center gap-2 px-3 py-2.5 sm:px-4 ${toolsOut ? '' : 'border-b border-gisviz-border bg-gisviz-paper/40'}`}>
-        <div className="inline-flex rounded-[8px] border border-gisviz-border bg-gisviz-paper p-0.5">
+      {wrap(<div className={`flex flex-wrap items-center gap-2 ${slim ? 'justify-end px-0 py-0' : 'px-3 py-2.5 sm:px-4'} ${toolsOut ? '' : 'border-b border-gisviz-border bg-gisviz-paper/40'}`}>
+        {!reader && <div className="inline-flex rounded-[8px] border border-gisviz-border bg-gisviz-paper p-0.5">
           <button type="button" onClick={() => setView('visual')} className={segBtn(view === 'visual')}>
             {spec.kind === 'map' ? <MapIcon size={14} /> : <BarChart3 size={14} />}
             {spec.kind === 'map' ? 'Map' : 'Chart'}
@@ -1227,7 +1257,16 @@ export default function InteractiveVisual({ spec, height = 520, className = '', 
               <Table2 size={14} /> Data
             </button>
           )}
-        </div>
+        </div>}
+
+        {spec.live && (
+          <span className="inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-gisviz-alert/30 bg-gisviz-alert/5 px-2.5 text-[12px] font-semibold text-gisviz-alert"
+                title={`Live data: refreshed every ${spec.live.refresh_seconds} s`}>
+            <span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-gisviz-alert opacity-60" /><span className="relative inline-flex h-2 w-2 rounded-full bg-gisviz-alert" /></span>
+            LIVE
+            {main.fetchedAt && <span className="font-mono text-[10.5px] font-medium text-gisviz-ink-soft">{new Date(main.fetchedAt).toLocaleTimeString()}</span>}
+          </span>
+        )}
 
         {/* one visual per post: no chart-type or measure switching; readers filter the labels instead */}
         {view === 'visual' && filterField && allLabels.length > 1 && !(chipsOnPoster && !groupField) && (
@@ -1243,8 +1282,8 @@ export default function InteractiveVisual({ spec, height = 520, className = '', 
           </button>
         )}
 
-        <div className="ml-auto flex items-center gap-3">
-          {rows && view === 'visual' && (
+        <div className={`${slim ? '' : 'ml-auto'} flex items-center gap-3`}>
+          {rows && view === 'visual' && !reader && (
             <span className="hidden font-mono text-[11.5px] text-gisviz-ink-soft sm:inline">
               {(spec.kind === 'chart' ? chartRows?.length ?? 0 : mapFc?.features.length ?? 0).toLocaleString()} shown
             </span>
@@ -1323,4 +1362,6 @@ export default function InteractiveVisual({ spec, height = 520, className = '', 
       )}
     </div>
   )
+  // fullscreen goes to <body>: a poster's transforms and stacking would otherwise keep it under the top nav
+  return expanded && typeof document !== 'undefined' ? createPortal(body, document.body) : body
 }

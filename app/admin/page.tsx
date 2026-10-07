@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import {
   ShieldCheck, BarChart2, Tag, Users, FileText, Flag,
   MessageSquare, UserX, KeyRound, ArrowRight, Activity, Loader2,
-  Cpu, Database, LifeBuoy, BookOpen,
+  Cpu, Database, LifeBuoy, BookOpen, Building2,
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { API_ORIGIN } from '../../connector/api'
@@ -60,6 +60,13 @@ function buildAreas(): AreaCard[] {
       icon:  <FileText size={22} />,
       title: 'Datasets',
       desc:  'Create datasets, drop their Parquet files, activate, edit, delete.',
+    },
+    {
+      key:   'orgs',
+      href:  '/admin/orgs',
+      icon:  <Building2 size={22} />,
+      title: 'Organisations',
+      desc:  'Verify organisation accounts; members join by their email domain.',
     },
     {
       key:   'erd',
@@ -126,7 +133,7 @@ export default function AdminHomePage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 sm:px-6 lg:px-8 py-8 pb-20">
+    <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-8 pb-20">
 
       {/* Header */}
       <div className="mb-8">

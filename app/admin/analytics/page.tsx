@@ -6,11 +6,12 @@ import Link from 'next/link'
 import {
   BarChart2, Users, FileText, MessageSquare,
   Tag, Hash, Flag, TrendingUp, TrendingDown, Minus,
-  Loader2, RefreshCw, ArrowUpRight, Activity, Database,
+  Loader2, RefreshCw, ArrowUpRight, Activity, Database, Eye,
 } from 'lucide-react'
 import { useAuth } from '../../../context/AuthContext'
 import { gisvizApi } from '../../../connector/api'
 import AccessRestricted from '../../components/AccessRestricted'
+import GrowthPanel from './GrowthPanel'
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -57,7 +58,7 @@ function StatCard({ icon, label, value, sub, trend }: {
   )
 }
 
-type TopBy = 'likes' | 'bookmarks' | 'comments'
+type TopBy = 'views' | 'likes' | 'bookmarks' | 'comments'
 type UserBy = 'followers' | 'posts'
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -73,7 +74,7 @@ export default function AdminAnalyticsPage() {
   const [loading, setLoading]           = useState(false) // ← false: no auto-load
   const [topPostsBusy, setTopPostsBusy] = useState(false)
   const [topUsersBusy, setTopUsersBusy] = useState(false)
-  const [topPostsBy, setTopPostsBy]     = useState<TopBy>('likes')
+  const [topPostsBy, setTopPostsBy]     = useState<TopBy>('views')
   const [topUsersBy, setTopUsersBy]     = useState<UserBy>('followers')
   const [hasLoaded, setHasLoaded]       = useState(false)
 
@@ -96,7 +97,7 @@ export default function AdminAnalyticsPage() {
     try {
       const [ov, tp, tu, cm] = await Promise.all([
         gisvizApi.adminFetchOverview(),
-        gisvizApi.adminFetchTopPosts('likes'),
+        gisvizApi.adminFetchTopPosts('views'),
         gisvizApi.adminFetchTopUsers('followers'),
         gisvizApi.adminFetchTopCommenters(),
       ])
@@ -142,7 +143,7 @@ export default function AdminAnalyticsPage() {
   const asOf = overview?.as_of   || null
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 sm:px-6 lg:px-8 py-8 pb-20">
+    <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-8 pb-20">
 
       {/* ── Header ── */}
       <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
@@ -152,8 +153,8 @@ export default function AdminAnalyticsPage() {
           </h1>
           <p className="text-[14.5px] text-gisviz-ink-soft mt-1.5 leading-relaxed flex items-center gap-1.5">
             <Database size={11} />
-            Snapshot warehouse
-            {asOf && <span className="text-gisviz-ink-soft/60 ml-1">· as of {asOf}</span>}
+            Live counts · growth history from the analytics DB
+            {asOf && <span className="text-gisviz-ink-soft/60 ml-1">· as of {new Date(asOf).toLocaleString()}</span>}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -177,10 +178,10 @@ export default function AdminAnalyticsPage() {
         <div className="flex flex-col items-center justify-center py-24 gap-3 text-gisviz-ink-soft">
           <Database size={36} className="opacity-30" />
           <p className="font-mono text-[12px]">
-            Click <strong className="text-gisviz-ink">Load Data</strong> to fetch from the snapshot warehouse.
+            Click <strong className="text-gisviz-ink">Load Data</strong> to fetch the numbers.
           </p>
           <p className="font-mono text-[12px] opacity-60">
-            Numbers reflect the last Dagster snapshot — not live counts.
+            Totals are live; the growth chart reads the daily history captured every hour.
           </p>
         </div>
       )}
@@ -196,7 +197,7 @@ export default function AdminAnalyticsPage() {
       {hasLoaded && !loading && (
         <>
           {/* Stat grid */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
             <StatCard
               icon={<Users size={18} />} label="Total Users" value={t.users ?? 0}
               trend={<Trend current={tw.new_users ?? 0} previous={lw.new_users ?? 0} />}
@@ -205,12 +206,18 @@ export default function AdminAnalyticsPage() {
               icon={<FileText size={18} />} label="Total Posts" value={t.posts ?? 0}
               trend={<Trend current={tw.new_posts ?? 0} previous={lw.new_posts ?? 0} />}
               sub={`+${tw.new_posts ?? 0} this week`} />
+            <StatCard
+              icon={<Eye size={18} />} label="Post views" value={t.views ?? 0}
+              trend={<Trend current={tw.views ?? 0} previous={lw.views ?? 0} />}
+              sub={`${fmt(tw.views ?? 0)} this week`} />
             <StatCard icon={<Tag size={18} />}  label="Categories"   value={t.categories  ?? 0} />
             <StatCard icon={<Hash size={18} />} label="Keywords"     value={t.keywords    ?? 0} />
             <StatCard
               icon={<Flag size={18} />} label="Open Reports" value={t.open_reports ?? 0}
               sub={t.open_reports > 0 ? 'Needs attention' : 'All clear'} />
           </div>
+
+          <GrowthPanel trigger={triggerLoad} />
 
           {/* Tables */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
@@ -220,7 +227,7 @@ export default function AdminAnalyticsPage() {
               <div className="flex items-center justify-between px-5 py-3 border-b border-gisviz-border bg-gisviz-canvas/50">
                 <h2 className="font-mono text-[12px] font-bold text-gisviz-ink uppercase tracking-widest">Top Posts</h2>
                 <div className="flex gap-1">
-                  {(['likes', 'bookmarks', 'comments'] as TopBy[]).map(b => (
+                  {(['views', 'likes', 'bookmarks', 'comments'] as TopBy[]).map(b => (
                     <button key={b} onClick={() => switchTopPosts(b)}
                       className={`px-2 py-0.5 rounded text-[12px] font-mono transition-colors ${
                         topPostsBy === b
@@ -233,7 +240,7 @@ export default function AdminAnalyticsPage() {
               {topPostsBusy ? (
                 <div className="flex justify-center py-8"><Loader2 size={20} className="animate-spin text-gisviz-accent" /></div>
               ) : topPosts.length === 0 ? (
-                <div className="py-8 text-center text-[12px] font-mono text-gisviz-ink-soft">No posts in snapshot yet.</div>
+                <div className="py-8 text-center text-[12px] font-mono text-gisviz-ink-soft">No posts yet.</div>
               ) : (
                 <div className="divide-y divide-gisviz-border/50">
                   {topPosts.map((p, i) => (
@@ -248,7 +255,7 @@ export default function AdminAnalyticsPage() {
                       </div>
                       <div className="text-right shrink-0">
                         <p className="text-[12px] font-mono font-bold text-gisviz-ink">
-                          {fmt(topPostsBy === 'likes' ? p.total_likes_count : p.total_comments_count)}
+                          {fmt(p.metric_value ?? (topPostsBy === 'likes' ? p.total_likes_count : p.total_comments_count))}
                         </p>
                         <p className="text-[12px] font-mono text-gisviz-ink-soft">{topPostsBy}</p>
                       </div>
@@ -276,7 +283,7 @@ export default function AdminAnalyticsPage() {
               {topUsersBusy ? (
                 <div className="flex justify-center py-8"><Loader2 size={20} className="animate-spin text-gisviz-accent" /></div>
               ) : topUsers.length === 0 ? (
-                <div className="py-8 text-center text-[12px] font-mono text-gisviz-ink-soft">No users in snapshot yet.</div>
+                <div className="py-8 text-center text-[12px] font-mono text-gisviz-ink-soft">No users yet.</div>
               ) : (
                 <div className="divide-y divide-gisviz-border/50">
                   {topUsers.map((u, i) => (
@@ -310,7 +317,7 @@ export default function AdminAnalyticsPage() {
               </h2>
             </div>
             {commenters.length === 0 ? (
-              <div className="py-8 text-center text-[12px] font-mono text-gisviz-ink-soft">No commenters in snapshot yet.</div>
+              <div className="py-8 text-center text-[12px] font-mono text-gisviz-ink-soft">No comments yet.</div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 divide-x divide-y divide-gisviz-border/50">
                 {commenters.map((c, i) => (

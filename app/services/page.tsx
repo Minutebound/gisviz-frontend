@@ -143,7 +143,7 @@ const TIERS = [
   },
 ]
 
-const SHELL = 'mx-auto max-w-5xl px-4 sm:px-8 lg:px-[72px]'
+const SHELL = 'mx-auto max-w-7xl px-4 sm:px-8 lg:px-[72px]'
 
 export default function ServicesPage() {
   return (

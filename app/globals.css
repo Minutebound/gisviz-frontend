@@ -10,6 +10,10 @@
   }
 }
 
+/* a visual in fullscreen covers the whole window: the site's top nav and footer step aside */
+html.gv-fullscreen .gv-site-nav,
+html.gv-fullscreen .gv-site-footer { visibility: hidden; }
+
 /* ─────────────────────────────────────────────────────────────
    1. Tailwind v4 Custom Theme Variables
 ───────────────────────────────────────────────────────────── */
@@ -194,4 +198,54 @@ body > *:not(header):not(.fixed) {
 #nprogress .bar,
 #nprogress .peg {
   z-index: 9999 !important;
+}
+/* ─────────────────────────────────────────────────────────────
+   Category banner infographic (app/components/feed/CategoryBanner.tsx)
+───────────────────────────────────────────────────────────── */
+.gv-infographic .gv-bar {
+  transform-box: fill-box; transform-origin: 50% 100%;
+  animation: gv-grow .8s cubic-bezier(.2,.8,.2,1) var(--d, 0s) both,
+             gv-breathe 3.6s ease-in-out calc(var(--d, 0s) + 1.2s) infinite;
+}
+.gv-infographic .gv-line { stroke-dasharray: 1; stroke-dashoffset: 1; animation: gv-draw var(--t, 1.6s) ease-out var(--d, .35s) forwards; }
+.gv-infographic .gv-fadein { animation: gv-fadein .6s ease-out var(--d, 0s) both; }
+.gv-infographic .gv-barx { transform-box: fill-box; transform-origin: var(--o, 0% 50%); animation: gv-growx .8s cubic-bezier(.2,.8,.2,1) var(--d, 0s) both; }
+.gv-infographic .gv-spin { transform-box: fill-box; transform-origin: center; animation: gv-spin var(--t, 8s) linear infinite; }
+.gv-infographic .gv-flow { stroke-dasharray: 5 11; animation: gv-flow var(--t, 1.2s) linear infinite; }
+.gv-infographic .gv-drift { animation: gv-drift var(--t, 8s) linear infinite; }
+.gv-infographic .gv-fall { animation: gv-fall var(--t, 1.4s) linear var(--d, 0s) infinite; }
+.gv-infographic .gv-blink { animation: gv-blink var(--t, 3s) ease-in-out var(--d, 0s) infinite; }
+.gv-infographic .gv-bob { animation: gv-bob var(--t, 3s) ease-in-out infinite; }
+.gv-infographic .gv-pop.gv-beat-soft { transform-box: fill-box; transform-origin: center;
+  animation: gv-pop .5s cubic-bezier(.2,1.4,.4,1) var(--d, 0s) both, gv-beat-soft 2.8s ease-in-out calc(var(--d, 0s) + .6s) infinite; }
+.gv-infographic .gv-area { opacity: 0; animation: gv-fade .8s ease-out 1.3s forwards; }
+.gv-infographic .gv-pop { transform-box: fill-box; transform-origin: center; animation: gv-pop .5s cubic-bezier(.2,1.4,.4,1) var(--d, 0s) both; }
+.gv-infographic .gv-end { animation: gv-pop .5s cubic-bezier(.2,1.4,.4,1) 1.85s both, gv-beat 2.4s ease-in-out 2.4s infinite; }
+.gv-infographic .gv-ripple { transform-box: fill-box; transform-origin: center; opacity: 0; animation: gv-ripple 2.8s ease-out calc(var(--d, 0s) + .4s) infinite; }
+.gv-infographic .gv-seg { stroke-dasharray: 0 100; animation: gv-sweep 1.1s cubic-bezier(.2,.8,.2,1) var(--d, 0s) forwards; }
+
+@keyframes gv-grow { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+@keyframes gv-breathe { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(var(--b, .85)); } }
+@keyframes gv-draw { to { stroke-dashoffset: 0; } }
+@keyframes gv-fade { to { opacity: 1; } }
+@keyframes gv-pop { from { transform: scale(0); } to { transform: scale(1); } }
+@keyframes gv-beat { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.35); } }
+@keyframes gv-ripple { 0% { transform: scale(.2); opacity: .8; } 100% { transform: scale(1.6); opacity: 0; } }
+@keyframes gv-sweep { to { stroke-dasharray: var(--len, 0) 100; } }
+@keyframes gv-fadein { from { opacity: 0; } to { opacity: 1; } }
+@keyframes gv-growx { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes gv-spin { to { transform: rotate(360deg); } }
+@keyframes gv-flow { to { stroke-dashoffset: -32; } }
+@keyframes gv-drift { from { transform: translateX(0); } to { transform: translateX(var(--dx, -160px)); } }
+@keyframes gv-fall { 0% { transform: translateY(0); opacity: 0; } 15% { opacity: 1; } 100% { transform: translateY(110px); opacity: 0; } }
+@keyframes gv-blink { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
+@keyframes gv-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
+@keyframes gv-beat-soft { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.18); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .gv-infographic * { animation: none !important; }
+  .gv-infographic .gv-line { stroke-dashoffset: 0; }
+  .gv-infographic .gv-area { opacity: 1; }
+  .gv-infographic .gv-seg { stroke-dasharray: var(--len, 0) 100; }
+  .gv-infographic .gv-ripple { display: none; }
 }

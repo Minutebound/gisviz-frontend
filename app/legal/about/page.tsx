@@ -1,4 +1,4 @@
-import LegalPage from '../LegalPage'
+import LegalPage from '../page'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'About | GisViz' }

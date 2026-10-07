@@ -101,7 +101,7 @@ export default function AdminActivityPage() {
     return <AccessRestricted requiredRoles={['admin']} currentRole={user?.role_name} backHref="/" backLabel="Return to Feed" />
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 sm:px-6 lg:px-8 py-8 pb-20">
+    <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-8 pb-20">
 
       {/* header */}
       <div className="flex items-center justify-between mb-6 flex-wrap gap-4">

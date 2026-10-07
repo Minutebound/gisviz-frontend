@@ -84,9 +84,9 @@ export default function ERDPage() {
   const dbs           = data ? [...new Set(data.tables.map(t => t.database))] : []
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 sm:px-6 lg:px-8 py-8 pb-20">
+    <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-8 pb-20">
 
-      <div className="mb-6 max-w-5xl mx-auto">
+      <div className="mb-6 max-w-7xl mx-auto">
         <div className="flex items-start justify-between flex-wrap gap-4">
           <div>
             <h1 className="text-[28px] sm:text-[32px] font-display font-bold text-gisviz-ink tracking-tight flex items-center gap-3">
@@ -110,7 +110,7 @@ export default function ERDPage() {
       </div>
 
       {data && (
-        <div className="mb-4 max-w-5xl mx-auto flex flex-wrap items-center gap-3">
+        <div className="mb-4 max-w-7xl mx-auto flex flex-wrap items-center gap-3">
           <div className="flex gap-1.5 flex-wrap">
             <button onClick={() => setFilterDb(null)}
               className={`px-3 py-1 rounded-sm text-[12px]  font-mono border transition-colors ${!filterDb ? 'bg-gisviz-ink text-gisviz-canvas border-gisviz-ink' : 'bg-gisviz-card border-gisviz-border text-gisviz-ink-soft hover:text-gisviz-ink'}`}>
@@ -160,13 +160,13 @@ export default function ERDPage() {
       )}
 
       {error && (
-        <div className="mb-4 max-w-5xl mx-auto px-4 py-3 rounded-sm border border-gisviz-alert/30 bg-gisviz-alert/5 text-[12px] font-mono text-gisviz-alert">
+        <div className="mb-4 max-w-7xl mx-auto px-4 py-3 rounded-sm border border-gisviz-alert/30 bg-gisviz-alert/5 text-[12px] font-mono text-gisviz-alert">
           {error}
         </div>
       )}
 
       {loading ? (
-        <div className="flex items-center justify-center py-24 bg-gisviz-card border border-gisviz-border rounded-sm max-w-5xl mx-auto">
+        <div className="flex items-center justify-center py-24 bg-gisviz-card border border-gisviz-border rounded-sm max-w-7xl mx-auto">
           <Loader2 size={24} className="animate-spin text-gisviz-accent" />
         </div>
       ) : data ? (
@@ -185,7 +185,7 @@ export default function ERDPage() {
       ) : null}
 
       {selected && (
-        <div className="mt-4 max-w-5xl mx-auto bg-gisviz-card border rounded-sm shadow-sm overflow-hidden"
+        <div className="mt-4 max-w-7xl mx-auto bg-gisviz-card border rounded-sm shadow-sm overflow-hidden"
              style={{ borderColor: selected.dbColor }}>
           <div className="flex items-center justify-between px-5 py-3 border-b border-gisviz-border"
                style={{ backgroundColor: selected.dbColor + '18' }}>

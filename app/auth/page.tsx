@@ -32,6 +32,7 @@ function AuthContent() {
   const [successMsg, setSuccessMsg] = useState('')
   const [devNotice, setDevNotice] = useState('')
   const [resendCooldown, setResendCooldown] = useState(0)
+  const [acceptTerms, setAcceptTerms] = useState(false)      // GDPR: recorded with the policy version
 
   const [formData, setFormData] = useState({
     user_handle: '',
@@ -66,6 +67,7 @@ function AuthContent() {
         user_handle: formData.user_handle,
         email_address: formData.email_address,
         plaintext_password: formData.password,
+        accept_terms: acceptTerms,
       })
       setSuccessMsg(res.message)
       if (res.dev_otp) setDevNotice(`DEV MODE: Your OTP is ${res.dev_otp}`)
@@ -297,10 +299,20 @@ function AuthContent() {
               </div>
             ))}
 
+            <label className="flex items-start gap-2.5 pt-2 text-[12.5px] leading-snug text-gisviz-ink-soft">
+              <input type="checkbox" required checked={acceptTerms} onChange={e => setAcceptTerms(e.target.checked)}
+                     className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--accent)]" />
+              <span>
+                I accept the <a href="/legal/terms" target="_blank" className="font-semibold text-gisviz-accent hover:underline">Terms of Service</a> and
+                the <a href="/legal/privacy" target="_blank" className="font-semibold text-gisviz-accent hover:underline">Privacy Policy</a>, and
+                I am at least 16 years old.
+              </span>
+            </label>
+
             <button
               type="submit"
-              disabled={isLoading}
-              className="w-full flex items-center justify-center gap-2 bg-gisviz-accent text-gisviz-white py-2.5 rounded-md hover:bg-opacity-90 transition-all font-mono text-[12px] font-bold mt-6"
+              disabled={isLoading || !acceptTerms}
+              className="w-full flex items-center justify-center gap-2 bg-gisviz-accent text-gisviz-white py-2.5 rounded-md hover:bg-opacity-90 transition-all font-mono text-[12px] font-bold mt-4 disabled:opacity-60"
             >
               {isLoading ? <Loader2 size={16} className="animate-spin" /> : <UserPlus size={16} />}
               {isLoading ? 'Registering...' : 'Create Account'}

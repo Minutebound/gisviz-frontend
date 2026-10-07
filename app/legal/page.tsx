@@ -14,6 +14,7 @@ const LEGAL_PAGES = [
   { slug: 'privacy',       label: 'Privacy Policy' },
   { slug: 'terms',         label: 'Terms of Service' },
   { slug: 'cookies',       label: 'Cookie Policy' },
+  { slug: 'data-policy',   label: 'Data & Licensing' },
   { slug: 'accessibility', label: 'Accessibility' },
 ]
 

@@ -7,7 +7,8 @@
  *   visual      only the chart / map, 90% of the poster width, on the poster itself (no card); its legend
  *               sits top right of it (the visual portals it here through PosterContext)
  *   footer      the GISViz mark (black or white) bottom left; filter chips and "(Source: …)" bottom right
- *   tools       the reader's controls (labels, data, fullscreen) under the poster, outside it
+ *   tools       the visual's controls, outside the poster: above it in the post editor (data, labels),
+ *               a slim row under it on the post page (filter, labels, fullscreen)
  *
  * Every block can be moved: `layout` keeps offsets in % of the poster width, so the arrangement scales with the
  * poster. With `edit` the blocks are draggable (and nudged with the arrow keys once clicked).
@@ -94,7 +95,7 @@ function Movable({ id, pos, posterW, edit, className = '', style, children }: {
 }
 
 export default function VisualBackdrop({ regionCode, regions, accent, eyebrow, design, title, subtitle, sources, note,
-  renderVisual, children, edit }: {
+  renderVisual, children, edit, toolsAt = 'bottom', posterAttrs }: {
   regionCode?: string | null
   regions: Region[]
   accent: string                       // the post's theme colour: the only colour on the poster besides black / white
@@ -107,6 +108,8 @@ export default function VisualBackdrop({ regionCode, regions, accent, eyebrow, d
   renderVisual?: (width: number) => React.ReactNode   // the visual, sized to its width on the poster
   children?: React.ReactNode
   edit?: PosterEdit                    // poster editor: blocks are draggable
+  toolsAt?: 'top' | 'bottom'           // where the visual's controls go (editor: top)
+  posterAttrs?: Record<string, string> // data-* attributes on the poster itself (screenshot page)
 }) {
   const { ink, soft, line, dark } = posterInk(design.bg)
   const font = FONTS[design.font] ?? FONTS.playfair
@@ -151,8 +154,9 @@ export default function VisualBackdrop({ regionCode, regions, accent, eyebrow, d
   const mv = (id: BlockId) => ({ id, pos: layout[id], posterW, edit })
 
   return (
-    <div className="mb-8">
-      <section ref={posterRef} style={vars}
+    <div>
+      {toolsAt === 'top' && <div ref={setToolsHost} className="mb-2 empty:hidden" />}
+      <section ref={posterRef} style={vars} {...posterAttrs}
                onPointerDown={() => edit?.onSelect(null)}
                className={`group/poster relative isolate overflow-hidden rounded-[18px] border border-gisviz-border`}>
 
@@ -217,7 +221,7 @@ export default function VisualBackdrop({ regionCode, regions, accent, eyebrow, d
         </footer>
       </section>
       {/* the reader's controls live under the poster, so the poster shows only the visual */}
-      <div ref={setToolsHost} className="mt-2 empty:hidden" />
+      {toolsAt === 'bottom' && <div ref={setToolsHost} className="mt-2 empty:hidden" />}
     </div>
   )
 }

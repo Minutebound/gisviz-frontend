@@ -52,7 +52,7 @@ const catalog = store<VisualCatalog>({ categories: [], types: [] })
 const fetchCategories = async (): Promise<Category[]> =>
   ((await gisvizApi.listCategories()) as any[]).map(c => ({
     category_id: c.category_id, slug: c.slug, label: c.label, description: c.description || '',
-    theme_color: c.theme_color || DEFAULT_ACCENT, sort_order: c.sort_order ?? 0,
+    theme_color: c.theme_color || DEFAULT_ACCENT, sort_order: c.sort_order ?? 0, banner: c.banner ?? null,
   }))
 const fetchRegions = () => gisvizApi.listRegionCatalog()
 const fetchCatalog = () => gisvizApi.getVisualCatalog()

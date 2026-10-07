@@ -175,7 +175,7 @@ export default function AdminControlPage() {
   const meta = TABS.find(t => t.id === activeTab)!
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 sm:px-6 lg:px-8 py-8 pb-20">
+    <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-8 pb-20">
 
       <div className="flex items-start justify-between gap-4 mb-8 flex-wrap">
         <div>

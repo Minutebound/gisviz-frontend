@@ -25,18 +25,29 @@ import { useAuth } from '../../../context/AuthContext'
 import { gisvizApi, type ColumnEdit, type ColumnKind, type StagedUpload } from '../../../connector/api'
 import AccessRestricted from '../../components/AccessRestricted'
 import type { DatasetSyncReport, ManagedDataset, ManagedDatasetMetadata, Region } from '../../../types/visuals'
+import AccessPanel from '../../components/access/AccessPanel'
+import { DatasetPolicyFields, IngestKeyPanel, POLICY_EMPTY, policyFrom, policyPayload } from './DatasetPolicy'
+
+/** Form -> API body (policy fields in their real types). */
+function payload(f: Record<string, string>) {
+  const { visibility, owner_handle, pipeline, refresh_seconds, retention_rows, license_code, copyright_holder, attribution,
+          contains_personal_data, license: _l, publisher: _p, ...meta } = f
+  // one copyright field: the attribution shown with visuals is made from it on the server ("© holder")
+  return { ...meta, ...policyPayload({ visibility, owner_handle, pipeline, refresh_seconds, retention_rows, license_code,
+                                       copyright_holder, attribution: '', contains_personal_data }) }
+}
 
 type CategoryOpt = { category_id: number; slug: string; label: string }
 type BrokenPost = { post_id: string; title: string; share_slug?: string; problem: string }
-const EMPTY = { title: '', description: '', category: '', region: '', source_name: '', source_url: '', license: '', publisher: '' }
+const EMPTY = { title: '', description: '', category: '', region: '', source_name: '', source_url: '', license: '', publisher: '', ...POLICY_EMPTY }
 type Form = typeof EMPTY
 type Note = { kind: 'ok' | 'err'; text: string }
 
 // keep in sync with SUPPORTED in backend app/duckstore/convert.py
 const ACCEPT = '.parquet,.csv,.tsv,.txt,.json,.ndjson,.jsonl,.geojson,.xlsx,.xls,.ods,.feather,.arrow,.gpkg,.kml,.kmz,.gpx,.fgb,.gml,.topojson,.dxf,.zip'
 const FORMATS_HINT = 'Parquet · CSV · Excel · ODS · JSON · GeoJSON · Shapefile (.zip) · GeoPackage · KML/KMZ · GPX · FlatGeobuf · GML · TopoJSON · File Geodatabase (.zip)'
-const inputCls = 'w-full bg-gisviz-canvas border border-gisviz-border rounded-md px-3 py-2 text-gisviz-ink text-[13px] focus:ring-2 focus:ring-gisviz-accent outline-none'
-const labelCls = 'block text-[11px] font-mono text-gisviz-ink-soft mb-1.5 uppercase tracking-wider'
+const inputCls = 'w-full bg-gisviz-canvas border border-gisviz-border rounded-md px-2.5 py-1.5 text-gisviz-ink text-[13px] focus:ring-2 focus:ring-gisviz-accent outline-none'
+const labelCls = 'block text-[10.5px] font-mono font-semibold text-gisviz-ink-soft mb-1 uppercase tracking-wider'
 const headerBtn = 'px-4 py-2 bg-gisviz-canvas border border-gisviz-border rounded-md font-mono text-[12px] text-gisviz-ink hover:border-gisviz-accent transition-colors flex items-center gap-1.5 disabled:opacity-60'
 
 const errText = (e: any, fallback: string) => {
@@ -181,7 +192,7 @@ function DatasetModal({ dataset, categories, regions, onClose, onDone }: {
   const [form, setForm] = useState<Form>(() => dataset ? {
     title: dataset.title || '', description: dataset.description || '', category: dataset.category || '',
     region: dataset.region || '', source_name: dataset.source_name || '', source_url: dataset.source_url || '',
-    license: dataset.license || '', publisher: dataset.publisher || '',
+    license: dataset.license || '', publisher: dataset.publisher || '', ...policyFrom(dataset),
   } : EMPTY)
   const initial = useRef(form)
   const [file, setFile] = useState<File | null>(null)
@@ -246,17 +257,20 @@ function DatasetModal({ dataset, categories, regions, onClose, onDone }: {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (staged && current) { await commit(current.dataset_id, false); return }      // step 3: go live
-    if (!form.title.trim()) { setErr('A title is required.'); return }
+    const missing = !form.title.trim() ? 'A title is required.' : !form.source_name.trim() ? 'The source name is required.'
+      : !form.copyright_holder.trim() ? 'The copyright holder is required.' : ''
+    if (missing) { setErr(missing); return }
     setBusy(true); setErr(''); setConflict(null)
     let code = current?.dataset_id
     let created = false
     try {
       if (!current) {
-        const r = await gisvizApi.createDataset(form)
+        const r = await gisvizApi.createDataset(payload(form))
         code = r.dataset_id; created = true
         setCurrent(r); initial.current = form
       } else if (dirty) {
-        await gisvizApi.saveDatasetMeta(current.dataset_id, form)
+        const saved = await gisvizApi.saveDatasetMeta(current.dataset_id, payload(form))
+        setCurrent(saved)
         initial.current = form
       }
     } catch (e2) {
@@ -312,29 +326,25 @@ function DatasetModal({ dataset, categories, regions, onClose, onDone }: {
     <div className="fixed inset-0 z-[1000] flex items-start sm:items-center justify-center p-4 overflow-y-auto" role="dialog" aria-modal="true">
       <div className="absolute inset-0 bg-gisviz-black/20 backdrop-blur-sm" onClick={() => !busy && close()} />
       <form onSubmit={submit}
-            className={`relative z-10 w-full ${staged ? 'max-w-5xl' : 'max-w-2xl'} my-8 bg-gisviz-card border border-gisviz-border rounded-xl shadow-2xl transition-[max-width]`}>
-        <div className="flex items-start justify-between gap-4 px-6 pt-5 pb-4 border-b border-gisviz-border">
+            className={`relative z-10 w-full ${staged ? 'max-w-7xl' : 'max-w-5xl'} my-6 bg-gisviz-card border border-gisviz-border rounded-xl shadow-2xl transition-[max-width]`}>
+        <div className="flex items-start justify-between gap-4 px-5 pt-4 pb-3 border-b border-gisviz-border">
           <div>
             <h2 className="font-display text-[17px] font-bold text-gisviz-ink flex items-center gap-2">
               {isEdit ? <Pencil size={16} className="text-gisviz-accent" /> : <Plus size={17} className="text-gisviz-accent" />}
               {isEdit ? <>Edit <span className="font-mono text-[14px] px-1.5 py-0.5 rounded bg-gisviz-canvas border border-gisviz-border">{current!.dataset_id}</span></> : 'New dataset'}
             </h2>
-            <p className="text-[12.5px] text-gisviz-ink-soft mt-1">
-              {isEdit ? 'Change the details, or drop a new file to replace the data.'
-                      : 'A code (ds_00001, ds_00002, …) is assigned automatically. Inactive until its data file is loaded.'}
+            <p className="text-[12px] text-gisviz-ink-soft mt-0.5">
+              {isEdit ? <>Change the details, or drop a new file to replace the data.{current!.publisher ? <> · Publisher <b className="font-semibold text-gisviz-ink">{current!.publisher}</b></> : null}</>
+                      : 'A code (ds_00001, …) is assigned automatically; you are its publisher. Inactive until its data file is loaded.'}
             </p>
           </div>
           <button type="button" onClick={close} disabled={busy} className="text-gisviz-ink-soft hover:text-gisviz-accent disabled:opacity-40"><X size={20} /></button>
         </div>
 
-        <div className="px-6 py-5 grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="md:col-span-2">
+        <div className="px-5 py-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-3 gap-y-3">
+          <div className="sm:col-span-2">
             <label className={labelCls}>Title <span className="text-gisviz-alert">*</span></label>
             <input value={form.title} onChange={set('title')} placeholder="e.g. India district rainfall 2024" className={inputCls} autoFocus />
-          </div>
-          <div className="md:col-span-2">
-            <label className={labelCls}>Description</label>
-            <textarea value={form.description} onChange={set('description')} rows={3} className={`${inputCls} resize-y`} />
           </div>
           <div>
             <label className={labelCls}>Category</label>
@@ -348,13 +358,28 @@ function DatasetModal({ dataset, categories, regions, onClose, onDone }: {
             <label className={labelCls}>Region</label>
             <RegionSelect regions={regions} value={form.region} onChange={v => setForm(f => ({ ...f, region: v }))} />
           </div>
-          <div><label className={labelCls}>Source name</label><input value={form.source_name} onChange={set('source_name')} placeholder="IMD / Our World in Data" className={inputCls} /></div>
-          <div><label className={labelCls}>Source link</label><input value={form.source_url} onChange={set('source_url')} placeholder="https://…" className={inputCls} /></div>
-          <div><label className={labelCls}>Licence</label><input value={form.license} onChange={set('license')} placeholder="CC-BY-4.0" className={inputCls} /></div>
-          <div><label className={labelCls}>Publisher</label><input value={form.publisher} onChange={set('publisher')} className={inputCls} /></div>
+          <div className="sm:col-span-2 lg:col-span-4">
+            <label className={labelCls}>Description</label>
+            <textarea value={form.description} onChange={set('description')} rows={2} className={`${inputCls} resize-y`} />
+          </div>
+          <div><label className={labelCls}>Source name <span className="text-gisviz-alert">*</span></label><input value={form.source_name} onChange={set('source_name')} placeholder="IMD / Our World in Data" className={inputCls} /></div>
+          <div><label className={labelCls}>Source link</label><input type="url" value={form.source_url} onChange={set('source_url')} placeholder="https://…" className={inputCls} /></div>
+          <DatasetPolicyFields form={form} set={(k, v) => setForm(f => ({ ...f, [k]: v }))} />
+          {isEdit && form.pipeline === 'stream' && current!.pipeline === 'stream' && (
+            <div className="sm:col-span-2 lg:col-span-4">
+            <IngestKeyPanel datasetId={current!.dataset_id} hasKey={current!.has_ingest_key} />
+            </div>
+          )}
+          {isEdit && (
+            <div className="sm:col-span-2 lg:col-span-4 rounded-lg border border-gisviz-border p-3">
+              <p className="mb-2 text-[12.5px] font-semibold text-gisviz-ink">Who can see this dataset</p>
+              <AccessPanel key={current!.visibility ?? "public"} kind="dataset" id={current!.dataset_id} compact
+                           onVisibility={v => { setForm(f => ({ ...f, visibility: v })); initial.current = { ...initial.current, visibility: v } }} />
+            </div>
+          )}
 
           {/* data file */}
-          <div className="md:col-span-2">
+          <div className="sm:col-span-2 lg:col-span-4">
             <label className={labelCls}>Data file {isEdit && current!.has_data && <span className="normal-case tracking-normal">· current: {Number(current!.row_count).toLocaleString()} rows, uploaded {fmtDate(current!.data_uploaded_at)}</span>}</label>
             {staged && view ? (
               <>
@@ -388,7 +413,7 @@ function DatasetModal({ dataset, categories, regions, onClose, onDone }: {
                 onDragLeave={() => setDrag(false)}
                 onDrop={e => { e.preventDefault(); setDrag(false); pick(e.dataTransfer.files?.[0]) }}
                 onClick={() => fileRef.current?.click()}
-                className={`rounded-lg border-2 border-dashed cursor-pointer transition-colors flex flex-col items-center justify-center gap-1.5 text-center py-6 px-4 ${
+                className={`rounded-lg border-2 border-dashed cursor-pointer transition-colors flex flex-col items-center justify-center gap-1 text-center py-4 px-4 ${
                   drag ? 'border-gisviz-accent bg-gisviz-accent/5' : 'border-gisviz-border hover:border-gisviz-accent'}`}>
                 <FileUp size={20} className="text-gisviz-accent" />
                 <span className="text-[13px] text-gisviz-ink">
@@ -403,7 +428,7 @@ function DatasetModal({ dataset, categories, regions, onClose, onDone }: {
         </div>
 
         {conflict && current && (
-          <div className="mx-6 mb-4 p-4 rounded-md border border-amber-500/50 bg-amber-500/10 text-[12.5px] text-gisviz-ink">
+          <div className="mx-5 mb-3 p-4 rounded-md border border-amber-500/50 bg-amber-500/10 text-[12.5px] text-gisviz-ink">
             <p className="font-semibold flex items-center gap-2 mb-1.5"><AlertCircle size={15} className="text-amber-600" /> This file would break published posts</p>
             <p className="text-gisviz-ink-soft mb-2">{conflict.message}</p>
             <ul className="space-y-1 mb-3 max-h-40 overflow-auto">
@@ -426,12 +451,12 @@ function DatasetModal({ dataset, categories, regions, onClose, onDone }: {
         )}
 
         {err && (
-          <div className="mx-6 mb-4 p-3 rounded-md border border-gisviz-alert/40 bg-gisviz-alert/10 text-[12.5px] text-gisviz-alert flex items-start gap-2">
+          <div className="mx-5 mb-3 p-3 rounded-md border border-gisviz-alert/40 bg-gisviz-alert/10 text-[12.5px] text-gisviz-alert flex items-start gap-2">
             <AlertCircle size={15} className="mt-px shrink-0" /><span>{err}</span>
           </div>
         )}
 
-        <div className="flex justify-end gap-3 px-6 py-4 border-t border-gisviz-border">
+        <div className="flex justify-end gap-3 px-5 py-3 border-t border-gisviz-border">
           <button type="button" onClick={close} disabled={busy}
                   className="px-5 py-2 rounded-md text-[13px] border border-gisviz-border text-gisviz-ink-soft hover:bg-gisviz-rail disabled:opacity-50">Cancel</button>
           <button type="submit" disabled={busy || refreshing || (isEdit && !dirty && !file && !staged)}

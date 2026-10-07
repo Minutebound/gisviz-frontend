@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { Bell, Menu, X, User, Settings, ShieldCheck, LogOut, LifeBuoy, LogIn } from 'lucide-react'
 import { useAuth } from '../../../context/AuthContext'
+import { canPublish } from '../../../lib/roles'
 import Logo from '../Logo'
 import ThemeToggle from '../ThemeToggle'
 import { SupportPopup } from '../SupportPopup'
@@ -88,7 +89,7 @@ export default function TopNav() {
   return (
     <>
       {/* ── Forced z-[100] to sit above ALL feed content and category bars ── */}
-      <header className="w-full relative top-0 z-[100] bg-gisviz-card border-b border-gisviz-border">
+      <header className="gv-site-nav relative top-0 z-[100] bg-gisviz-card border-b border-gisviz-border">
         <div className="mx-auto max-w-7xl px-4 sm:px-8 lg:px-[72px] h-[72px] flex items-center gap-6 lg:gap-10">
 
           <Link href="/" className="shrink-0">
@@ -230,7 +231,7 @@ export default function TopNav() {
               <div className="py-2">
                 {isAuthenticated ? (
                   <>
-                    <Link href="/post/upload" onClick={() => setMobileOpen(false)} className={mobileItemClass}>Publish map</Link>
+                    {canPublish(user) && <Link href="/post/upload" onClick={() => setMobileOpen(false)} className={mobileItemClass}>Publish map</Link>}
                     <Link href={profileHref} onClick={() => setMobileOpen(false)} className={mobileItemClass}>Profile</Link>
                     <Link href="/settings" onClick={() => setMobileOpen(false)} className={mobileItemClass}>Settings</Link>
                     {(user?.role_name === 'admin' || user?.role === 'admin' || user?.is_admin || user?.is_superuser) && (

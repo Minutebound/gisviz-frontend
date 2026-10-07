@@ -8,9 +8,10 @@
 import React from 'react'
 import Link from 'next/link'
 import {
-  Heart, MessageSquare, Bookmark, Share2, Database, BadgeCheck,
+  Heart, MessageSquare, Bookmark, Database, BadgeCheck, Radio,
 } from 'lucide-react'
 import { Post } from '../../../types/gisviz'
+import PostMenu from '../post/PostMenu'
 // Note: ensure layerColor is properly defined in your lib/designTokens or replace with a fallback
 import { layerColor } from '../../../lib/designTokens' 
 
@@ -85,10 +86,17 @@ function Thumb({ post, className }: { post: Post; className: string }) {
     ? mediaUrl(post.thumbnail_url) 
     : mediaUrl(legacyMapThumb) ?? mediaUrl(legacyVisualThumb)
 
-  if (!src) return <VizFallback post={post} className={className} />
+  // a missing image file (404) shows the drawn fallback instead of a broken picture
+  const [broken, setBroken] = React.useState(false)
+  React.useEffect(() => setBroken(false), [src])
+  if (!src || broken) return <VizFallback post={post} className={className} />
+  // the poster image has a margin around the poster: zoomed in 10% by default, 10% more on hover
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img src={src} alt="" aria-hidden className={`object-cover ${className}`} loading="lazy" />
+    <div className={`overflow-hidden ${className}`}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={src} alt="" aria-hidden onError={() => setBroken(true)}
+           className="h-full w-full scale-[1.1] object-cover transition-transform duration-500 group-hover:scale-[1.2]" loading="lazy" />
+    </div>
   )
 }
 
@@ -199,13 +207,6 @@ function CardFooter({ post, onLike, onBookmark, onShare, busy }: FooterProps) {
       >
         <Bookmark size={17} fill={post.is_bookmarked ? 'currentColor' : 'none'} />
       </button>
-      <button
-        type="button" onClick={stop(onShare)}
-        aria-label="Share this post"
-        className="w-8 h-8 grid place-items-center text-gisviz-ink-soft hover:text-gisviz-ink transition-colors"
-      >
-        <Share2 size={16} />
-      </button>
     </div>
   )
 }
@@ -219,13 +220,19 @@ export default function FeedCard(props: FooterProps) {
   return (
     <article className="w-full overflow-hidden rounded-2xl border border-gisviz-border bg-gisviz-card
                         flex flex-col transition-colors hover:border-gisviz-accent/40">
-      <div className="px-5 pt-4 pb-3">
+      <div className="flex items-center justify-between gap-2 px-5 pt-4 pb-3">
         <PublisherRow post={post} />
+        <PostMenu postId={post.post_id} onShare={() => props.onShare?.(post)} className="-mr-2" />
       </div>
 
       <Link href={`/post/${post.post_id}`} className="group block">
         <Thumb post={post} className="block aspect-square w-full bg-gisviz-paper" />
         <div className="flex flex-col gap-2 px-5 pt-4">
+          {(post as any).post_type === 'live' && (
+            <span className="inline-flex w-fit items-center gap-1 rounded-md bg-gisviz-alert/10 px-2 py-0.5 font-mono text-[11px] font-bold uppercase tracking-wider text-gisviz-alert">
+              <Radio size={11} /> Live data
+            </span>
+          )}
           <h3 className="font-display text-[20px] sm:text-[22px] font-bold leading-[1.2]
                          tracking-[-0.02em] text-gisviz-ink group-hover:text-gisviz-accent-text transition-colors">
             {post.title}

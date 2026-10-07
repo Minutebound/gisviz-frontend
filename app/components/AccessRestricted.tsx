@@ -24,7 +24,7 @@ export default function AccessRestricted({
   backLabel = 'Return to Homepage',
 }: AccessRestrictedProps) {
   return (
-    <div className="max-w-5xl mx-auto py-10 px-4">
+    <div className="max-w-7xl mx-auto py-10 px-4">
       {/* Page header — same structure as reports page */}
       <div className="mb-8">
         <h1 className="text-[24px] font-display font-bold text-gisviz-ink flex items-center gap-3">

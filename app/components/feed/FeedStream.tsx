@@ -4,11 +4,11 @@ import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { 
-  Loader2, Inbox, Plus, ChevronDown, BarChart2, Check, Flame, Clock, Search, Eye, Award
+  Loader2, Inbox, Plus, ChevronDown, BarChart2, Check, Flame, Clock, Search
 } from 'lucide-react'
 import { useAuth } from '../../../context/AuthContext'
 import { canPublish as canPublishRole } from '../../../lib/roles'
-import { gisvizApi } from '../../../connector/api'
+import { gisvizApi, POSTS_CHANGED } from '../../../connector/api'
 import {
   Post,
   FeedFilters,
@@ -19,9 +19,10 @@ import {
 import { FOR_YOU, useCategories, useVisualCatalog } from '../../../lib/referenceData'
 import RegionFilter from '../RegionFilter'
 import CategoryBar from './CategoryBar'
-import FeedCard, { FeedCardSkeleton, mediaUrl } from './FeedCard'
+import FeedCard, { FeedCardSkeleton } from './FeedCard'
 import type { FeaturedPost } from '../../../connector/api'
 import FeedRail, { MobileFeaturedPublishers, MobileTrendingTags } from './FeedRail'
+import CategoryBanner from './CategoryBanner'
 import ShareModal from '../SharePost'
 
 const PAGE_SIZE = 12
@@ -89,6 +90,16 @@ export default function FeedStream() {
     [filters],
   )
 
+  // a post was published / edited / deleted: load page 0 again (new poster images); the banner pick too
+  const [reloadTick, setReloadTick] = useState(0)
+  useEffect(() => {
+    const bump = () => { featuredCache.clear(); setReloadTick(t => t + 1) }
+    const onStorage = (e: StorageEvent) => { if (e.key === POSTS_CHANGED) bump() }
+    window.addEventListener(POSTS_CHANGED, bump)
+    window.addEventListener('storage', onStorage)
+    return () => { window.removeEventListener(POSTS_CHANGED, bump); window.removeEventListener('storage', onStorage) }
+  }, [])
+
   // ── Fetch page 0 on filter update ──
   useEffect(() => {
     let alive = true
@@ -112,7 +123,7 @@ export default function FeedStream() {
       })
 
     return () => { alive = false }
-  }, [filterKey])
+  }, [filterKey, reloadTick])   // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadMore = async () => {
     if (loadingMore || exhausted) return
@@ -165,7 +176,7 @@ export default function FeedStream() {
     }
     featuredCache.get(key)!.then(p => { if (live) setFeatured(p) })
     return () => { live = false }
-  }, [filters.category])
+  }, [filters.category, reloadTick])
 
   // filter options from the database (lib/referenceData.ts) — nothing hard-coded
   const dbCategories = useCategories()
@@ -190,61 +201,12 @@ export default function FeedStream() {
       <CategoryBar filters={filters} onChange={applyFilters} />
 
       {/* Main Single-Column Content Wrapper */}
-      <main className="mx-auto max-w-6xl px-4 sm:px-8 lg:px-[72px] pt-5 sm:pt-8 pb-14 w-full flex flex-col gap-6 sm:gap-8">
+      <main className="mx-auto max-w-7xl px-4 sm:px-8 lg:px-[72px] pt-5 sm:pt-8 pb-14 w-full flex flex-col gap-6 sm:gap-8">
         
         {/* ── FULL WIDTH TOP SECTION ── */}
         
-        {/* 1. Category banner (tablet & desktop only; phones show just the category bar).
-               Left: the category from the DB. Right: editor's pick = its most-viewed post. */}
-        <div className="hidden sm:grid grid-cols-1 md:grid-cols-2 w-full relative rounded-[20px] overflow-hidden border border-gisviz-border bg-gisviz-card shadow-sm shrink-0">
-          <div
-            className="absolute inset-0 pointer-events-none"
-            style={{ background: `linear-gradient(to right, ${activeCategory.theme_color}1f, transparent 60%)` }}
-          />
-          <div className="relative p-6 md:p-8 lg:p-10 flex flex-col justify-center">
-            <span
-              className="font-mono text-[11.5px] uppercase tracking-[0.14em] font-bold mb-2.5 block"
-              style={{ color: activeCategory.theme_color }}
-            >
-              {filters.category ? 'Category' : 'Global Feed'}
-            </span>
-            <h1 className="font-display text-[32px] lg:text-[42px] font-bold tracking-[-0.03em] text-gisviz-ink mb-2 leading-tight">
-              {activeCategory.label}
-            </h1>
-            {activeCategory.description && (
-              <p className="text-[15px] lg:text-[16px] text-gisviz-ink-soft max-w-xl leading-relaxed">
-                {activeCategory.description}
-              </p>
-            )}
-          </div>
-
-          {featured ? (
-            <Link href={`/post/${featured.post_id}`}
-              className="group relative hidden md:block min-h-[220px] overflow-hidden border-l border-gisviz-border">
-              {mediaUrl(featured.visual_image_path)
-                ? <img src={mediaUrl(featured.visual_image_path)!} alt=""
-                       className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]" />
-                : <div className="absolute inset-0" style={{ background: `linear-gradient(135deg, ${featured.theme_color || activeCategory.theme_color}33, ${featured.theme_color || activeCategory.theme_color}0d)` }} />}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
-              <div className="absolute left-0 right-0 bottom-0 p-5 lg:p-6">
-                <span className="inline-flex items-center gap-1.5 mb-2 px-2.5 py-1 rounded-full text-[11px] font-mono font-bold uppercase tracking-wider text-white"
-                      style={{ background: featured.theme_color || activeCategory.theme_color }}>
-                  <Award size={12} /> Editor&apos;s pick
-                </span>
-                <h2 className="font-display text-[18px] lg:text-[21px] font-bold leading-snug text-white line-clamp-2 group-hover:underline decoration-white/50 underline-offset-4">
-                  {featured.title}
-                </h2>
-                <p className="mt-1.5 flex items-center gap-3 text-[12.5px] text-white/80">
-                  <span className="inline-flex items-center gap-1"><Eye size={13} /> {featured.views_count.toLocaleString()} {featured.views_count === 1 ? 'view' : 'views'}</span>
-                  {featured.publisher_handle && <span>@{featured.publisher_handle}</span>}
-                </p>
-              </div>
-            </Link>
-          ) : (
-            <div className="relative hidden md:block min-h-[220px]"
-                 style={{ background: `linear-gradient(to left, ${activeCategory.theme_color}26, transparent)` }} />
-          )}
-        </div>
+        {/* 1. Category banner with an animated infographic (tablet & desktop only; phones show just the category bar) */}
+        <CategoryBanner category={activeCategory} isCategory={!!filters.category} featured={featured} />
 
         {/* ── Header Controls (Filters, Search & Publish) ── */}
         <header className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 pb-4 border-b border-gisviz-border/60 shrink-0">

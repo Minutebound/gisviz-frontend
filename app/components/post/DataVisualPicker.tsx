@@ -4,27 +4,26 @@
  * DatasetVisualPicker — everything a post's visual needs, chosen before publishing (the post page
  * shows exactly this visual; readers cannot switch chart types there).
  *
- *   1. Dataset    search the catalog (datasets DB)
- *   2. Visual     the recommended chart or map is pre-selected; other types the data supports are
- *                 offered, named from the visual catalog (misc DB)
- *   3. Data       which columns go on the axes / colour / size / popup
- *   4. Story      title, subtitle, measure name
- *   5. Legend     colour bars by a category column, one colour per group (bar charts)
- *   6. Reference  average / median / fixed value line or ranking divider (bar charts)
- *   7. Filter     the labels readers can filter, and which are shown first
- *   + theme colour and a live preview with the whole dataset in its Data tab.
+ *   Dataset    search the catalog (datasets DB)
+ *   Visual     the recommended chart or map is pre-selected; other types the data supports are
+ *              offered, named from the visual catalog (misc DB)
+ *   Columns    which columns go on the axes / colour / size / popup
+ *   More       subtitle and value name, labels on by default, colour groups (bar charts), reference lines,
+ *              the labels readers can filter
+ * Compact, for the post editor's side panel; the editor shows the visual (onSpec) on the poster preview.
+ * The poster's headline is the post's title.
  *
  * Data choices (type, columns, colour column, map type) rebuild the spec on the server; presentation
  * choices apply to the preview instantly and are validated by the server on publish.
  */
 
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { Check, ChevronDown, Database, Loader2, Plus, Search, Sparkles, Trash2, X } from 'lucide-react'
+import { Check, ChevronDown, Database, Loader2, Lock, Plus, Radio, Search, Sparkles, Trash2, X } from 'lucide-react'
 import { gisvizApi } from '../../../connector/api'
 import { resolveSpec } from '../../../lib/visualSpec'
-import InteractiveVisual, { type VisualSpec } from '../InteractiveVisual'
+import type { VisualSpec } from '../InteractiveVisual'
 import { PALETTE } from '../visuals/D3Chart'
-import { DEFAULT_ACCENT, useCategories, useVisualCatalog } from '../../../lib/referenceData'
+import { DEFAULT_ACCENT, useVisualCatalog } from '../../../lib/referenceData'
 import { VIZ_NEEDS, hasLabelToggle, isMapViz, type VizParam } from '../../../types/visuals'
 import type {
   DatasetCard, ReferenceLineChoice, SuggestResponse, VisualChoice, VizOption, VizType,
@@ -40,6 +39,10 @@ interface Props {
   initialDatasetId?: string
   /** the spec as readers will see it (story choices applied): the poster preview puts it in the middle */
   onSpec?: (spec: VisualSpec | null) => void
+  /** only datasets of this pipeline: batch (standard posts) | stream (live posts) */
+  pipeline?: 'batch' | 'stream'
+  /** the visual is being (re)built on the server */
+  onLoading?: (busy: boolean) => void
 }
 
 const selectCls =
@@ -48,27 +51,19 @@ const inputCls = selectCls
 const labelCls = 'block text-[11px] font-mono text-gisviz-ink-soft mb-1.5 uppercase tracking-wider'
 const COLORABLE: VizType[] = ['bar', 'hbar', 'lollipop']      // colour groups + reference lines (story steps 4–5)
 
-function Step({ n, title, hint, children }: { n: number; title: string; hint?: string; children: React.ReactNode }) {
+function Step({ title, hint, children }: { n?: number; title: string; hint?: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-lg border border-gisviz-border bg-gisviz-card/60 p-4">
-      <h3 className="mb-3 flex items-baseline gap-2 text-[13px] font-semibold text-gisviz-ink">
-        <span className="font-mono text-[11px] text-gisviz-accent">{n}</span> {title}
-        {hint && <span className="text-[11.5px] font-normal text-gisviz-ink-soft">{hint}</span>}
+    <section>
+      <h3 className="mb-1.5 flex items-baseline gap-2 font-mono text-[11px] font-semibold uppercase tracking-wider text-gisviz-ink-soft">
+        {title}{hint && <span className="normal-case tracking-normal font-sans text-[11px] font-normal">{hint}</span>}
       </h3>
       {children}
     </section>
   )
 }
 
-export default function DatasetVisualPicker({ value, onChange, accent, onAccentChange, initialDatasetId, onSpec }: Props) {
-  // preset theme colours: the site accent plus one per category colour in the DB (duplicates dropped)
-  const categories = useCategories()
+export default function DatasetVisualPicker({ value, onChange, accent, initialDatasetId, onSpec, pipeline, onLoading }: Props) {
   const catalog = useVisualCatalog()
-  const themePresets = useMemo(() => {
-    const seen = new Set<string>()
-    return [{ label: 'Default', color: DEFAULT_ACCENT }, ...categories.map(c => ({ label: c.label, color: c.theme_color }))]
-      .filter(p => { const k = p.color.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true })
-  }, [categories])
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<DatasetCard[]>([])
   const [open, setOpen] = useState(false)
@@ -92,7 +87,7 @@ export default function DatasetVisualPicker({ value, onChange, accent, onAccentC
     setSearching(true)
     const t = setTimeout(async () => {
       try {
-        const rows = await gisvizApi.searchDatasets(query.trim(), 12)
+        const rows = await gisvizApi.searchDatasets(query.trim(), 12, pipeline)
         if (!cancelled) { setResults(rows); setSearchError('') }
       } catch (e: any) {
         if (!cancelled) setSearchError(e?.response?.data?.detail || 'Could not reach the dataset catalog.')
@@ -101,7 +96,7 @@ export default function DatasetVisualPicker({ value, onChange, accent, onAccentC
       }
     }, 250)
     return () => { cancelled = true; clearTimeout(t) }
-  }, [query, open])
+  }, [query, open, pipeline])
 
   // close the result list on outside click
   useEffect(() => {
@@ -111,6 +106,7 @@ export default function DatasetVisualPicker({ value, onChange, accent, onAccentC
   }, [])
 
   // ── load a dataset's column profile + ranked visual options; the recommended one is pre-selected ──
+  const picked = useRef<DatasetCard | null>(null)          // the search result (access flags) of the chosen dataset
   const loadInfo = async (datasetId: string, keepChoice: boolean) => {
     setLoadingInfo(true)
     setSpec(null)
@@ -120,7 +116,8 @@ export default function DatasetVisualPicker({ value, onChange, accent, onAccentC
       setInfo(sres)
       if (!keepChoice) {
         const best = sres.options.find(o => o.viz === sres.recommended) ?? sres.options[0]
-        onChange({ dataset_id: datasetId, viz: best.viz, ...best.params }, sres.dataset)
+        const card = picked.current?.dataset_id === datasetId ? { ...sres.dataset, ...picked.current } : sres.dataset
+        onChange({ dataset_id: datasetId, viz: best.viz, ...best.params }, card)
       }
     } catch (e: any) {
       setInfo(null)
@@ -132,6 +129,7 @@ export default function DatasetVisualPicker({ value, onChange, accent, onAccentC
   }
 
   const pickDataset = (card: DatasetCard) => {
+    picked.current = card
     setOpen(false)
     setQuery('')
     loadInfo(card.dataset_id, false)
@@ -216,6 +214,7 @@ export default function DatasetVisualPicker({ value, onChange, accent, onAccentC
   }, [spec, accent, value])
 
   useEffect(() => { onSpec?.(shownSpec) }, [shownSpec])   // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { onLoading?.(loadingSpec || loadingInfo) }, [loadingSpec, loadingInfo])   // eslint-disable-line react-hooks/exhaustive-deps
 
   const option: VizOption | undefined = useMemo(
     () => info?.options.find(o => o.viz === value?.viz), [info, value?.viz])
@@ -279,10 +278,9 @@ export default function DatasetVisualPicker({ value, onChange, accent, onAccentC
   const setRef = (i: number, p: Partial<ReferenceLineChoice>) => patch({ reference_lines: refs.map((r, k) => (k === i ? { ...r, ...p } : r)) })
 
   return (
-    <div className="space-y-4">
-      {/* ── search ── */}
-      <div ref={boxRef} className="relative">
-        <label className={labelCls}>Dataset <span className="text-gisviz-alert">*</span></label>
+    <div className="space-y-3.5">
+      {/* ── search (hidden once a dataset is picked; its card has a "change" button) ── */}
+      <div ref={boxRef} className={`relative ${info && value ? 'hidden' : ''}`}>
         <div className="relative">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gisviz-ink-soft" />
           <input
@@ -311,8 +309,20 @@ export default function DatasetVisualPicker({ value, onChange, accent, onAccentC
                 className="flex w-full items-start gap-3 px-3 py-2.5 text-left hover:bg-gisviz-paper border-b border-gisviz-border last:border-0"
               >
                 <Database size={15} className="mt-0.5 shrink-0 text-gisviz-accent" />
-                <span className="min-w-0">
-                  <span className="block truncate text-[13px] font-semibold text-gisviz-ink">{r.title}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center gap-1.5">
+                    <span className="truncate text-[13px] font-semibold text-gisviz-ink">{r.title}</span>
+                    {r.visibility === 'private' && (
+                      <span className="inline-flex shrink-0 items-center gap-0.5 rounded bg-gisviz-paper px-1.5 py-px font-mono text-[9.5px] font-bold uppercase text-gisviz-ink-soft" title={r.can_publish_publicly ? 'Private dataset: posts show the visual, never the rows' : 'Shared with you: posts on it must stay private'}>
+                        <Lock size={9} /> {r.can_publish_publicly ? 'Private' : 'Shared'}
+                      </span>
+                    )}
+                    {r.pipeline === 'stream' && (
+                      <span className="inline-flex shrink-0 items-center gap-0.5 rounded bg-gisviz-alert/10 px-1.5 py-px font-mono text-[9.5px] font-bold uppercase text-gisviz-alert">
+                        <Radio size={9} /> Live
+                      </span>
+                    )}
+                  </span>
                   <span className="block truncate font-mono text-[11px] text-gisviz-ink-soft">
                     {r.dataset_id} · {r.row_count.toLocaleString()} rows · {r.column_count ?? '?'} columns
                     {r.geometry_type ? ` · ${r.geometry_type}` : ' · table'}
@@ -332,7 +342,7 @@ export default function DatasetVisualPicker({ value, onChange, accent, onAccentC
 
       {info && value && (
         <>
-          <div className="flex items-start justify-between gap-3 rounded-md border border-gisviz-border bg-gisviz-paper/50 px-3 py-2.5">
+          <div className="flex items-start justify-between gap-3 rounded-md border border-gisviz-border bg-gisviz-paper/50 px-3 py-2">
             <div className="min-w-0">
               <p className="truncate text-[13px] font-semibold text-gisviz-ink">{info.dataset.title}</p>
               <p className="font-mono text-[11px] text-gisviz-ink-soft">
@@ -340,34 +350,34 @@ export default function DatasetVisualPicker({ value, onChange, accent, onAccentC
                 {info.dataset.geometry_type ? ` · ${info.dataset.geometry_type}` : ''}
               </p>
             </div>
-            <button type="button" onClick={clear} className="shrink-0 text-gisviz-ink-soft hover:text-gisviz-alert" aria-label="Choose a different dataset">
-              <X size={16} />
+            <button type="button" onClick={clear} className="shrink-0 rounded px-1.5 py-0.5 text-[11.5px] font-semibold text-gisviz-accent hover:bg-gisviz-accent/10" aria-label="Choose a different dataset">
+              Change
             </button>
           </div>
 
-          <Step n={1} title="Visual" hint="the recommended one is selected; readers see only this one">
+          <Step n={1} title="Visual" hint="the best fit is selected">
             {(() => {
               const tile = (o: VizOption) => {
                 const on = o.viz === value.viz
                 return (
                   <button key={o.viz} type="button" onClick={() => changeViz(o.viz)} aria-pressed={on}
-                    className={`relative rounded-md border px-3 py-2 text-left transition-colors ${on
+                    className={`relative rounded-md border px-2.5 py-1.5 text-left transition-colors ${on
                       ? 'border-gisviz-accent bg-gisviz-accent/10' : 'border-gisviz-border bg-gisviz-canvas hover:border-gisviz-border-strong'}`}>
-                    <span className="block pr-9 text-[12.5px] font-semibold text-gisviz-ink">{typeName(o.viz)}</span>
-                    <span className="block font-mono text-[10.5px] uppercase tracking-wider text-gisviz-ink-soft">{isMapViz(o.viz) ? 'Map' : 'Chart'}</span>
+                    <span className="block truncate pr-8 text-[12px] font-semibold text-gisviz-ink" title={typeName(o.viz)}>{typeName(o.viz)}</span>
+                    <span className="block font-mono text-[10px] uppercase tracking-wider text-gisviz-ink-soft">{isMapViz(o.viz) ? 'Map' : 'Chart'}</span>
                     {o.viz === info.recommended && (
                       <span className="absolute right-1.5 top-1.5 inline-flex items-center gap-0.5 rounded-full bg-gisviz-accent px-1.5 py-0.5 text-[9.5px] font-bold uppercase text-[color:var(--accent-on)]">
                         <Sparkles size={9} /> Best
                       </span>
                     )}
-                    {on && <Check size={13} className="absolute bottom-2 right-2 text-gisviz-accent" />}
+                    {on && !(o.viz === info.recommended) && <Check size={13} className="absolute right-2 top-2 text-gisviz-accent" />}
                   </button>
                 )
               }
               const chosenInRest = restOpts.some(o => o.viz === value.viz)
               return (
                 <>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">{topOpts.map(tile)}</div>
+                  <div className="grid grid-cols-2 gap-1.5">{topOpts.map(tile)}</div>
                   {restOpts.length > 0 && (
                     <div className="mt-2.5">
                       <button type="button" onClick={() => setShowAll(v => !v)}
@@ -378,7 +388,7 @@ export default function DatasetVisualPicker({ value, onChange, accent, onAccentC
                       {(showAll || chosenInRest) && families.map(f => (
                         <div key={f} className="mt-3">
                           <p className="mb-1.5 font-mono text-[10.5px] font-bold uppercase tracking-wider text-gisviz-ink-soft">{famName(f)}</p>
-                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">{restOpts.filter(o => famOf(o.viz) === f).map(tile)}</div>
+                          <div className="grid grid-cols-2 gap-1.5">{restOpts.filter(o => famOf(o.viz) === f).map(tile)}</div>
                         </div>
                       ))}
                     </div>
@@ -387,7 +397,7 @@ export default function DatasetVisualPicker({ value, onChange, accent, onAccentC
               )
             })()}
             {option && (
-              <p className="mt-2.5 flex items-start gap-1.5 text-[12px] text-gisviz-ink-soft">
+              <p className="mt-2 flex items-start gap-1.5 text-[11.5px] leading-snug text-gisviz-ink-soft">
                 <Sparkles size={13} className="mt-0.5 shrink-0 text-gisviz-accent" />
                 <span>{value.viz === info.recommended ? 'Recommended: ' : ''}{option.reason}</span>
               </p>
@@ -403,8 +413,8 @@ export default function DatasetVisualPicker({ value, onChange, accent, onAccentC
             )}
           </Step>
 
-          <Step n={2} title="Data">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Step n={2} title="Columns">
+            <div className="grid grid-cols-2 gap-2">
               {has('x') && (
                 <div>
                   <label className={labelCls}>{roleLabel.x ?? (numericX ? 'X axis (number)' : xKind === 'time' ? 'Time / order' : 'Labels / categories')}{!req('x') && ' (optional)'}</label>
@@ -464,33 +474,26 @@ export default function DatasetVisualPicker({ value, onChange, accent, onAccentC
             )}
           </Step>
 
-          <Step n={3} title="Story" hint="optional">
-            <div className="grid grid-cols-1 gap-3">
-              <div>
-                <label className={labelCls}>Visual title</label>
-                <input value={value.title ?? ''} maxLength={160} onChange={e => patch({ title: e.target.value })}
-                       placeholder="e.g. The countries that are best at math" className={inputCls} />
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className={labelCls}>Subtitle</label>
-                  <input value={value.subtitle ?? ''} maxLength={300} onChange={e => patch({ subtitle: e.target.value })}
-                         placeholder="What the numbers are, and when" className={inputCls} />
-                </div>
-                {!isMap && (
-                  <div>
-                    <label className={labelCls}>Value name</label>
-                    <input value={value.y_label ?? ''} maxLength={60} onChange={e => patch({ y_label: e.target.value })}
-                           placeholder={value.y === 'count' ? 'Count' : (cols.find(c => c.column_name === value.y)?.label || value.y || '')} className={inputCls} />
-                  </div>
-                )}
-              </div>
+          <details className="group rounded-md border border-gisviz-border">
+            <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2 text-[12.5px] font-semibold text-gisviz-ink">
+              More options
+              <span className="text-[11px] font-normal text-gisviz-ink-soft">subtitle{colorable ? ', colours, reference line' : ''}{filterField && labels.length > 1 ? ', reader filter' : ''}</span>
+              <ChevronDown size={14} className="text-gisviz-ink-soft transition-transform group-open:rotate-180" />
+            </summary>
+            <div className="space-y-3.5 border-t border-gisviz-border px-3 py-3">
+          <Step n={3} title="Poster text" hint="optional">
+            <div className="grid grid-cols-1 gap-2">
+              <input value={value.subtitle ?? ''} maxLength={300} onChange={e => patch({ subtitle: e.target.value })}
+                     placeholder="Subtitle: what the numbers are, and when" className={inputCls} aria-label="Subtitle" />
+              {!isMap && (
+                <input value={value.y_label ?? ''} maxLength={60} onChange={e => patch({ y_label: e.target.value })} aria-label="Value name"
+                       placeholder={`Value name: ${value.y === 'count' ? 'Count' : (cols.find(c => c.column_name === value.y)?.label || value.y || '')}`} className={inputCls} />
+              )}
               {hasLabelToggle(value.viz) && (
-                <label className="inline-flex items-center gap-2 text-[13px] text-gisviz-ink">
+                <label className="inline-flex items-center gap-2 text-[12.5px] text-gisviz-ink">
                   <input type="checkbox" className="accent-gisviz-accent" checked={!!value.show_labels}
                          onChange={e => patch({ show_labels: e.target.checked })} />
-                  Show labels on the {isMap ? 'map' : 'points'} by default
-                  <span className="text-[12px] text-gisviz-ink-soft">(readers can switch them on / off)</span>
+                  Labels on the {isMap ? 'map' : 'points'} by default
                 </label>
               )}
             </div>
@@ -498,7 +501,7 @@ export default function DatasetVisualPicker({ value, onChange, accent, onAccentC
 
           {colorable && (
             <Step n={4} title="Legend & colours" hint="colour the bars by a category">
-              <div className="max-w-xs">
+              <div>
                 <label className={labelCls}>Colour by</label>
                 <select value={value.color ?? ''} onChange={e => patch({ color: e.target.value || null, colors: null })} className={selectCls}>
                   <option value="">One colour (theme)</option>
@@ -524,7 +527,7 @@ export default function DatasetVisualPicker({ value, onChange, accent, onAccentC
             <Step n={5} title="Reference line" hint="e.g. an average the bars are compared with">
               <div className="space-y-2.5">
                 {refs.map((r, i) => (
-                  <div key={i} className="grid grid-cols-2 sm:grid-cols-[1fr_1fr_1.4fr_1fr_auto] gap-2 items-end">
+                  <div key={i} className="grid grid-cols-2 gap-2 items-end rounded-md bg-gisviz-paper/50 p-2">
                     <div>
                       <label className={labelCls}>Value</label>
                       <select value={r.stat ?? 'value'} className={selectCls}
@@ -579,7 +582,7 @@ export default function DatasetVisualPicker({ value, onChange, accent, onAccentC
                 </button>
               </div>
               {value.filter_default && (
-                <div className="max-h-44 overflow-y-auto rounded-md border border-gisviz-border bg-gisviz-canvas p-2 grid grid-cols-2 sm:grid-cols-3 gap-x-3">
+                <div className="max-h-44 overflow-y-auto rounded-md border border-gisviz-border bg-gisviz-canvas p-2 grid grid-cols-2 gap-x-3">
                   {labels.map(l => (
                     <label key={l} className="flex items-center gap-2 py-0.5 text-[12.5px] text-gisviz-ink truncate">
                       <input type="checkbox" className="accent-gisviz-accent" checked={value.filter_default!.includes(l)}
@@ -592,44 +595,10 @@ export default function DatasetVisualPicker({ value, onChange, accent, onAccentC
             </Step>
           )}
 
-          {onAccentChange && (
-            <div>
-              <label className={labelCls}>Theme colour</label>
-              <div className="flex flex-wrap items-center gap-2">
-                {themePresets.map(p => (
-                  <button
-                    key={p.label}
-                    type="button"
-                    title={p.label}
-                    aria-label={`Theme colour ${p.label}`}
-                    aria-pressed={accent?.toLowerCase() === p.color.toLowerCase()}
-                    onClick={() => onAccentChange(p.color)}
-                    style={{ background: p.color }}
-                    className={`h-7 w-7 rounded-full border-2 transition-transform hover:scale-110 ${
-                      accent?.toLowerCase() === p.color.toLowerCase() ? 'border-gisviz-ink' : 'border-transparent'}`}
-                  />
-                ))}
-                <label className="ml-1 inline-flex items-center gap-2 text-[12px] text-gisviz-ink-soft">
-                  <input type="color" value={accent || DEFAULT_ACCENT} onChange={e => onAccentChange(e.target.value)}
-                         className="h-7 w-9 cursor-pointer rounded border border-gisviz-border bg-transparent p-0" aria-label="Custom theme colour" />
-                  Custom
-                </label>
-              </div>
             </div>
-          )}
+          </details>
 
-          {/* ── live preview ── */}
-          <div>
-            <label className={labelCls}>Preview (interactive, exactly as readers will see it)</label>
-            {specError && <p className="mb-2 text-[12px] font-mono text-gisviz-alert">{specError}</p>}
-            {loadingSpec && !shownSpec && (
-              <div className="flex h-[300px] items-center justify-center rounded-[16px] border border-gisviz-border bg-gisviz-canvas">
-                <Loader2 className="animate-spin text-gisviz-accent" size={26} />
-              </div>
-            )}
-            {shownSpec && <InteractiveVisual key={key} spec={shownSpec} datasetId={value.dataset_id}
-                                             height={value.viz === 'hbar' ? Math.min(900, Math.max(380, labels.length * 22 + 80)) : 420} />}
-          </div>
+          {specError && <p className="text-[12px] font-mono text-gisviz-alert">{specError}</p>}
         </>
       )}
 
