@@ -326,7 +326,8 @@ export default function DatasetVisualPicker({ value, onChange, accent, initialDa
         </div>
 
         {open && (
-          <div className="absolute z-30 mt-1 max-h-72 w-full overflow-auto rounded-lg border border-gisviz-border bg-gisviz-card shadow-lg">
+          // in the flow, not floating: the Data tab is short, so a floating list would be clipped by the panel
+          <div role="listbox" aria-label="Matching datasets" className="mt-2 max-h-80 w-full overflow-auto rounded-lg border border-gisviz-border bg-gisviz-card">
             {searchError && <p className="p-3 text-[12px] text-gisviz-alert">{searchError}</p>}
             {!searchError && !searching && results.length === 0 && (
               <p className="p-3 text-[12px] text-gisviz-ink-soft">No datasets match “{query}”.</p>
