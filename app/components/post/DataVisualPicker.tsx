@@ -2,14 +2,14 @@
 
 /**
  * DatasetVisualPicker — everything a post's visual needs, chosen before publishing (the post page
- * shows exactly this visual; readers cannot switch chart types there).
+ * shows exactly this visual; readers cannot switch chart types there). Two sections, shown one at a time by the
+ * post editor's tabs (both stay mounted, so the preview keeps updating):
  *
- *   Dataset    search the catalog (datasets DB)
- *   Visual     the recommended chart or map is pre-selected; other types the data supports are
- *              offered, named from the visual catalog (misc DB)
- *   Columns    which columns go on the axes / colour / size / popup
- *   More       subtitle and value name, labels on by default, colour groups (bar charts), reference lines,
- *              the labels readers can filter
+ *   data     Dataset (search the catalog) · Visual (the recommended chart or map is pre-selected; other types the
+ *            data supports are offered) · Columns (axes, size, labels)
+ *   design   Text (subtitle, value name, labels) · Classes & colours (a class column, one colour per class,
+ *            palettes) · Axes (linear or log) · Measures (mean / median / mode / a fixed threshold, optionally
+ *            shaded, plus a summary card) · the labels readers can filter
  * Compact, for the post editor's side panel; the editor shows the visual (onSpec) on the poster preview.
  * The poster's headline is the post's title.
  *
@@ -18,13 +18,14 @@
  */
 
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { Check, ChevronDown, Database, Loader2, Lock, Plus, Radio, Search, Sparkles, Trash2, X } from 'lucide-react'
+import { Check, ChevronDown, Database, Loader2, Lock, Radio, Search, Sparkles, Trash2, X } from 'lucide-react'
 import { gisvizApi } from '../../../connector/api'
 import { resolveSpec } from '../../../lib/visualSpec'
 import type { VisualSpec } from '../InteractiveVisual'
 import { PALETTE } from '../visuals/D3Chart'
 import { DEFAULT_ACCENT, useVisualCatalog } from '../../../lib/referenceData'
-import { VIZ_NEEDS, hasLabelToggle, isMapViz, type VizParam } from '../../../types/visuals'
+import { REF_VIZ, VIZ_NEEDS, XY_VIZ, hasLabelToggle, isMapViz, type VizParam } from '../../../types/visuals'
+import { Field, Group, Pill, Seg, Toggle, inputCls } from './ui'
 import type {
   DatasetCard, ReferenceLineChoice, SuggestResponse, VisualChoice, VizOption, VizType,
 } from '../../../types/visuals'
@@ -43,26 +44,27 @@ interface Props {
   pipeline?: 'batch' | 'stream'
   /** the visual is being (re)built on the server */
   onLoading?: (busy: boolean) => void
+  /** which part of the designer is shown: the data (dataset, visual, columns) or the design (colours, axes, measures) */
+  section?: 'data' | 'design'
+  /** design section with no dataset yet: take the publisher to the data section */
+  onGoData?: () => void
 }
 
-const selectCls =
-  'w-full bg-gisviz-canvas border border-gisviz-border rounded-md px-3 py-2 text-gisviz-ink text-[12.5px] focus:ring-2 focus:ring-gisviz-accent outline-none'
-const inputCls = selectCls
-const labelCls = 'block text-[11px] font-mono text-gisviz-ink-soft mb-1.5 uppercase tracking-wider'
-const COLORABLE: VizType[] = ['bar', 'hbar', 'lollipop']      // colour groups + reference lines (story steps 4–5)
+const selectCls = inputCls
+const COLORABLE: VizType[] = ['bar', 'hbar', 'lollipop']      // classes coloured by a category column even without a "color" role
+/** Palettes the publisher can apply to the classes in one click. The first is the site default. */
+const PALETTES: { name: string; colors: string[] }[] = [
+  { name: 'Default', colors: PALETTE },
+  { name: 'Colour-blind safe', colors: ['#0072B2', '#E69F00', '#009E73', '#CC79A7', '#D55E00', '#56B4E9', '#F0E442', '#999999'] },
+  { name: 'Soft', colors: ['#7aa6c2', '#e3b95f', '#8fb98e', '#b48fc4', '#d98a87', '#68bfb5', '#ee9b83', '#a5a0ae'] },
+]
+const STAT_NAME = { mean: 'Mean', median: 'Median', mode: 'Mode' } as const
 
 function Step({ title, hint, children }: { n?: number; title: string; hint?: string; children: React.ReactNode }) {
-  return (
-    <section>
-      <h3 className="mb-1.5 flex items-baseline gap-2 font-mono text-[11px] font-semibold uppercase tracking-wider text-gisviz-ink-soft">
-        {title}{hint && <span className="normal-case tracking-normal font-sans text-[11px] font-normal">{hint}</span>}
-      </h3>
-      {children}
-    </section>
-  )
+  return <Group title={title} hint={hint}>{children}</Group>
 }
 
-export default function DatasetVisualPicker({ value, onChange, accent, initialDatasetId, onSpec, pipeline, onLoading }: Props) {
+export default function DatasetVisualPicker({ value, onChange, accent, initialDatasetId, onSpec, pipeline, onLoading, section = 'data', onGoData }: Props) {
   const catalog = useVisualCatalog()
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<DatasetCard[]>([])
@@ -207,7 +209,12 @@ export default function DatasetVisualPicker({ value, onChange, accent, initialDa
     const out: any = { ...spec, accent: accent || undefined,
       title: value.title || undefined, subtitle: value.subtitle || undefined, y_label: value.y_label || undefined }
     if (value.color) out.colors = value.colors ?? undefined
-    if (COLORABLE.includes(value.viz)) out.reference_lines = value.reference_lines ?? undefined
+    if (REF_VIZ.includes(value.viz)) out.reference_lines = value.reference_lines ?? undefined
+    if (XY_VIZ.includes(value.viz)) {
+      out.x_scale = value.x_scale === 'log' ? 'log' : undefined
+      out.y_scale = value.y_scale === 'log' ? 'log' : undefined
+      out.show_summary = value.show_summary || undefined
+    }
     if (out.label_filter) out.label_filter = { ...out.label_filter, default: value.filter_default ?? null }
     if (hasLabelToggle(value.viz)) out.show_labels = !!value.show_labels
     return out as VisualSpec
@@ -255,6 +262,8 @@ export default function DatasetVisualPicker({ value, onChange, accent, initialDa
   const colorCols = cols.filter(c => (c.dtype === 'categorical' || c.dtype === 'text') && c.n_distinct <= (value?.viz === 'edge_bundling' ? 60 : 24) && c.column_name !== value?.x)
   const allowCount = option?.count ?? (!isMap && value?.viz !== 'scatter' && value?.viz !== 'bubble' && value?.viz !== 'histogram')
   const colorable = !!value && COLORABLE.includes(value.viz)
+  const isXY = !!value && XY_VIZ.includes(value.viz)
+  const canRef = !!value && REF_VIZ.includes(value.viz)
   const has = (r: VizParam) => needs.includes(r) || optional.includes(r)
   const req = (r: VizParam) => needs.includes(r)
 
@@ -270,17 +279,38 @@ export default function DatasetVisualPicker({ value, onChange, accent, initialDa
     const opt = info?.options.find(o => o.viz === viz)
     if (!opt || !value) return
     const keepStory = { title: value.title, subtitle: value.subtitle, y_label: value.y_label, show_labels: value.show_labels }
-    onChange({ dataset_id: value.dataset_id, viz, ...opt.params, label_field: opt.params.label_field ?? value.label_field,
-               ...keepStory, ...(COLORABLE.includes(viz) ? { color: opt.params.color ?? value.color, colors: value.colors, reference_lines: value.reference_lines } : {}) })
+    const canColorNew = COLORABLE.includes(viz) || (opt.optional ?? []).includes('color') || (opt.needs ?? []).includes('color')
+    onChange({
+      dataset_id: value.dataset_id, viz, ...opt.params, label_field: opt.params.label_field ?? value.label_field, ...keepStory,
+      ...(canColorNew ? { color: opt.params.color ?? value.color, colors: value.colors } : {}),
+      ...(REF_VIZ.includes(viz) ? { reference_lines: (value.reference_lines ?? []).map(r => (XY_VIZ.includes(viz) ? r : { ...r, axis: undefined, shade: undefined })) } : {}),
+      ...(XY_VIZ.includes(viz) ? { x_scale: value.x_scale, y_scale: value.y_scale, show_summary: value.show_summary } : {}),
+    })
   }
   const patch = (p: Partial<VisualChoice>) => value && onChange({ ...value, ...p })
   const refs = value?.reference_lines ?? []
   const setRef = (i: number, p: Partial<ReferenceLineChoice>) => patch({ reference_lines: refs.map((r, k) => (k === i ? { ...r, ...p } : r)) })
+  const addRef = (r: ReferenceLineChoice) => refs.length < 3 && patch({ reference_lines: [...refs, r] })
+  const canColor = !!value && (colorable || has('color'))
+  const applyPalette = (colors: string[]) => patch({ colors: Object.fromEntries(groups.map((g, i) => [g, colors[i % colors.length]])) })
+
+  const groupCounts = useMemo(() => {
+    const m = new Map<string, number>()
+    if (value?.color) for (const r of records) { const g = String(r[value.color] ?? ''); if (g) m.set(g, (m.get(g) ?? 0) + 1) }
+    return m
+  }, [records, value?.color])
+  const medianOf = (col?: string | null) => {
+    const v = records.map(r => Number(r[col ?? ''])).filter(n => Number.isFinite(n)).sort((a, b) => a - b)
+    return v.length ? v[Math.floor(v.length / 2)] : 0
+  }
+  const hasData = !!(info && value)
+  const sectionCls = (s: 'data' | 'design') =>
+    `divide-y divide-gisviz-border [&>*]:py-5 [&>*:first-child]:pt-0 [&>*:last-child]:pb-0 ${section === s ? '' : 'hidden'}`
 
   return (
-    <div className="space-y-3.5">
-      {/* ── search (hidden once a dataset is picked; its card has a "change" button) ── */}
-      <div ref={boxRef} className={`relative ${info && value ? 'hidden' : ''}`}>
+    <div className="space-y-5">
+      {/* ── search (only until a dataset is picked; its card has a "change" button) ── */}
+      <div ref={boxRef} className={`relative ${section === 'data' && !hasData ? '' : 'hidden'}`}>
         <div className="relative">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gisviz-ink-soft" />
           <input
@@ -289,41 +319,41 @@ export default function DatasetVisualPicker({ value, onChange, accent, initialDa
             onChange={e => { setQuery(e.target.value); setOpen(true) }}
             onFocus={() => setOpen(true)}
             placeholder="Search datasets by name or code, e.g. ds_00001"
-            className="w-full bg-gisviz-canvas border border-gisviz-border rounded-md pl-9 pr-9 py-2.5 text-gisviz-ink text-[13px] focus:ring-2 focus:ring-gisviz-accent outline-none"
+            className={`${inputCls} h-10 pl-9 pr-9`}
             aria-label="Search datasets"
           />
           {searching && <Loader2 size={15} className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-gisviz-accent" />}
         </div>
 
         {open && (
-          <div className="absolute z-30 mt-1 w-full max-h-72 overflow-auto rounded-md border border-gisviz-border bg-gisviz-card shadow-lg">
-            {searchError && <p className="p-3 text-[12px] font-mono text-gisviz-alert">{searchError}</p>}
+          <div className="absolute z-30 mt-1 max-h-72 w-full overflow-auto rounded-lg border border-gisviz-border bg-gisviz-card shadow-lg">
+            {searchError && <p className="p-3 text-[12px] text-gisviz-alert">{searchError}</p>}
             {!searchError && !searching && results.length === 0 && (
-              <p className="p-3 text-[12px] font-mono text-gisviz-ink-soft">No datasets match “{query}”.</p>
+              <p className="p-3 text-[12px] text-gisviz-ink-soft">No datasets match “{query}”.</p>
             )}
             {results.map(r => (
               <button
                 key={r.dataset_id}
                 type="button"
                 onClick={() => pickDataset(r)}
-                className="flex w-full items-start gap-3 px-3 py-2.5 text-left hover:bg-gisviz-paper border-b border-gisviz-border last:border-0"
+                className="flex w-full items-start gap-3 border-b border-gisviz-border px-3 py-2.5 text-left last:border-0 hover:bg-gisviz-paper"
               >
                 <Database size={15} className="mt-0.5 shrink-0 text-gisviz-accent" />
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-1.5">
                     <span className="truncate text-[13px] font-semibold text-gisviz-ink">{r.title}</span>
                     {r.visibility === 'private' && (
-                      <span className="inline-flex shrink-0 items-center gap-0.5 rounded bg-gisviz-paper px-1.5 py-px font-mono text-[9.5px] font-bold uppercase text-gisviz-ink-soft" title={r.can_publish_publicly ? 'Private dataset: posts show the visual, never the rows' : 'Shared with you: posts on it must stay private'}>
+                      <span className="inline-flex shrink-0 items-center gap-0.5 rounded bg-gisviz-paper px-1.5 py-px text-[10px] font-bold uppercase text-gisviz-ink-soft" title={r.can_publish_publicly ? 'Private dataset: posts show the visual, never the rows' : 'Shared with you: posts on it must stay private'}>
                         <Lock size={9} /> {r.can_publish_publicly ? 'Private' : 'Shared'}
                       </span>
                     )}
                     {r.pipeline === 'stream' && (
-                      <span className="inline-flex shrink-0 items-center gap-0.5 rounded bg-gisviz-alert/10 px-1.5 py-px font-mono text-[9.5px] font-bold uppercase text-gisviz-alert">
+                      <span className="inline-flex shrink-0 items-center gap-0.5 rounded bg-gisviz-alert/10 px-1.5 py-px text-[10px] font-bold uppercase text-gisviz-alert">
                         <Radio size={9} /> Live
                       </span>
                     )}
                   </span>
-                  <span className="block truncate font-mono text-[11px] text-gisviz-ink-soft">
+                  <span className="block truncate text-[11.5px] text-gisviz-ink-soft">
                     {r.dataset_id} · {r.row_count.toLocaleString()} rows · {r.column_count ?? '?'} columns
                     {r.geometry_type ? ` · ${r.geometry_type}` : ' · table'}
                   </span>
@@ -335,274 +365,305 @@ export default function DatasetVisualPicker({ value, onChange, accent, initialDa
       </div>
 
       {loadingInfo && (
-        <div className="flex items-center gap-2 text-[12px] font-mono text-gisviz-ink-soft">
+        <div className="flex items-center gap-2 text-[12.5px] text-gisviz-ink-soft">
           <Loader2 size={14} className="animate-spin" /> Analysing columns…
+        </div>
+      )}
+
+      {section === 'design' && !hasData && !loadingInfo && (
+        <div className="rounded-xl border border-dashed border-gisviz-border px-4 py-8 text-center">
+          <p className="text-[13px] font-semibold text-gisviz-ink">Pick a dataset first</p>
+          <p className="mt-1 text-[12px] text-gisviz-ink-soft">Colours, axes and measures depend on the data you chart.</p>
+          {onGoData && (
+            <button type="button" onClick={onGoData} className="mt-3 inline-flex h-8 items-center rounded-lg bg-gisviz-accent px-3 text-[12.5px] font-bold text-[color:var(--accent-on)]">
+              Choose a dataset
+            </button>
+          )}
         </div>
       )}
 
       {info && value && (
         <>
-          <div className="flex items-start justify-between gap-3 rounded-md border border-gisviz-border bg-gisviz-paper/50 px-3 py-2">
-            <div className="min-w-0">
-              <p className="truncate text-[13px] font-semibold text-gisviz-ink">{info.dataset.title}</p>
-              <p className="font-mono text-[11px] text-gisviz-ink-soft">
-                {info.dataset.dataset_id} · {info.dataset.row_count.toLocaleString()} rows · {cols.length} columns
-                {info.dataset.geometry_type ? ` · ${info.dataset.geometry_type}` : ''}
-              </p>
+          {/* ════════════ DATA: dataset · visual · columns ════════════ */}
+          <div className={sectionCls('data')}>
+            <div className="flex items-start justify-between gap-3 rounded-xl border border-gisviz-border bg-gisviz-paper/50 px-3 py-2.5">
+              <div className="min-w-0">
+                <p className="truncate text-[13px] font-semibold text-gisviz-ink">{info.dataset.title}</p>
+                <p className="text-[11.5px] text-gisviz-ink-soft">
+                  {info.dataset.dataset_id} · {info.dataset.row_count.toLocaleString()} rows · {cols.length} columns
+                  {info.dataset.geometry_type ? ` · ${info.dataset.geometry_type}` : ''}
+                </p>
+              </div>
+              <button type="button" onClick={clear} className="shrink-0 rounded-md px-2 py-1 text-[12px] font-semibold text-gisviz-accent hover:bg-gisviz-accent/10" aria-label="Choose a different dataset">
+                Change
+              </button>
             </div>
-            <button type="button" onClick={clear} className="shrink-0 rounded px-1.5 py-0.5 text-[11.5px] font-semibold text-gisviz-accent hover:bg-gisviz-accent/10" aria-label="Choose a different dataset">
-              Change
-            </button>
+
+            <Step title="Visual" hint="The best fit for your data is selected. Pick another to compare.">
+              {(() => {
+                const tile = (o: VizOption) => {
+                  const on = o.viz === value.viz
+                  return (
+                    <button key={o.viz} type="button" onClick={() => changeViz(o.viz)} aria-pressed={on}
+                      className={`relative rounded-lg border px-2.5 py-2 text-left transition-colors ${on
+                        ? 'border-gisviz-accent bg-gisviz-accent/10' : 'border-gisviz-border bg-gisviz-canvas hover:border-gisviz-border-strong'}`}>
+                      <span className="block truncate pr-9 text-[12.5px] font-semibold text-gisviz-ink" title={typeName(o.viz)}>{typeName(o.viz)}</span>
+                      <span className="block text-[10.5px] font-medium uppercase tracking-wider text-gisviz-ink-soft">{isMapViz(o.viz) ? 'Map' : 'Chart'}</span>
+                      {o.viz === info.recommended && (
+                        <span className="absolute right-1.5 top-1.5 inline-flex items-center gap-0.5 rounded-full bg-gisviz-accent px-1.5 py-0.5 text-[9.5px] font-bold uppercase text-[color:var(--accent-on)]">
+                          <Sparkles size={9} /> Best
+                        </span>
+                      )}
+                      {on && !(o.viz === info.recommended) && <Check size={13} className="absolute right-2 top-2 text-gisviz-accent" />}
+                    </button>
+                  )
+                }
+                const chosenInRest = restOpts.some(o => o.viz === value.viz)
+                return (
+                  <>
+                    <div className="grid grid-cols-2 gap-1.5">{topOpts.map(tile)}</div>
+                    {restOpts.length > 0 && (
+                      <div className="pt-1">
+                        <button type="button" onClick={() => setShowAll(v => !v)}
+                                className="inline-flex items-center gap-1 text-[12px] font-semibold text-gisviz-accent hover:underline">
+                          {showAll || chosenInRest ? 'Hide' : 'Show'} {restOpts.length} more visuals that fit this data
+                          <ChevronDown size={13} className={`transition-transform ${showAll || chosenInRest ? 'rotate-180' : ''}`} />
+                        </button>
+                        {(showAll || chosenInRest) && families.map(f => (
+                          <div key={f} className="mt-3">
+                            <p className="mb-1.5 text-[10.5px] font-bold uppercase tracking-wider text-gisviz-ink-soft">{famName(f)}</p>
+                            <div className="grid grid-cols-2 gap-1.5">{restOpts.filter(o => famOf(o.viz) === f).map(tile)}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )
+              })()}
+              {option && (
+                <p className="flex items-start gap-1.5 text-[11.5px] leading-snug text-gisviz-ink-soft">
+                  <Sparkles size={13} className="mt-0.5 shrink-0 text-gisviz-accent" />
+                  <span>{value.viz === info.recommended ? 'Recommended: ' : ''}{option.reason}</span>
+                </p>
+              )}
+              {value.viz === 'map' && mapTypes.length > 1 && (
+                <Field label="Map type" className="max-w-xs">
+                  <select value={value.visual_type ?? ''} onChange={e => patch({ visual_type: e.target.value || null })} className={selectCls}>
+                    <option value="">Automatic (from the geometry)</option>
+                    {mapTypes.map(t => <option key={t.code} value={t.code}>{t.name}</option>)}
+                  </select>
+                </Field>
+              )}
+            </Step>
+
+            <Step title="Columns" hint="Which column goes where.">
+              <div className="grid grid-cols-2 gap-2.5">
+                {has('x') && (
+                  <Field label={`${roleLabel.x ?? (numericX ? 'X axis (number)' : xKind === 'time' ? 'Time / order' : 'Labels / categories')}${!req('x') ? ' (optional)' : ''}`}>
+                    <select value={value.x ?? ''} onChange={e => patch({ x: e.target.value || null, filter_default: null })} className={selectCls}>
+                      {!req('x') && <option value="">None</option>}
+                      {xCols.map(c => <option key={c.column_name} value={c.column_name}>{c.label || c.column_name}</option>)}
+                    </select>
+                  </Field>
+                )}
+                {has('z') && (
+                  <Field label={`${roleLabel.z ?? (value.viz === 'stacked' ? 'Stack by' : 'Second category')}${!req('z') ? ' (optional)' : ''}`}>
+                    <select value={value.z ?? ''} onChange={e => patch({ z: e.target.value || null, filter_default: null })} className={selectCls}>
+                      {!req('z') && <option value="">None</option>}
+                      {zCols.map(c => <option key={c.column_name} value={c.column_name}>{c.label || c.column_name}</option>)}
+                    </select>
+                  </Field>
+                )}
+                {has('y') && (
+                  <Field label={`${roleLabel.y ?? (isMap ? 'Value (colour / size)' : 'Value')}${!req('y') ? ' (optional)' : ''}`}>
+                    <select value={value.y ?? ''} onChange={e => patch({ y: e.target.value })} className={selectCls}>
+                      {numericCols.map(c => <option key={c.column_name} value={c.column_name}>{c.label || c.column_name}</option>)}
+                      {allowCount && <option value="count">count (rows)</option>}
+                    </select>
+                  </Field>
+                )}
+                {has('size') && (
+                  <Field label={roleLabel.size ?? 'Bubble size'}>
+                    <select value={value.size ?? ''} onChange={e => patch({ size: e.target.value })} className={selectCls}>
+                      {sizeCols.map(c => <option key={c.column_name} value={c.column_name}>{c.label || c.column_name}</option>)}
+                    </select>
+                  </Field>
+                )}
+                {(isMap || has('label_field')) && value.viz !== 'connection_map' && labelCols.length > 0 && (
+                  <Field label={isMap ? 'Place names (popup + filter)' : 'Point labels (tooltip)'}>
+                    <select value={value.label_field ?? ''} onChange={e => patch({ label_field: e.target.value || null, filter_default: null })} className={selectCls}>
+                      {!isMap && <option value="">None</option>}
+                      {labelCols.map(c => <option key={c.column_name} value={c.column_name}>{c.label || c.column_name}</option>)}
+                    </select>
+                  </Field>
+                )}
+              </div>
+              {option?.viz === 'connection_map' && (
+                <p className="text-[12px] text-gisviz-ink-soft">Lines are drawn from the origin and destination coordinate columns found in the data.</p>
+              )}
+            </Step>
           </div>
 
-          <Step n={1} title="Visual" hint="the best fit is selected">
-            {(() => {
-              const tile = (o: VizOption) => {
-                const on = o.viz === value.viz
-                return (
-                  <button key={o.viz} type="button" onClick={() => changeViz(o.viz)} aria-pressed={on}
-                    className={`relative rounded-md border px-2.5 py-1.5 text-left transition-colors ${on
-                      ? 'border-gisviz-accent bg-gisviz-accent/10' : 'border-gisviz-border bg-gisviz-canvas hover:border-gisviz-border-strong'}`}>
-                    <span className="block truncate pr-8 text-[12px] font-semibold text-gisviz-ink" title={typeName(o.viz)}>{typeName(o.viz)}</span>
-                    <span className="block font-mono text-[10px] uppercase tracking-wider text-gisviz-ink-soft">{isMapViz(o.viz) ? 'Map' : 'Chart'}</span>
-                    {o.viz === info.recommended && (
-                      <span className="absolute right-1.5 top-1.5 inline-flex items-center gap-0.5 rounded-full bg-gisviz-accent px-1.5 py-0.5 text-[9.5px] font-bold uppercase text-[color:var(--accent-on)]">
-                        <Sparkles size={9} /> Best
-                      </span>
-                    )}
-                    {on && !(o.viz === info.recommended) && <Check size={13} className="absolute right-2 top-2 text-gisviz-accent" />}
-                  </button>
-                )
-              }
-              const chosenInRest = restOpts.some(o => o.viz === value.viz)
-              return (
-                <>
-                  <div className="grid grid-cols-2 gap-1.5">{topOpts.map(tile)}</div>
-                  {restOpts.length > 0 && (
-                    <div className="mt-2.5">
-                      <button type="button" onClick={() => setShowAll(v => !v)}
-                              className="inline-flex items-center gap-1 text-[12px] font-semibold text-gisviz-accent hover:underline">
-                        {showAll || chosenInRest ? 'Hide' : 'Show'} {restOpts.length} more visuals that fit this data
-                        <ChevronDown size={13} className={`transition-transform ${showAll || chosenInRest ? 'rotate-180' : ''}`} />
-                      </button>
-                      {(showAll || chosenInRest) && families.map(f => (
-                        <div key={f} className="mt-3">
-                          <p className="mb-1.5 font-mono text-[10.5px] font-bold uppercase tracking-wider text-gisviz-ink-soft">{famName(f)}</p>
-                          <div className="grid grid-cols-2 gap-1.5">{restOpts.filter(o => famOf(o.viz) === f).map(tile)}</div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </>
-              )
-            })()}
-            {option && (
-              <p className="mt-2 flex items-start gap-1.5 text-[11.5px] leading-snug text-gisviz-ink-soft">
-                <Sparkles size={13} className="mt-0.5 shrink-0 text-gisviz-accent" />
-                <span>{value.viz === info.recommended ? 'Recommended: ' : ''}{option.reason}</span>
-              </p>
-            )}
-            {value.viz === 'map' && mapTypes.length > 1 && (
-              <div className="mt-3 max-w-xs">
-                <label className={labelCls}>Map type</label>
-                <select value={value.visual_type ?? ''} onChange={e => patch({ visual_type: e.target.value || null })} className={selectCls}>
-                  <option value="">Automatic (from the geometry)</option>
-                  {mapTypes.map(t => <option key={t.code} value={t.code}>{t.name}</option>)}
-                </select>
-              </div>
-            )}
-          </Step>
+          {/* ════════════ DESIGN: text · classes & colours · axes · measures · reader filter ════════════ */}
+          <div className={sectionCls('design')}>
+            <Step title="Text" hint="Optional words on the poster.">
+              <Field label="Subtitle">
+                <input value={value.subtitle ?? ''} maxLength={300} onChange={e => patch({ subtitle: e.target.value })}
+                       placeholder="What the numbers are, and when" className={inputCls} />
+              </Field>
+              {!isMap && (
+                <Field label="Value name" hint="shown on the axis and in tooltips">
+                  <input value={value.y_label ?? ''} maxLength={60} onChange={e => patch({ y_label: e.target.value })}
+                         placeholder={value.y === 'count' ? 'Count' : (cols.find(c => c.column_name === value.y)?.label || value.y || '')} className={inputCls} />
+                </Field>
+              )}
+              {hasLabelToggle(value.viz) && (
+                <Toggle checked={!!value.show_labels} onChange={v => patch({ show_labels: v })}
+                        label={`Names on the ${isMap ? 'map' : 'points'}`} hint="Readers can switch them off." />
+              )}
+            </Step>
 
-          <Step n={2} title="Columns">
-            <div className="grid grid-cols-2 gap-2">
-              {has('x') && (
-                <div>
-                  <label className={labelCls}>{roleLabel.x ?? (numericX ? 'X axis (number)' : xKind === 'time' ? 'Time / order' : 'Labels / categories')}{!req('x') && ' (optional)'}</label>
-                  <select value={value.x ?? ''} onChange={e => patch({ x: e.target.value || null, filter_default: null })} className={selectCls}>
-                    {!req('x') && <option value="">None</option>}
-                    {xCols.map(c => <option key={c.column_name} value={c.column_name}>{c.label || c.column_name}</option>)}
-                  </select>
-                </div>
-              )}
-              {has('z') && (
-                <div>
-                  <label className={labelCls}>{roleLabel.z ?? (value.viz === 'stacked' ? 'Stack by' : 'Second category')}{!req('z') && ' (optional)'}</label>
-                  <select value={value.z ?? ''} onChange={e => patch({ z: e.target.value || null, filter_default: null })} className={selectCls}>
-                    {!req('z') && <option value="">None</option>}
-                    {zCols.map(c => <option key={c.column_name} value={c.column_name}>{c.label || c.column_name}</option>)}
-                  </select>
-                </div>
-              )}
-              {has('y') && (
-                <div>
-                  <label className={labelCls}>{roleLabel.y ?? (isMap ? 'Value (colour / size)' : 'Value')}{!req('y') && ' (optional)'}</label>
-                  <select value={value.y ?? ''} onChange={e => patch({ y: e.target.value })} className={selectCls}>
-                    {numericCols.map(c => <option key={c.column_name} value={c.column_name}>{c.label || c.column_name}</option>)}
-                    {allowCount && <option value="count">count (rows)</option>}
-                  </select>
-                </div>
-              )}
-              {has('size') && (
-                <div>
-                  <label className={labelCls}>{roleLabel.size ?? 'Bubble size'}</label>
-                  <select value={value.size ?? ''} onChange={e => patch({ size: e.target.value })} className={selectCls}>
-                    {sizeCols.map(c => <option key={c.column_name} value={c.column_name}>{c.label || c.column_name}</option>)}
-                  </select>
-                </div>
-              )}
-              {has('color') && !colorable && (
-                <div>
-                  <label className={labelCls}>{roleLabel.color ?? 'Colour by'} (optional)</label>
+            {canColor && (
+              <Step title="Classes & colours" hint="Colour the marks by a category so each class stands apart.">
+                <Field label="Class column">
                   <select value={value.color ?? ''} onChange={e => patch({ color: e.target.value || null, colors: null })} className={selectCls}>
                     <option value="">One colour (theme)</option>
                     {colorCols.map(c => <option key={c.column_name} value={c.column_name}>{c.label || c.column_name} ({c.n_distinct})</option>)}
                   </select>
-                </div>
-              )}
-              {(isMap || has('label_field')) && value.viz !== 'connection_map' && labelCols.length > 0 && (
-                <div>
-                  <label className={labelCls}>{isMap ? 'Place names (popup + filter)' : 'Point labels (tooltip)'}</label>
-                  <select value={value.label_field ?? ''} onChange={e => patch({ label_field: e.target.value || null, filter_default: null })} className={selectCls}>
-                    {!isMap && <option value="">None</option>}
-                    {labelCols.map(c => <option key={c.column_name} value={c.column_name}>{c.label || c.column_name}</option>)}
-                  </select>
-                </div>
-              )}
-            </div>
-            {option?.viz === 'connection_map' && (
-              <p className="mt-2 text-[12px] text-gisviz-ink-soft">Lines are drawn from the origin and destination coordinate columns found in the data.</p>
+                </Field>
+                {!value.color && colorCols.length === 0 && (
+                  <p className="text-[11.5px] leading-snug text-gisviz-ink-soft">This dataset has no category column with few enough values to use as classes.</p>
+                )}
+                {value.color && groups.length > 0 && (
+                  <>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="mr-0.5 text-[11.5px] font-semibold text-gisviz-ink-soft">Palette</span>
+                      {PALETTES.map(p => (
+                        <Pill key={p.name} onClick={() => applyPalette(p.colors)} title={`Apply the ${p.name} palette to the classes`}>
+                          <span className="flex">{p.colors.slice(0, 4).map(c => <i key={c} className="-ml-0.5 h-2.5 w-2.5 rounded-full border border-gisviz-card first:ml-0" style={{ background: c }} />)}</span>
+                          {p.name}
+                        </Pill>
+                      ))}
+                    </div>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {groups.map(g => (
+                        <label key={g} className="flex items-center gap-2 rounded-lg border border-gisviz-border bg-gisviz-canvas py-1 pl-1 pr-2 text-[12.5px] text-gisviz-ink">
+                          <input type="color" value={value.colors?.[g] ?? '#888888'} aria-label={`Colour of ${g}`}
+                                 onChange={e => patch({ colors: { ...(value.colors ?? {}), [g]: e.target.value } })}
+                                 className="h-6 w-7 shrink-0 cursor-pointer rounded border-0 bg-transparent p-0" />
+                          <span className="min-w-0 flex-1 truncate" title={g}>{g}</span>
+                          <span className="font-mono text-[10.5px] text-gisviz-ink-soft">{(groupCounts.get(g) ?? 0).toLocaleString()}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </Step>
             )}
-          </Step>
 
-          <details className="group rounded-md border border-gisviz-border">
-            <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2 text-[12.5px] font-semibold text-gisviz-ink">
-              More options
-              <span className="text-[11px] font-normal text-gisviz-ink-soft">subtitle{colorable ? ', colours, reference line' : ''}{filterField && labels.length > 1 ? ', reader filter' : ''}</span>
-              <ChevronDown size={14} className="text-gisviz-ink-soft transition-transform group-open:rotate-180" />
-            </summary>
-            <div className="space-y-3.5 border-t border-gisviz-border px-3 py-3">
-          <Step n={3} title="Poster text" hint="optional">
-            <div className="grid grid-cols-1 gap-2">
-              <input value={value.subtitle ?? ''} maxLength={300} onChange={e => patch({ subtitle: e.target.value })}
-                     placeholder="Subtitle: what the numbers are, and when" className={inputCls} aria-label="Subtitle" />
-              {!isMap && (
-                <input value={value.y_label ?? ''} maxLength={60} onChange={e => patch({ y_label: e.target.value })} aria-label="Value name"
-                       placeholder={`Value name: ${value.y === 'count' ? 'Count' : (cols.find(c => c.column_name === value.y)?.label || value.y || '')}`} className={inputCls} />
-              )}
-              {hasLabelToggle(value.viz) && (
-                <label className="inline-flex items-center gap-2 text-[12.5px] text-gisviz-ink">
-                  <input type="checkbox" className="accent-gisviz-accent" checked={!!value.show_labels}
-                         onChange={e => patch({ show_labels: e.target.checked })} />
-                  Labels on the {isMap ? 'map' : 'points'} by default
-                </label>
-              )}
-            </div>
-          </Step>
-
-          {colorable && (
-            <Step n={4} title="Legend & colours" hint="colour the bars by a category">
-              <div>
-                <label className={labelCls}>Colour by</label>
-                <select value={value.color ?? ''} onChange={e => patch({ color: e.target.value || null, colors: null })} className={selectCls}>
-                  <option value="">One colour (theme)</option>
-                  {colorCols.map(c => <option key={c.column_name} value={c.column_name}>{c.label || c.column_name} ({c.n_distinct})</option>)}
-                </select>
-              </div>
-              {value.color && groups.length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {groups.map(g => (
-                    <label key={g} className="inline-flex items-center gap-2 rounded-md border border-gisviz-border bg-gisviz-canvas py-1 pl-1 pr-2.5 text-[12.5px] text-gisviz-ink">
-                      <input type="color" value={value.colors?.[g] ?? '#888888'} aria-label={`Colour of ${g}`}
-                             onChange={e => patch({ colors: { ...(value.colors ?? {}), [g]: e.target.value } })}
-                             className="h-6 w-7 cursor-pointer rounded border-0 bg-transparent p-0" />
-                      {g}
-                    </label>
+            {isXY && (
+              <Step title="Axes" hint="Log spreads out data that spans orders of magnitude, like income or population. Values of 0 or below can't be shown on a log axis.">
+                <div className="grid grid-cols-2 gap-2.5">
+                  {([['X axis', 'x_scale'], ['Y axis', 'y_scale']] as const).map(([name, key]) => (
+                    <Field key={key} label={name}>
+                      <Seg<'linear' | 'log'> label={name} value={value[key] === 'log' ? 'log' : 'linear'}
+                                             onChange={v => patch({ [key]: v === 'log' ? 'log' : null })}
+                                             options={[{ value: 'linear', label: 'Linear' }, { value: 'log', label: 'Log' }]} />
+                    </Field>
                   ))}
                 </div>
-              )}
-            </Step>
-          )}
+              </Step>
+            )}
 
-          {colorable && (
-            <Step n={5} title="Reference line" hint="e.g. an average the bars are compared with">
-              <div className="space-y-2.5">
+            {canRef && (
+              <Step title="Measures" hint={isXY ? 'Mean, median, mode or a fixed threshold, drawn over the chart. A threshold can tint one side.' : 'A line the bars are compared with: mean, median, mode or a fixed number.'}>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {(['mean', 'median', 'mode'] as const).map(st => (
+                    <Pill key={st} onClick={() => addRef({ stat: st, label: STAT_NAME[st], mode: value.viz === 'hbar' ? 'divider' : 'line', ...(isXY ? { axis: 'y' as const } : {}) })}>
+                      + {STAT_NAME[st]}
+                    </Pill>
+                  ))}
+                  <Pill onClick={() => addRef({ value: Math.round(medianOf(value.y)), label: 'Threshold', mode: 'line', ...(isXY ? { axis: 'y' as const, shade: 'below' as const } : {}) })}>
+                    + Threshold
+                  </Pill>
+                  {refs.length >= 3 && <span className="text-[11.5px] text-gisviz-ink-soft">Up to 3 measures.</span>}
+                </div>
                 {refs.map((r, i) => (
-                  <div key={i} className="grid grid-cols-2 gap-2 items-end rounded-md bg-gisviz-paper/50 p-2">
-                    <div>
-                      <label className={labelCls}>Value</label>
-                      <select value={r.stat ?? 'value'} className={selectCls}
-                              onChange={e => setRef(i, e.target.value === 'value' ? { stat: undefined, value: r.value ?? 0 } : { stat: e.target.value as 'mean' | 'median', value: undefined })}>
-                        <option value="mean">Average of the bars</option>
-                        <option value="median">Median of the bars</option>
-                        <option value="value">Fixed number</option>
-                      </select>
+                  <div key={i} className="space-y-2 rounded-xl border border-gisviz-border bg-gisviz-paper/40 p-2.5">
+                    <div className="flex items-center gap-2">
+                      <div className="min-w-0 flex-1">
+                        <select value={r.stat ?? 'value'} aria-label="What to measure" className={selectCls}
+                                onChange={e => setRef(i, e.target.value === 'value' ? { stat: undefined, value: r.value ?? Math.round(medianOf(value.y)) } : { stat: e.target.value as 'mean' | 'median' | 'mode', value: undefined })}>
+                          <option value="mean">Mean (average)</option>
+                          <option value="median">Median (middle value)</option>
+                          <option value="mode">Mode (most common)</option>
+                          <option value="value">Fixed number</option>
+                        </select>
+                      </div>
+                      {!r.stat && (
+                        <div className="w-28 shrink-0">
+                          <input type="number" aria-label="Number" value={r.value ?? ''} className={inputCls}
+                                 onChange={e => setRef(i, { value: e.target.value === '' ? undefined : Number(e.target.value) })} />
+                        </div>
+                      )}
+                      <button type="button" onClick={() => patch({ reference_lines: refs.filter((_, k) => k !== i) })}
+                              className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-gisviz-border text-gisviz-ink-soft hover:text-gisviz-alert" aria-label="Remove measure">
+                        <Trash2 size={14} />
+                      </button>
                     </div>
-                    <div>
-                      <label className={labelCls}>Number</label>
-                      <input type="number" disabled={!!r.stat} value={r.stat ? '' : (r.value ?? '')} className={`${inputCls} disabled:opacity-50`}
-                             onChange={e => setRef(i, { value: e.target.value === '' ? undefined : Number(e.target.value) })} />
-                    </div>
-                    <div>
-                      <label className={labelCls}>Label</label>
-                      <input value={r.label} maxLength={60} placeholder="e.g. OECD average" className={inputCls}
-                             onChange={e => setRef(i, { label: e.target.value })} />
-                    </div>
-                    <div>
-                      <label className={labelCls}>Style</label>
-                      <select value={r.mode ?? 'line'} onChange={e => setRef(i, { mode: e.target.value as 'line' | 'divider' })} className={selectCls}>
-                        <option value="line">Dashed line</option>
-                        {value.viz === 'hbar' && <option value="divider">Divider in the ranking</option>}
-                      </select>
-                    </div>
-                    <button type="button" onClick={() => patch({ reference_lines: refs.filter((_, k) => k !== i) })}
-                            className="h-[34px] w-9 grid place-items-center rounded-md border border-gisviz-border text-gisviz-ink-soft hover:text-gisviz-alert" aria-label="Remove reference line">
-                      <Trash2 size={14} />
-                    </button>
+                    <input value={r.label} maxLength={60} aria-label="Label" placeholder="Label on the chart, e.g. Median" className={inputCls}
+                           onChange={e => setRef(i, { label: e.target.value })} />
+                    {isXY && (
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                        <Seg<'x' | 'y'> size="sm" label="Axis" value={r.axis === 'x' ? 'x' : 'y'} onChange={v => setRef(i, { axis: v })}
+                                        options={[{ value: 'y', label: 'On Y axis' }, { value: 'x', label: 'On X axis' }]} />
+                        <Seg<'none' | 'below' | 'above'> size="sm" label="Shading" value={r.shade ?? 'none'}
+                                                         onChange={v => setRef(i, { shade: v === 'none' ? null : v })}
+                                                         options={[{ value: 'none', label: 'No tint' }, { value: 'below', label: 'Tint below' }, { value: 'above', label: 'Tint above' }]} />
+                      </div>
+                    )}
+                    {value.viz === 'hbar' && (
+                      <Seg<'line' | 'divider'> size="sm" label="Style" value={r.mode ?? 'line'} onChange={v => setRef(i, { mode: v })}
+                                               options={[{ value: 'line', label: 'Dashed line' }, { value: 'divider', label: 'Divider in the ranking' }]} />
+                    )}
                   </div>
                 ))}
-                {refs.length < 3 && (
-                  <button type="button" onClick={() => patch({ reference_lines: [...refs, { stat: 'mean', label: 'Average', mode: value.viz === 'hbar' ? 'divider' : 'line' }] })}
-                          className="inline-flex items-center gap-1.5 rounded-md border border-dashed border-gisviz-border px-3 py-1.5 text-[12.5px] text-gisviz-ink-soft hover:border-gisviz-accent hover:text-gisviz-accent">
-                    <Plus size={13} /> Add a reference line
-                  </button>
+                {isXY && (
+                  <Toggle checked={!!value.show_summary} onChange={v => patch({ show_summary: v })}
+                          label="Summary card" hint="n, mean, median and mode of both axes, in a corner of the chart." />
                 )}
-              </div>
-            </Step>
-          )}
+              </Step>
+            )}
 
-          {filterField && labels.length > 1 && (
-            <Step n={colorable ? 6 : 4} title="Reader filter" hint={`readers pick which ${cols.find(c => c.column_name === filterField)?.label || filterField} values to show`}>
-              <div className="flex flex-wrap items-center gap-2 mb-2 text-[12.5px]">
-                <span className="text-gisviz-ink-soft">Show at first:</span>
-                <button type="button" onClick={() => patch({ filter_default: null })}
-                        className={`rounded-md border px-2.5 py-1 ${!value.filter_default ? 'border-gisviz-accent text-gisviz-accent' : 'border-gisviz-border'}`}>All {labels.length}</button>
-                <button type="button" onClick={() => patch({ filter_default: labels.slice(0, 10) })}
-                        className={`rounded-md border px-2.5 py-1 ${value.filter_default ? 'border-gisviz-accent text-gisviz-accent' : 'border-gisviz-border'}`}>
-                  {value.filter_default ? `${value.filter_default.length} selected` : 'A selection'}
-                </button>
-              </div>
-              {value.filter_default && (
-                <div className="max-h-44 overflow-y-auto rounded-md border border-gisviz-border bg-gisviz-canvas p-2 grid grid-cols-2 gap-x-3">
-                  {labels.map(l => (
-                    <label key={l} className="flex items-center gap-2 py-0.5 text-[12.5px] text-gisviz-ink truncate">
-                      <input type="checkbox" className="accent-gisviz-accent" checked={value.filter_default!.includes(l)}
-                             onChange={e => patch({ filter_default: e.target.checked ? [...value.filter_default!, l] : value.filter_default!.filter(x => x !== l) })} />
-                      <span className="truncate">{l}</span>
-                    </label>
-                  ))}
+            {filterField && labels.length > 1 && (
+              <Step title="Reader filter" hint={`Readers pick which ${cols.find(c => c.column_name === filterField)?.label || filterField} values to show.`}>
+                <div className="flex flex-wrap items-center gap-2 text-[12.5px]">
+                  <span className="text-gisviz-ink-soft">Show at first:</span>
+                  <Pill active={!value.filter_default} onClick={() => patch({ filter_default: null })}>All {labels.length}</Pill>
+                  <Pill active={!!value.filter_default} onClick={() => patch({ filter_default: labels.slice(0, 10) })}>
+                    {value.filter_default ? `${value.filter_default.length} selected` : 'A selection'}
+                  </Pill>
                 </div>
-              )}
-            </Step>
-          )}
+                {value.filter_default && (
+                  <div className="grid max-h-44 grid-cols-2 gap-x-3 overflow-y-auto rounded-lg border border-gisviz-border bg-gisviz-canvas p-2">
+                    {labels.map(l => (
+                      <label key={l} className="flex items-center gap-2 truncate py-0.5 text-[12.5px] text-gisviz-ink">
+                        <input type="checkbox" className="accent-gisviz-accent" checked={value.filter_default!.includes(l)}
+                               onChange={e => patch({ filter_default: e.target.checked ? [...value.filter_default!, l] : value.filter_default!.filter(x => x !== l) })} />
+                        <span className="truncate">{l}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </Step>
+            )}
+          </div>
 
-            </div>
-          </details>
-
-          {specError && <p className="text-[12px] font-mono text-gisviz-alert">{specError}</p>}
+          {specError && <p className="text-[12px] text-gisviz-alert">{specError}</p>}
         </>
       )}
 
-      {!info && !loadingInfo && specError && <p className="text-[12px] font-mono text-gisviz-alert">{specError}</p>}
+      {!info && !loadingInfo && specError && <p className="text-[12px] text-gisviz-alert">{specError}</p>}
     </div>
   )
 }

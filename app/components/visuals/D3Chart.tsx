@@ -88,9 +88,13 @@ type Tip = { x: number; y: number; title: string; lines: [string, string][] } | 
 export interface ReferenceLine {
   /** A fixed value, or a statistic of the plotted values. */
   value?: number
-  stat?: 'mean' | 'median'
+  stat?: 'mean' | 'median' | 'mode'
   label: string
   mode?: 'line' | 'divider'
+  /** Scatter / bubble: which axis the line measures (default y). */
+  axis?: 'x' | 'y'
+  /** Scatter / bubble: tint everything below / above the line (a threshold band). */
+  shade?: 'below' | 'above' | null
 }
 
 /** Group -> colour: explicit map first, then accent + palette in order of first appearance. */
@@ -105,12 +109,40 @@ export function groupColors(groups: string[], accent: string, colors?: Record<st
   return out
 }
 
-export function refValue(r: ReferenceLine, values: number[]): number | null {
+/**
+ * Mode of a list of numbers. A clearly repeated value (3+ times and 5%+ of the values: counts, ratings, ages) is the
+ * mode; otherwise the middle of the fullest bin (Sturges' rule, bins in log space on a log axis), so a coincidental
+ * duplicate in continuous data is not called the mode. Same rule as _stat in the server's visual_image.py.
+ */
+export function modeOf(vals: number[], log = false): number | null {
+  if (!vals.length) return null
+  const sv = [...vals].sort((a, b) => a - b)
+  const counts = new Map<number, number>()
+  for (const v of sv) counts.set(v, (counts.get(v) ?? 0) + 1)
+  const top = d3.max(counts.values()) ?? 0
+  if (top >= Math.max(3, 0.05 * sv.length)) return d3.min([...counts].filter(([, c]) => c === top).map(([v]) => v)) ?? null
+  const useLog = log && sv[0] > 0
+  const pts = useLog ? sv.map(Math.log10) : sv
+  const lo = pts[0], hi = pts[pts.length - 1]
+  if (hi === lo) return sv[0]
+  const n = Math.max(1, Math.ceil(Math.log2(pts.length)) + 1)
+  const step = (hi - lo) / n
+  const bins = new Array<number>(n).fill(0)
+  for (const v of pts) bins[Math.min(n - 1, Math.floor((v - lo) / step))]++
+  const mid = lo + (bins.indexOf(d3.max(bins) ?? 0) + 0.5) * step
+  return useLog ? 10 ** mid : mid
+}
+
+export function statOf(stat: 'mean' | 'median' | 'mode', vals: number[], log = false): number | null {
+  if (!vals.length) return null
+  if (stat === 'mean') return d3.mean(vals) ?? null
+  if (stat === 'median') return d3.median(vals) ?? null
+  return modeOf(vals, log)
+}
+
+export function refValue(r: ReferenceLine, values: number[], log = false): number | null {
   if (typeof r.value === 'number') return r.value
-  if (!values.length) return null
-  if (r.stat === 'median') return d3.median(values) ?? null
-  if (r.stat === 'mean') return d3.mean(values) ?? null
-  return null
+  return r.stat ? statOf(r.stat, values, log) : null
 }
 
 interface Props {
@@ -134,11 +166,19 @@ interface Props {
   /** Scatter / bubble: the column that names each point, and whether names are drawn next to the points. */
   labelField?: string
   showLabels?: boolean
+  /** Scatter / bubble: "log" spreads data that spans orders of magnitude (GDP, population, electricity use). */
+  xScale?: 'linear' | 'log'
+  yScale?: 'linear' | 'log'
+  /** Scatter / bubble: a small card with n, mean, median and mode of both axes. */
+  showSummary?: boolean
+  /** Friendly name of the x column (axis title). */
+  xLabel?: string
   /** On a poster: the colour-group legend goes there (top right of the visual, no box). */
   legendHost?: HTMLElement | null
 }
 
-export default function D3Chart({ rows, type, x, y, z, size, accent, colorBy, colors, refLines, yLabel, fields, geo, labelField, showLabels, legendHost }: Props) {
+export default function D3Chart({ rows, type, x, y, z, size, accent, colorBy, colors, refLines, yLabel, fields, geo, labelField, showLabels, legendHost,
+                                 xScale, yScale, showSummary, xLabel }: Props) {
   const [wrap, { width, height }] = useSize<HTMLDivElement>()
   const [tip, setTip] = useState<Tip>(null)
   const [focus, setFocus] = useState<string | null>(null)        // legend hover: highlight one group
@@ -147,6 +187,18 @@ export default function D3Chart({ rows, type, x, y, z, size, accent, colorBy, co
     ? groupColors(rows.map(r => String(r[colorBy] ?? '')).filter(Boolean), accent, colors)
     : null, [rows, colorBy, accent, colors])
   const story = { colorBy, groupColor, focus, refLines, yName: yLabel || y }
+  const isXY = type === 'scatter' || type === 'bubble'
+  // n, mean, median and mode of both axes, over the points that are drawn (a log axis cannot show values <= 0)
+  const summary = useMemo(() => {
+    if (!showSummary || !isXY) return null
+    const logX = xScale === 'log', logY = yScale === 'log'
+    const pts = rows.map(r => [toNum(r[x]), toNum(r[y])] as const)
+      .filter((p): p is readonly [number, number] => p[0] !== null && p[1] !== null && (!logX || p[0] > 0) && (!logY || p[1] > 0))
+    if (!pts.length) return null
+    const xs = pts.map(p => p[0]), ys = pts.map(p => p[1])
+    const of = (v: number[], log: boolean) => ({ mean: statOf('mean', v, log), median: statOf('median', v, log), mode: statOf('mode', v, log) })
+    return { n: pts.length, dropped: rows.length - pts.length, x: of(xs, logX), y: of(ys, logY) }
+  }, [rows, showSummary, isXY, x, y, xScale, yScale])
 
   const show = (e: React.MouseEvent | React.PointerEvent, title: string, lines: [string, string][]) => {
     const box = wrap.current?.getBoundingClientRect()
@@ -166,7 +218,8 @@ export default function D3Chart({ rows, type, x, y, z, size, accent, colorBy, co
             : type === 'bar' ? <Bars {...{ rows, x, y, accent, width, height, show, hide, ...story }} />
             : type === 'hbar' ? <HBars {...{ rows, x, y, accent, width, height, show, hide, ...story, flagOf: flags.flag, flagFailed: flags.failed }} />
             : type === 'stacked' ? <Stacked {...{ rows, x, y, z: z!, accent, width, height, show, hide }} />
-            : type === 'scatter' || type === 'bubble' ? <Scatter {...{ rows, x, y, size: type === 'bubble' ? size : undefined, accent, width, height, show, hide, labelField, showLabels }} />
+            : type === 'scatter' || type === 'bubble' ? <Scatter {...{ rows, x, y, size: type === 'bubble' ? size : undefined, accent, width, height, show, hide, labelField, showLabels,
+                                       colorBy, groupColor, focus, refLines, xScale, yScale, xName: xLabel || x, yName: yLabel || y }} />
             : type === 'histogram' ? <Histogram {...{ rows, y, accent, width, height, show, hide }} />
             : type === 'donut' ? <Donut {...{ rows, x, y, accent, width, height, show, hide }} />
             : type === 'treemap' ? <Treemap {...{ rows, x, y, accent, width, height, show, hide }} />
@@ -174,7 +227,7 @@ export default function D3Chart({ rows, type, x, y, z, size, accent, colorBy, co
             : null}
         </svg>
       )}
-      {groupColor && groupColor.size > 1 && (type === 'hbar' || type === 'bar') && (() => {
+      {groupColor && groupColor.size > 1 && (type === 'hbar' || type === 'bar' || isXY) && (() => {
         const items = [...groupColor].map(([g, c]) => (
           <button key={g} type="button" onMouseEnter={() => setFocus(g)} onFocus={() => setFocus(g)} onBlur={() => setFocus(null)}
                   className={`flex w-full items-center gap-2 py-0.5 text-left text-[12.5px] transition-opacity ${focus && focus !== g ? 'opacity-40' : ''}`}>
@@ -186,10 +239,27 @@ export default function D3Chart({ rows, type, x, y, z, size, accent, colorBy, co
         if (legendHost === null) return null
         return (
           <div className={`absolute z-[5] rounded-[10px] border border-gisviz-border bg-gisviz-card/90 px-3 py-2.5 shadow-sm backdrop-blur-sm ${
-                 type === 'bar' ? 'top-2 right-3' : 'bottom-12 right-14'}`}
+                 type === 'bar' || isXY ? 'top-2 right-3' : 'bottom-12 right-14'}`}
                onMouseLeave={() => setFocus(null)}>{items}</div>
         )
       })()}
+      {summary && (
+        <div className="pointer-events-none absolute left-16 top-2 z-[4] rounded-[10px] border border-gisviz-border bg-gisviz-card/90 px-3 py-2 shadow-sm backdrop-blur-sm"
+             aria-label="Summary statistics">
+          <div className="mb-1 font-mono text-[10.5px] font-bold text-gisviz-ink-soft">
+            n = {summary.n.toLocaleString()}{summary.dropped > 0 && <span className="font-normal"> · {summary.dropped.toLocaleString()} not shown</span>}
+          </div>
+          <div className="grid grid-cols-[auto_repeat(3,auto)] gap-x-3 gap-y-0.5 text-[11.5px]">
+            <span />{(['mean', 'median', 'mode'] as const).map(k => <span key={k} className="text-right font-mono text-[10px] uppercase text-gisviz-ink-soft">{k}</span>)}
+            {([[xLabel || x, summary.x], [yLabel || y, summary.y]] as const).map(([name, st]) => (
+              <React.Fragment key={name}>
+                <span className="max-w-[150px] truncate text-gisviz-ink-soft" title={name}>{name}</span>
+                {(['mean', 'median', 'mode'] as const).map(k => <span key={k} className="text-right font-mono text-gisviz-ink">{st[k] === null ? '–' : compact(st[k]!)}</span>)}
+              </React.Fragment>
+            ))}
+          </div>
+        </div>
+      )}
       {tip && (
         <div className="pointer-events-none absolute z-10 min-w-[120px] max-w-[260px] rounded-[8px] border border-gisviz-border bg-gisviz-card px-2.5 py-2 text-[12px] text-gisviz-ink shadow-lg"
              style={{ left: Math.min(tip.x + 14, Math.max(0, width - 200)), top: Math.max(0, tip.y - 12) }}>
@@ -495,21 +565,37 @@ function Stacked({ rows, x, y, z, accent, width, height, show, hide }: Shared & 
 
 /* ───────────────────────── scatter / bubble ───────────────────────── */
 
-function Scatter({ rows, x, y, size, accent, width, height, show, hide, labelField, showLabels }: Shared & {
-  x: string; y: string; size?: string; labelField?: string; showLabels?: boolean }) {
-  const pts = useMemo(() => rows.map(r => ({ r, a: toNum(r[x]), b: toNum(r[y]), s: size ? toNum(r[size]) : 1 }))
-    .filter((p): p is { r: Row; a: number; b: number; s: number } => p.a !== null && p.b !== null && p.s !== null), [rows, x, y, size])
+/** Log-axis ticks: 1, 2 and 5 times a power of ten, thinned so labels keep `gap` pixels apart. */
+function logTicks(scale: d3.ScaleLogarithmic<number, number>, gap: number) {
+  const nice = scale.ticks(40).filter(t => { const m = t / 10 ** Math.floor(Math.log10(t)); return m === 1 || m === 2 || m === 5 })
+  const out: number[] = []
+  let last = -Infinity
+  for (const t of nice) { const p = scale(t); if (Math.abs(p - last) >= gap) { out.push(t); last = p } }
+  return out
+}
+
+function Scatter({ rows, x, y, size, accent, width, height, show, hide, labelField, showLabels, colorBy, groupColor, focus, refLines, xScale, yScale, xName, yName }: Shared & {
+  x: string; y: string; size?: string; labelField?: string; showLabels?: boolean
+  colorBy?: string; groupColor?: Map<string, string> | null; focus?: string | null; refLines?: ReferenceLine[]
+  xScale?: 'linear' | 'log'; yScale?: 'linear' | 'log'; xName?: string; yName?: string }) {
+  const logX = xScale === 'log', logY = yScale === 'log'
+  const pts = useMemo(() => rows.map(r => ({ r, a: toNum(r[x]), b: toNum(r[y]), s: size ? toNum(r[size]) : 1, g: colorBy ? String(r[colorBy] ?? '') : '' }))
+    .filter((p): p is { r: Row; a: number; b: number; s: number; g: string } =>
+      p.a !== null && p.b !== null && p.s !== null && (!logX || p.a > 0) && (!logY || p.b > 0)), [rows, x, y, size, colorBy, logX, logY])
   const [hot, setHot] = useState<number | null>(null)
   return (
     <Frame width={width} height={height} bottom={44}>
       {(w, h) => {
         if (!pts.length) return null
-        const xs = d3.scaleLinear().domain(d3.extent(pts, p => p.a) as [number, number]).nice().range([0, w])
-        const ys = d3.scaleLinear().domain(d3.extent(pts, p => p.b) as [number, number]).nice().range([h, 0])
-        const rs = d3.scaleSqrt().domain(d3.extent(pts, p => p.s) as [number, number]).range([3, Math.min(22, Math.max(10, w / 24))])
-        const yt = ys.ticks(5), xt = xs.ticks(Math.max(3, Math.floor(w / 80)))
+        const ext = (f: (p: { a: number; b: number }) => number) => d3.extent(pts, f) as [number, number]
+        const xs = (logX ? d3.scaleLog() : d3.scaleLinear()).domain(ext(p => p.a)).nice().range([0, w]) as d3.ScaleContinuousNumeric<number, number>
+        const ys = (logY ? d3.scaleLog() : d3.scaleLinear()).domain(ext(p => p.b)).nice().range([h, 0]) as d3.ScaleContinuousNumeric<number, number>
+        const rs = d3.scaleSqrt().domain(d3.extent(pts, p => p.s) as [number, number]).range([3, Math.min(40, Math.max(12, w / 14))])
+        const yt = logY ? logTicks(ys as d3.ScaleLogarithmic<number, number>, 28) : ys.ticks(5)
+        const xt = logX ? logTicks(xs as d3.ScaleLogarithmic<number, number>, 56) : xs.ticks(Math.max(3, Math.floor(w / 80)))
         const label = (r: Row) => labelField && r[labelField] != null ? String(r[labelField])
-          : String(Object.values(r).find(v => typeof v === 'string' && v.length < 40) ?? '')
+          : String(Object.values(r).find(v => typeof v === 'string' && v.length < 40 && v !== (colorBy ? r[colorBy] : undefined)) ?? '')
+        const fill = (g: string) => (groupColor && g ? groupColor.get(g) ?? accent : accent)
         // labels on: names beside the points, biggest bubbles first, overlapping ones skipped
         const tags: { x: number; y: number; t: string }[] = []
         if (showLabels) {
@@ -526,21 +612,50 @@ function Scatter({ rows, x, y, size, accent, width, height, show, hide, labelFie
             tags.push({ x: lx, y: ys(p.b), t })
           }
         }
+        // measures: a fixed value or the mean / median / mode of an axis, optionally tinting one side (a threshold band)
+        const measures = (refLines ?? []).map(r => {
+          const axis = r.axis === 'x' ? 'x' : 'y'
+          const v = refValue(r, pts.map(p => (axis === 'x' ? p.a : p.b)), axis === 'x' ? logX : logY)
+          if (v === null || !Number.isFinite(v) || (axis === 'x' ? logX : logY) && v <= 0) return null
+          const text = r.stat ? `${r.label ? r.label + ': ' : ''}${compact(v)}` : r.label || compact(v)
+          return { axis, v, text, shade: r.shade ?? null, pos: axis === 'x' ? xs(v) : ys(v) }
+        }).filter((m): m is NonNullable<typeof m> => !!m && m.pos >= -1 && m.pos <= (m.axis === 'x' ? w : h) + 1)
+        const drawn = size ? [...pts.keys()].sort((a, b) => pts[b].s - pts[a].s) : [...pts.keys()]      // big bubbles behind small ones
         return (
           <>
+            {measures.filter(m => m.shade).map((m, i) => (
+              <rect key={`s${i}`} fill={accent} fillOpacity={0.1} pointerEvents="none"
+                    {...(m.axis === 'y'
+                      ? { x: 0, width: w, y: m.shade === 'below' ? m.pos : 0, height: m.shade === 'below' ? h - m.pos : m.pos }
+                      : { y: 0, height: h, x: m.shade === 'below' ? 0 : m.pos, width: m.shade === 'below' ? m.pos : w - m.pos })} />
+            ))}
             <Grid ticks={yt} y={ys} w={w} />
             <g>{xt.map(t => <line key={t} y1={0} y2={h} x1={xs(t)} x2={xs(t)} stroke="currentColor" strokeOpacity={0.08} />)}</g>
-            <YAxis ticks={yt} y={ys} label={y} />
+            <YAxis ticks={yt} y={ys} label={yName ?? y} />
             <g fontSize={11} fill="currentColor" transform={`translate(0,${h + 16})`}>
               {xt.map(t => <text key={t} x={xs(t)} textAnchor="middle">{compact(t)}</text>)}
-              <text x={w} y={16} textAnchor="end">{trunc(size ? `${x}  ·  bubble size = ${size}` : x, 48)}</text>
+              <text x={w} y={16} textAnchor="end">{trunc(size ? `${xName ?? x}${logX ? ' (log)' : ''}  ·  bubble size = ${size}` : `${xName ?? x}${logX ? ' (log)' : ''}`, 60)}</text>
             </g>
-            {pts.map((p, i) => (
-              <circle key={i} cx={xs(p.a)} cy={ys(p.b)} r={size ? rs(p.s) : 4.5} fill={accent} fillOpacity={size ? 0.5 : 0.7}
-                      stroke={accent} strokeWidth={hot === i ? 2.5 : 1}
-                      onMouseMove={e => { setHot(i); show(e, label(p.r) || `${full(p.a)}, ${full(p.b)}`,
-                        [[x, full(p.a)], [y, full(p.b)], ...(size ? [[size, full(p.s)] as [string, string]] : [])]) }}
-                      onMouseLeave={() => { setHot(null); hide() }} />
+            {drawn.map(i => {
+              const p = pts[i], c = fill(p.g), dim = !!focus && !!colorBy && p.g !== focus
+              return (
+                <circle key={i} cx={xs(p.a)} cy={ys(p.b)} r={size ? rs(p.s) : 4.5} fill={c} fillOpacity={dim ? 0.08 : size ? 0.5 : 0.75}
+                        stroke={c} strokeOpacity={dim ? 0.2 : 1} strokeWidth={hot === i ? 2.5 : 1}
+                        onMouseMove={e => { setHot(i); show(e, label(p.r) || `${full(p.a)}, ${full(p.b)}`,
+                          [...(colorBy && p.g ? [[colorBy, p.g] as [string, string]] : []), [xName ?? x, full(p.a)], [yName ?? y, full(p.b)],
+                           ...(size ? [[size, full(p.s)] as [string, string]] : [])]) }}
+                        onMouseLeave={() => { setHot(null); hide() }} />
+              )
+            })}
+            {measures.map((m, i) => (
+              <g key={`m${i}`} pointerEvents="none">
+                {m.axis === 'y'
+                  ? <line x1={0} x2={w} y1={m.pos} y2={m.pos} stroke="currentColor" strokeWidth={1.4} strokeDasharray="5 4" strokeOpacity={0.75} />
+                  : <line y1={0} y2={h} x1={m.pos} x2={m.pos} stroke="currentColor" strokeWidth={1.4} strokeDasharray="5 4" strokeOpacity={0.75} />}
+                <text x={m.axis === 'y' ? w - 4 : m.pos + 5} y={m.axis === 'y' ? m.pos - 5 : 11} textAnchor={m.axis === 'y' ? 'end' : 'start'}
+                      fontSize={11.5} fontWeight={600} fill="var(--ink)"
+                      style={{ paintOrder: 'stroke', stroke: 'var(--card)', strokeWidth: 3, strokeLinejoin: 'round' }}>{m.text}</text>
+              </g>
             ))}
             {tags.length > 0 && (
               <g fontSize={10.5} fontWeight={600} fill="var(--ink)" pointerEvents="none" dominantBaseline="middle"
