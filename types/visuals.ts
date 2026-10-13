@@ -22,6 +22,10 @@ export const VIZ_NEEDS: Partial<Record<VizType, VizParam[]>> = {
   stacked: ['x', 'y', 'z'], heatmap: ['x', 'y', 'z'],
   scatter: ['x', 'y'], bubble: ['x', 'y', 'size'], histogram: ['y'],
 }
+/** Numeric x and y: log axes, measure lines on either axis, a summary card. */
+export const XY_VIZ: VizType[] = ['scatter', 'bubble']
+/** Visuals that can carry measure lines (mean / median / mode / fixed threshold). */
+export const REF_VIZ: VizType[] = ['bar', 'hbar', 'lollipop', 'scatter', 'bubble']
 export const isMapViz = (v: VizType) => (MAP_VIZ as readonly string[]).includes(v)
 /** Visuals with an on/off "Labels" switch (names + values drawn on the map / points instead of on hover only). */
 export const LABEL_TOGGLE_VIZ: VizType[] = ['map', 'map_heat', 'bubble_map', 'hexbin_map', 'scatter', 'bubble']
@@ -47,6 +51,10 @@ export interface DatasetCard {
   column_count?: number
   show_data?: boolean               // rows may be shown publicly on post pages
   updated_at?: string | null
+  pipeline?: 'batch' | 'stream'     // stream datasets back live posts
+  visibility?: 'public' | 'private'
+  can_publish_publicly?: boolean    // false: the dataset was only shared with me, so posts on it stay private
+  has_ingest_key?: boolean          // stream datasets (admin)
 }
 
 export interface DatasetColumn {
@@ -94,9 +102,13 @@ export interface SuggestResponse {
 /** What the upload page keeps in state and sends to POST /posts. */
 export interface ReferenceLineChoice {
   value?: number
-  stat?: 'mean' | 'median'
+  stat?: 'mean' | 'median' | 'mode'
   label: string
   mode?: 'line' | 'divider'
+  /** Scatter / bubble: the axis the line measures (default y). */
+  axis?: 'x' | 'y'
+  /** Scatter / bubble: tint everything below / above the line (a threshold band). */
+  shade?: 'below' | 'above' | null
 }
 
 /** Everything the publisher chooses for a post's visual (sent as `visual_params`, re-validated on the server). */
@@ -118,6 +130,11 @@ export interface VisualChoice extends VizParams {
   filter_default?: string[] | null
   /** Draw labels (name + value) on the map / points from the start; readers can switch them off and on. */
   show_labels?: boolean | null
+  /** Scatter / bubble: log axes (null = linear). */
+  x_scale?: 'linear' | 'log' | null
+  y_scale?: 'linear' | 'log' | null
+  /** Scatter / bubble: show a card with n, mean, median and mode of both axes. */
+  show_summary?: boolean | null
 }
 
 /** The `visual_params` of POST/PUT /posts for a choice. */
@@ -137,6 +154,7 @@ export function choiceFromSpec(datasetId: string, spec: any): VisualChoice | nul
     visual_type: spec.visual_type ?? null, title: spec.title ?? null, subtitle: spec.subtitle ?? null,
     y_label: spec.y_label ?? null, colors: spec.colors ?? null, reference_lines: spec.reference_lines ?? null,
     filter_default: spec.label_filter?.default ?? null, show_labels: spec.show_labels ?? null,
+    x_scale: spec.x_scale ?? null, y_scale: spec.y_scale ?? null, show_summary: spec.show_summary ?? null,
   }
 }
 

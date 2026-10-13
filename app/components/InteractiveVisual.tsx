@@ -89,6 +89,11 @@ export interface ChartSpec extends StoryOptions {
   reference_lines?: ReferenceLine[]
   /** Scatter / bubble: the column naming each point (tooltip title, point labels). */
   label_field?: string
+  /** Scatter / bubble: "log" axes for data that spans orders of magnitude. */
+  x_scale?: 'linear' | 'log'
+  y_scale?: 'linear' | 'log'
+  /** Scatter / bubble: a card with n, mean, median and mode of both axes. */
+  show_summary?: boolean
 }
 
 export interface MapSpec extends StoryOptions {
@@ -1316,7 +1321,8 @@ export default function InteractiveVisual({ spec, height = 520, className = '', 
           <div className="h-full px-2 pt-3 pb-1 sm:px-4">
             <D3Chart rows={chartRows ?? []} type={chartType} x={spec.x} y={field} z={spec.z} size={spec.size} accent={accent} fields={spec.fields}
                      colorBy={spec.color_by} colors={spec.colors} refLines={spec.reference_lines} yLabel={spec.y_label}
-                     labelField={spec.label_field} showLabels={canLabel && labelsOn} legendHost={bareOnPoster ? poster.legendHost : undefined} />
+                     labelField={spec.label_field} showLabels={canLabel && labelsOn} legendHost={bareOnPoster ? poster.legendHost : undefined}
+                     xScale={spec.x_scale} yScale={spec.y_scale} showSummary={spec.show_summary} />
           </div>
         )}
         {mapFc && !badData && view === 'visual' && spec.kind === 'map' && mapStyle === 'cartogram' && (

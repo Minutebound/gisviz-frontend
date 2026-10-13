@@ -1,11 +1,11 @@
 'use client'
 /**
  * The box right under the post's visual:
- *   Description   the publisher's text about the visual
- *   Data          the dataset's rows: only for readers the dataset's access level lets see them (public dataset
- *                 whose licence allows it, or a private one they own / it was shared with)
- * Readers without access to the rows get no Data tab: only the description. With only one of the two there are no
- * tabs, just that one under its heading. The data's source, licence, size and update date are in the side panel.
+ *   Description   the publisher's text about the visual: always shown
+ *   Data          the dataset's rows: a tab only for readers the dataset's access level lets see them (a public
+ *                 dataset whose licence allows it, or a private one they own / it was shared with)
+ * Readers without access to the rows see the description alone under its heading, no tabs. The data's source,
+ * licence, size and update date are in the side panel.
  */
 import React, { useState } from 'react'
 import { FileText, Lock, Table2 } from 'lucide-react'
@@ -13,13 +13,13 @@ import { DatasetTable } from '../InteractiveVisual'
 
 export default function PostData({ post }: { post: any }) {
   const ds = post.dataset
-  const hasDescription = !!post.description?.trim()
+  const description = (post.description || '').trim()
   const canSeeRows = !!ds?.show_data                  // decided by the server from the dataset's access level
-  const [tab, setTab] = useState<'description' | 'data'>(hasDescription ? 'description' : 'data')
-  if (!hasDescription && !canSeeRows) return null
+  const [tab, setTab] = useState<'description' | 'data'>('description')
 
-  const both = hasDescription && canSeeRows
-  const active = both ? tab : hasDescription ? 'description' : 'data'
+  // the Description is always there; the Data tab only for readers the dataset's access level lets see the rows
+  const both = canSeeRows
+  const active = both ? tab : 'description'
   const head = 'inline-flex h-9 items-center gap-1.5 border-b-2 px-1 text-[13px] font-semibold transition-colors'
   const tabBtn = (on: boolean) => `${head} ${on
     ? 'border-gisviz-accent text-gisviz-ink' : 'border-transparent text-gisviz-ink-soft hover:text-gisviz-ink'}`
@@ -46,12 +46,12 @@ export default function PostData({ post }: { post: any }) {
         </div>
       ) : (
         <h2 className="border-b border-gisviz-border px-4">
-          <span className={`${head} border-transparent text-gisviz-ink`}>{hasDescription ? descriptionLabel : dataLabel}</span>
+          <span className={`${head} border-transparent text-gisviz-ink`}>{descriptionLabel}</span>
         </h2>
       )}
       {active === 'description' ? (
         <div role={both ? 'tabpanel' : undefined} className="whitespace-pre-wrap px-5 py-4 text-[15px] leading-[1.75] text-gisviz-ink sm:px-6">
-          {post.description}
+          {description || <span className="text-gisviz-ink-soft">No description was added to this post.</span>}
         </div>
       ) : (
         <div role={both ? 'tabpanel' : undefined} className="h-[440px]"><DatasetTable datasetId={ds.dataset_id} /></div>

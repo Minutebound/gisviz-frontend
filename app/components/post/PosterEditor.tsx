@@ -7,11 +7,10 @@
  * Any block on the poster (title, visual, legend, filter, sources, logo) can be dragged, or clicked and nudged
  * with the arrow keys (Shift = bigger steps).
  *
- * Until the publisher changes something the value stays "auto": the server picks colour, texture and font from
- * the topic on publish (the preview shows that pick). Any change makes it the publisher's own design.
+ * Infographic overlays allow users to place custom PNG icons/labels directly on the canvas.
  */
-import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { AlignCenter, AlignLeft, ChevronDown, Loader2, Move, RotateCcw, Sparkles, Type } from 'lucide-react'
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
+import { AlignCenter, AlignLeft, ChevronDown, Loader2, Move, RotateCcw, Sparkles, Type, Image as ImageIcon } from 'lucide-react'
 import { gisvizApi } from '../../../connector/api'
 import { visualHeightFor } from '../../../lib/visualSpec'
 import VisualBackdrop, { type PosterSource } from '../visuals/VisualBackdrop'
@@ -21,6 +20,15 @@ import {
   BLOCK_NAMES, DEFAULT_DESIGN, FONTS, SWATCHES, TEXTURES, isHex, textureStyle, toDesign, useTitleFonts,
   type BlockId, type FontCode, type MapBase, type PosterChoice, type PosterDesign,
 } from '../../../lib/poster'
+
+export interface InfographicOverlay {
+  id: string;
+  imageUrl: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
 
 export interface PosterInputs {
   note?: string
@@ -62,18 +70,51 @@ function Pop({ label, icon, children, wide = false }: { label: string; icon?: Re
 }
 
 export default function PosterEditor({ value, onChange, inputs, spec, sources, datasetId, loading: specLoading }: {
-  value: PosterChoice                  // "auto" | "none" | the publisher's design
+  value: PosterChoice                  
   onChange: (v: PosterChoice) => void
-  inputs: PosterInputs                 // the form's details: title, categories, ... (the poster shows them, "auto" reads them)
-  spec?: VisualSpec | null             // the visual being built: in the middle of the poster
+  inputs: PosterInputs                 
+  spec?: VisualSpec | null             
   sources?: PosterSource[]
-  datasetId?: string | null            // the Data tab shows the whole dataset
-  loading?: boolean                    // the visual is being (re)built
+  datasetId?: string | null            
+  loading?: boolean                    
 }) {
   const regions = useRegions()
   const categories = useCategories()
   const accent = inputs.theme_color || '#06ba24'
   useTitleFonts(ALL_FONTS)
+
+  /* Infographic overlays and configuration logic */
+  const editorRef = useRef<HTMLDivElement>(null)
+  const [overlays, setOverlays] = useState<InfographicOverlay[]>([])
+  const [draggingOverlayId, setDraggingOverlayId] = useState<string | null>(null)
+
+  const handlePngUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const imageUrl = URL.createObjectURL(file);
+    const newOverlay: InfographicOverlay = {
+      id: Math.random().toString(36).substr(2, 9),
+      imageUrl,
+      x: 50, y: 50, width: 80, height: 80
+    };
+    setOverlays(prev => [...prev, newOverlay]);
+  };
+
+  const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    if (!draggingOverlayId || !editorRef.current) return;
+    const rect = editorRef.current.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+
+    setOverlays(prev => prev.map(ov => 
+      ov.id === draggingOverlayId ? { ...ov, x, y } : ov
+    ));
+  }, [draggingOverlayId]);
+
+  const handlePointerUp = useCallback(() => {
+    setDraggingOverlayId(null);
+  }, []);
 
   /* "auto": ask the server what it would pick for this topic (debounced while the publisher types) */
   const [auto, setAuto] = useState<PosterDesign | null>(null)
@@ -89,7 +130,7 @@ export default function PosterEditor({ value, onChange, inputs, spec, sources, d
         .finally(() => setPicking(false))
     }, 600)
     return () => clearTimeout(t)
-  }, [value, topicKey])   // eslint-disable-line react-hooks/exhaustive-deps
+  }, [value, topicKey])
 
   const design: PosterDesign | null = value === 'none' ? null
     : value === 'auto' ? (auto ?? DEFAULT_DESIGN) : value
@@ -101,7 +142,7 @@ export default function PosterEditor({ value, onChange, inputs, spec, sources, d
     selected,
     onSelect: setSelected,
     onMove: (b: BlockId, pos: { x: number; y: number }) => set({ layout: { ...(design.layout ?? {}), [b]: pos } }),
-  } : undefined, [design, selected])   // eslint-disable-line react-hooks/exhaustive-deps
+  } : undefined, [design, selected])
   const moved = Object.keys(design?.layout ?? {}) as BlockId[]
   const resetBlock = (b: BlockId) => { const l = { ...(design?.layout ?? {}) }; delete l[b]; set({ layout: l }) }
 
@@ -182,6 +223,20 @@ export default function PosterEditor({ value, onChange, inputs, spec, sources, d
                 </div>
               </Pop>
             )}
+            
+            {/* Infographic Overlay Tools */}
+            <Pop label="Infographics" icon={<ImageIcon size={13} />} wide>
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center gap-2 text-[12px] text-gisviz-ink-soft">
+                  <input type="file" accept="image/png" id="upload-overlay" className="hidden" onChange={handlePngUpload} />
+                  <label htmlFor="upload-overlay" className="cursor-pointer inline-flex items-center gap-1.5 rounded-md border border-gisviz-accent px-3 py-1.5 text-gisviz-accent font-medium hover:bg-gisviz-accent/10 transition-colors">
+                    <ImageIcon size={14} /> Upload PNG Overlay
+                  </label>
+                </div>
+                <p className="text-[11px] text-gisviz-ink-soft/80">Uploaded images can be dragged anywhere on the canvas below.</p>
+              </div>
+            </Pop>
+
             {value === 'auto' ? (
               <span className="inline-flex items-center gap-1 px-1 text-[11.5px] text-gisviz-ink-soft" title="Colour, texture and font picked from the topic: change anything to make it yours">
                 {picking ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />} Topic pick
@@ -202,21 +257,53 @@ export default function PosterEditor({ value, onChange, inputs, spec, sources, d
         )}
       </div>
 
-      {/* the poster with the live visual (its controls appear right above it) */}
-      {design ? (
-        <VisualBackdrop regionCode={inputs.region} regions={regions} design={design} accent={accent} edit={edit} toolsAt="top"
-                        eyebrow={categories.find(c => inputs.category_ids.includes(c.category_id))?.label}
-                        title={inputs.title || (spec as any)?.title || 'Your title'} subtitle={(spec as any)?.subtitle}
-                        sources={sources} note={inputs.note}
-                        renderVisual={spec ? (w => <InteractiveVisual spec={spec} datasetId={datasetId}
-                                                                     height={Math.min(620, visualHeightFor(spec, w))} />) : undefined}>
-          {placeholder}
-        </VisualBackdrop>
-      ) : spec ? (
-        <InteractiveVisual spec={{ ...spec, title: inputs.title || spec.title }} datasetId={datasetId} height={460} />
-      ) : (
-        <div className="rounded-[16px] border border-gisviz-border bg-gisviz-card p-4 text-gisviz-ink-soft">{placeholder}</div>
-      )}
+      {/* the poster with the live visual and overlays */}
+      <div 
+        ref={editorRef} 
+        className="relative overflow-hidden w-full h-full"
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerLeave={handlePointerUp}
+      >
+        {design ? (
+          <VisualBackdrop regionCode={inputs.region} regions={regions} design={design} accent={accent} edit={edit} toolsAt="top"
+                          eyebrow={categories.find(c => inputs.category_ids.includes(c.category_id))?.label}
+                          title={inputs.title || (spec as any)?.title || 'Your title'} subtitle={(spec as any)?.subtitle}
+                          sources={sources} note={inputs.note}
+                          renderVisual={spec ? (w => <InteractiveVisual spec={spec} datasetId={datasetId}
+                                                                      height={Math.min(620, visualHeightFor(spec, w))} />) : undefined}>
+            {placeholder}
+          </VisualBackdrop>
+        ) : spec ? (
+          <InteractiveVisual spec={{ ...spec, title: inputs.title || spec.title }} datasetId={datasetId} height={460} />
+        ) : (
+          <div className="rounded-[16px] border border-gisviz-border bg-gisviz-card p-4 text-gisviz-ink-soft">{placeholder}</div>
+        )}
+
+        {/* Infographic PNG Render Layer */}
+        {overlays.map(overlay => (
+          <img 
+            key={overlay.id}
+            src={overlay.imageUrl}
+            onPointerDown={(e) => {
+              e.preventDefault();
+              setDraggingOverlayId(overlay.id);
+            }}
+            style={{
+              position: 'absolute',
+              left: `${overlay.x}%`,
+              top: `${overlay.y}%`,
+              width: `${overlay.width}px`,
+              height: `${overlay.height}px`,
+              transform: 'translate(-50%, -50%)',
+              cursor: draggingOverlayId === overlay.id ? 'grabbing' : 'grab',
+              zIndex: 50
+            }}
+            alt="infographic overlay"
+            className="pointer-events-auto shadow-sm"
+          />
+        ))}
+      </div>
     </div>
   )
 }

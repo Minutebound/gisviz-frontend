@@ -231,7 +231,7 @@ export default function TopNav() {
               <div className="py-2">
                 {isAuthenticated ? (
                   <>
-                    {canPublish(user) && <Link href="/post/upload" onClick={() => setMobileOpen(false)} className={mobileItemClass}>Publish map</Link>}
+                    {canPublish(user) && <Link href="/post/upload" onClick={() => setMobileOpen(false)} className={mobileItemClass}>Publish Visual</Link>}
                     <Link href={profileHref} onClick={() => setMobileOpen(false)} className={mobileItemClass}>Profile</Link>
                     <Link href="/settings" onClick={() => setMobileOpen(false)} className={mobileItemClass}>Settings</Link>
                     {(user?.role_name === 'admin' || user?.role === 'admin' || user?.is_admin || user?.is_superuser) && (

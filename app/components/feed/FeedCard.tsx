@@ -90,12 +90,12 @@ function Thumb({ post, className }: { post: Post; className: string }) {
   const [broken, setBroken] = React.useState(false)
   React.useEffect(() => setBroken(false), [src])
   if (!src || broken) return <VizFallback post={post} className={className} />
-  // the poster image has a margin around the poster: zoomed in 10% by default, 10% more on hover
+  // the poster image has a margin around the poster: zoomed in 32% by default (20% more than before), 10% more on hover
   return (
     <div className={`overflow-hidden ${className}`}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={src} alt="" aria-hidden onError={() => setBroken(true)}
-           className="h-full w-full scale-[1.1] object-cover transition-transform duration-500 group-hover:scale-[1.2]" loading="lazy" />
+           className="h-full w-full scale-[1.32] object-cover transition-transform duration-500 group-hover:scale-[1.42]" loading="lazy" />
     </div>
   )
 }
