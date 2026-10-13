@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Lock, Loader2, Save } from 'lucide-react'
-import { gisvizApi } from '../../services/api'
+import { gisvizApi } from '../../connector/api'
 
 export default function ResetPasswordPage() {
   const router = useRouter()

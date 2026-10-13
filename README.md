@@ -230,7 +230,7 @@ Wraps the whole app. Provides:
 - `logout()` — clears JWT and handle from localStorage
 - `refreshProfile()` — re-fetches `/users/me` and updates context
 
-### `services/api.ts`
+### `connector/api.ts`
 
 All HTTP calls are centralised here. Uses Axios with:
 - Base URL: `NEXT_PUBLIC_API_URL/api/v1`

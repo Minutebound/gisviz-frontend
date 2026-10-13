@@ -30,7 +30,7 @@
     "**/*.mts",
     "**/*.ts",
     "**/*.tsx"
-  ],
+, "app/components/post/DataVisualPicker.tszz"  ],
   "exclude": [
     "node_modules"
   ]

@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react'
 import { X, LifeBuoy, Loader2, Send } from 'lucide-react'
-import { gisvizApi } from '../../services/api'
+import { gisvizApi } from '../../connector/api'
 
 type TicketCategory =
   | 'bug'
