@@ -199,6 +199,12 @@ body > *:not(header):not(.fixed) {
 #nprogress .peg {
   z-index: 9999 !important;
 }
+/* the banner picture settles in once when the feed loads (the one moment of motion on the banner) */
+@media (prefers-reduced-motion: no-preference) {
+  .gv-banner-art { animation: gv-banner-in 900ms cubic-bezier(.2,.7,.2,1) both; }
+}
+@keyframes gv-banner-in { from { opacity: 0; transform: translateX(28px) scale(1.03); } to { opacity: 1; transform: none; } }
+
 /* ─────────────────────────────────────────────────────────────
    Category banner infographic (app/components/feed/CategoryBanner.tsx)
 ───────────────────────────────────────────────────────────── */

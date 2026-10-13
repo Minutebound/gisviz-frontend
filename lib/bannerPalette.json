@@ -1,0 +1,121 @@
+{
+  "climate": {
+    "scene": "warming",
+    "bg": "#2e1a0d",
+    "bg2": "#452510",
+    "ac": "#f97316",
+    "hi": "#fae8db"
+  },
+  "demographics": {
+    "scene": "population",
+    "bg": "#1e0d2e",
+    "bg2": "#2b1045",
+    "ac": "#a855f7",
+    "hi": "#ebdbfa"
+  },
+  "economy": {
+    "scene": "markets",
+    "bg": "#0e0f2d",
+    "bg2": "#111343",
+    "ac": "#6366f1",
+    "hi": "#dbdcfa"
+  },
+  "environment": {
+    "scene": "landscape",
+    "bg": "#102a1a",
+    "bg2": "#153f25",
+    "ac": "#22c55e",
+    "hi": "#dbfae7"
+  },
+  "infrastructure": {
+    "scene": "energy",
+    "bg": "#0d192e",
+    "bg2": "#102445",
+    "ac": "#3b82f6",
+    "hi": "#dbe7fa"
+  },
+  "scene-city": {
+    "scene": "city",
+    "bg": "#2a111a",
+    "bg2": "#3e1624",
+    "ac": "#c2255c",
+    "hi": "#fadbe6"
+  },
+  "scene-energy": {
+    "scene": "energy",
+    "bg": "#0f1e2b",
+    "bg2": "#132b41",
+    "ac": "#1971c2",
+    "hi": "#dbebfa"
+  },
+  "scene-globe": {
+    "scene": "globe",
+    "bg": "#0d2e12",
+    "bg2": "#104518",
+    "ac": "#06ba24",
+    "hi": "#dbfae0"
+  },
+  "scene-landscape": {
+    "scene": "landscape",
+    "bg": "#132717",
+    "bg2": "#1a3a20",
+    "ac": "#2f9e44",
+    "hi": "#dbfae1"
+  },
+  "scene-learning": {
+    "scene": "learning",
+    "bg": "#0e2d24",
+    "bg2": "#114434",
+    "ac": "#0ca678",
+    "hi": "#dbfaf1"
+  },
+  "scene-markets": {
+    "scene": "markets",
+    "bg": "#2a2010",
+    "bg2": "#3f2e15",
+    "ac": "#b7791f",
+    "hi": "#faeddb"
+  },
+  "scene-population": {
+    "scene": "population",
+    "bg": "#29111a",
+    "bg2": "#3e1624",
+    "ac": "#d6336c",
+    "hi": "#fadbe6"
+  },
+  "scene-transport": {
+    "scene": "transport",
+    "bg": "#160f2b",
+    "bg2": "#1f1341",
+    "ac": "#7048e8",
+    "hi": "#e3dbfa"
+  },
+  "scene-warming": {
+    "scene": "warming",
+    "bg": "#2e180d",
+    "bg2": "#452210",
+    "ac": "#e8590c",
+    "hi": "#fae6db"
+  },
+  "scene-water": {
+    "scene": "water",
+    "bg": "#0f1e2b",
+    "bg2": "#132b41",
+    "ac": "#1c7ed6",
+    "hi": "#dbebfa"
+  },
+  "transport": {
+    "scene": "transport",
+    "bg": "#0e2d22",
+    "bg2": "#114332",
+    "ac": "#10b981",
+    "hi": "#dbfaf0"
+  },
+  "urban-planning": {
+    "scene": "city",
+    "bg": "#2e0d13",
+    "bg2": "#441019",
+    "ac": "#f43f5e",
+    "hi": "#fadbe1"
+  }
+}

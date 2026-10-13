@@ -38,6 +38,21 @@ export interface Category {
   description: string
   theme_color: string // #rrggbb from the DB (site accent when unset)
   sort_order?: number
+  /** The feed banner the server picked for the category's words (backend banner_service). */
+  banner?: CategoryBannerInfo | null
+}
+
+/** The scenes a category banner can show (backend banner_service.SCENES). */
+export type BannerScene =
+  | 'warming' | 'landscape' | 'water' | 'markets' | 'transport'
+  | 'energy' | 'city' | 'population' | 'learning' | 'globe'
+
+export interface CategoryBannerInfo {
+  version?: number
+  topic?: string
+  scene: BannerScene
+  label?: string
+  color?: string
 }
 
 
