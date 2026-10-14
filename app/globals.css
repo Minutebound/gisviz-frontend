@@ -46,6 +46,11 @@ html.gv-fullscreen .gv-site-footer { visibility: hidden; }
   --font-display:   var(--font-space-grotesk),   ui-sans-serif, system-ui, sans-serif;
   --font-mono:      var(--font-jetbrains-mono),  ui-monospace, SFMono-Regular, monospace;
   --font-condensed: var(--font-barlow-condensed), ui-monospace, monospace;
+  /* Logo: "gisviz" in a calligraphic serif italic, the small "beta" in mono italic (loaded in app/layout.tsx) */
+  --font-logo:      'EB Garamond', 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+  --font-logo-tag:  'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+  --color-gisviz-logo:     #fd5c19;
+  --color-gisviz-logo-tag: #5d7072;
 }
 
 /* ─────────────────────────────────────────────────────────────

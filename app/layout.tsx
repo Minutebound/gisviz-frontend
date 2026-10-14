@@ -1,4 +1,6 @@
 import './globals.css'
+import '@fontsource/eb-garamond/600-italic.css'      // logo: "gisviz"
+import '@fontsource/jetbrains-mono/500-italic.css'   // logo: "beta"
 import { Suspense } from 'react'
 import { AuthProvider } from '../context/AuthContext'
 import TopNav from './components/nav/TopNav'

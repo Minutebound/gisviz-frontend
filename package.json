@@ -11,6 +11,8 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@fontsource/eb-garamond": "^5.3.0",
+    "@fontsource/jetbrains-mono": "^5.3.0",
     "@protomaps/basemaps": "^5.7.2",
     "@tanstack/react-virtual": "^3.11.2",
     "axios": "^1.18.0",

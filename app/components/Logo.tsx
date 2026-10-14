@@ -2,33 +2,29 @@ import React from 'react'
 
 interface LogoProps {
   className?: string
-  /** Kept so existing callers keep working; the size now comes from `height`. */
+  /** Size of "gisviz"; "beta" is set relative to it. Default 38px. */
   textClassName?: string
   scale?: number
-  /** Height of the wordmark in px (width follows the picture's 1078 x 321 shape). */
-  height?: number
 }
 
 /**
- * The gisviz wordmark: orange calligraphic italic "gisviz" with a small grey "beta".
- * It is a picture (public/gisviz-wordmark.png, transparent, drawn at 2x) because that lettering is not
- * in the site's font list (Instrument Sans, Space Grotesk, JetBrains Mono, Barlow Condensed).
+ * The gisviz wordmark, set in text: orange calligraphic serif italic "gisviz" (--font-logo, EB Garamond)
+ * with a small, wide-spaced grey mono italic "beta" (--font-logo-tag, JetBrains Mono).
+ * Fonts and colours are the tokens in app/globals.css; the font files load in app/layout.tsx.
  */
-export default function Logo({ className = '', scale = 1, height = 40 }: LogoProps) {
+export default function Logo({ className = '', textClassName = 'text-[38px]', scale = 1 }: LogoProps) {
   return (
     <span
+      aria-label="gisviz beta, home"
       style={{ transform: `scale(${scale})`, transformOrigin: 'left center' }}
-      className={`group inline-flex items-center transition-opacity hover:opacity-80 ${className}`}
+      className={`group inline-flex items-baseline gap-[0.22em] whitespace-nowrap transition-opacity hover:opacity-80 ${textClassName} ${className}`}
     >
-      <img
-        src="/gisviz-wordmark.png"
-        alt="gisviz beta, home"
-        width={Math.round((height * 1078) / 321)}
-        height={height}
-        draggable={false}
-        style={{ height, width: 'auto' }}
-        className="block select-none"
-      />
+      <span aria-hidden className="font-logo italic font-semibold leading-none tracking-[-0.01em] text-gisviz-logo pb-[0.08em]">
+        gisviz
+      </span>
+      <span aria-hidden className="font-logo-tag italic font-medium text-[0.46em] leading-none tracking-[0.22em] text-gisviz-logo-tag">
+        beta
+      </span>
     </span>
   )
 }
