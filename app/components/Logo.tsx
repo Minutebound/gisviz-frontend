@@ -2,31 +2,33 @@ import React from 'react'
 
 interface LogoProps {
   className?: string
+  /** Kept so existing callers keep working; the size now comes from `height`. */
   textClassName?: string
   scale?: number
+  /** Height of the wordmark in px (width follows the picture's 1078 x 321 shape). */
+  height?: number
 }
 
-export default function Logo({
-  className = "",
-  textClassName = "text-[36px]",
-  scale = 1,
-}: LogoProps) {
+/**
+ * The gisviz wordmark: orange calligraphic italic "gisviz" with a small grey "beta".
+ * It is a picture (public/gisviz-wordmark.png, transparent, drawn at 2x) because that lettering is not
+ * in the site's font list (Instrument Sans, Space Grotesk, JetBrains Mono, Barlow Condensed).
+ */
+export default function Logo({ className = '', scale = 1, height = 40 }: LogoProps) {
   return (
     <span
-      aria-label="gisviz home"
       style={{ transform: `scale(${scale})`, transformOrigin: 'left center' }}
-      className={`group flex items-center transition-opacity hover:opacity-80 ${className}`}
+      className={`group inline-flex items-center transition-opacity hover:opacity-80 ${className}`}
     >
-      
-      <div style={{ fontFamily: '"Space Grotesk", ui-monospace, monospace' }} className={`text-gisviz-accent text-[24px] font-semibold ${textClassName}`}>
-        <span>GISVIZ</span>
-        <span
-          className="italic rounded-md bg-gisviz-infos ml-1 px-[4px] py-[3px] text-[8px] bg-gisviz-ink-soft/20 font-medium leading-none tracking-[0.1em] text-gisviz-ink"
-          style={{ fontFamily: '"IBM Plex Mono", ui-monospace, monospace' }}
-        >
-          beta
-        </span>
-      </div>
+      <img
+        src="/gisviz-wordmark.png"
+        alt="gisviz beta, home"
+        width={Math.round((height * 1078) / 321)}
+        height={height}
+        draggable={false}
+        style={{ height, width: 'auto' }}
+        className="block select-none"
+      />
     </span>
   )
 }
