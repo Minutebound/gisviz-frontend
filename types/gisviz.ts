@@ -38,6 +38,21 @@ export interface Category {
   description: string
   theme_color: string // #rrggbb from the DB (site accent when unset)
   sort_order?: number
+  /** The feed banner the server picked for the category's words (backend banner_service). */
+  banner?: CategoryBannerInfo | null
+}
+
+/** The scenes a category banner can show (backend banner_service.SCENES). */
+export type BannerScene =
+  | 'warming' | 'landscape' | 'water' | 'markets' | 'transport'
+  | 'energy' | 'city' | 'population' | 'learning' | 'globe'
+
+export interface CategoryBannerInfo {
+  version?: number
+  topic?: string
+  scene: BannerScene
+  label?: string
+  color?: string
 }
 
 
@@ -77,4 +92,36 @@ export function filtersFromParams(searchParams: URLSearchParams): FeedFilters {
     region: searchParams.get('region') ?? '',
     chart_type: searchParams.get('chart_type') ?? '',
   }
+}
+
+// ── Ask this map (POST /posts/{id}/ask) ──────────────────────────────────────
+/** What the chat can see: shown as a chip in the header of AskThisMap. */
+export interface AskGrounding {
+  layerCount: number
+  featureCount: number
+  attributeCount: number
+}
+
+export interface AskCitation {
+  kind: 'layer' | 'attr'
+  name: string
+  color?: string
+}
+
+/** A small table answer: first column is the label, the rest are values per row. */
+export interface AskResult {
+  columns: string[]
+  rows: { label: string; values: (string | number)[]; weight?: number }[]
+  footnote?: string
+  highlightFeatureIds?: string[]
+}
+
+export interface AskMessage {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+  pending?: boolean
+  error?: string
+  result?: AskResult
+  citations?: AskCitation[]
 }
